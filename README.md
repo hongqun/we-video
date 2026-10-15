@@ -6,11 +6,13 @@
 
 ![We-Video 视频创作工作台](<./We-Video%20AI%E8%A7%86%E9%A2%91%E5%88%9B%E4%BD%9C%E5%B7%A5%E4%BD%9C%E5%8F%B0.png>)
 
-We-Video 是一个基于解说类视频创作工作台。它能够以低的成本（大约0.1元/分钟）高效生产视频。
+We-Video 是一个解说类视频创作工作台。它能够以低的成本（大约0.1元/分钟）高效生产视频。
 
 We-Video把文章或资料自动转成口播稿，然后进行配音、字幕和视觉规划，最终渲染成 MP4文件。
 
-We-Video按步骤保留中间成果，便于人工检查和修改：
+<video controls width="100%" src="https://raw.githubusercontent.com/hongqun/we-video/main/We-Video解说类视频的低成本方案.mp4"></video>
+
+按步骤保留中间成果，便于人工检查和修改：
 
 1. **文稿**：输入文章或资料，生成或编辑口播稿。
 2. **配音**：选择音色并生成音频，审核后继续。

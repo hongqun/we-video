@@ -1,0 +1,23 @@
+[Unit]
+Description=Video workspace
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/talk-video/app
+EnvironmentFile=/opt/talk-video/app/.env
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

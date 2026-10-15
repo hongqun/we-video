@@ -1,0 +1,33 @@
+{
+  "deepseek": {
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "base_url": "https://api.deepseek.com",
+    "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
+    "default_model": "deepseek-v4-flash"
+  },
+  "bailian": {
+    "api_key_env": "DASHSCOPE_API_KEY",
+    "workspace_id": "YOUR_WORKSPACE_ID",
+    "base_http_api_url": "https://{workspace_id}.cn-beijing.maas.aliyuncs.com/api/v1",
+    "base_websocket_api_url": "wss://{workspace_id}.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference",
+    "model": "cosyvoice-v3-flash",
+    "models": ["cosyvoice-v3-flash"],
+    "default_voice": "longanhuan_v3",
+    "voices": [
+      {"id": "longanhuan_v3", "name": "龙安欢", "description": "欢脱元气女", "models": ["cosyvoice-v3-flash"]},
+      {"id": "longanyang", "name": "龙安洋", "description": "阳光大男孩", "models": ["cosyvoice-v3-flash"]},
+      {"id": "longanyun_v3", "name": "龙安昀", "description": "居家暖男", "models": ["cosyvoice-v3-flash"]},
+      {"id": "longanwen_v3", "name": "龙安温", "description": "优雅知性女", "models": ["cosyvoice-v3-flash"]},
+      {"id": "longanli_v3", "name": "龙安莉", "description": "利落从容女", "models": ["cosyvoice-v3-flash"]},
+      {"id": "longanlang_v3", "name": "龙安朗", "description": "清爽利落男", "models": ["cosyvoice-v3-flash"]}
+    ],
+    "sample_rate": 24000,
+    "volume": 50,
+    "rate": 0.95,
+    "pitch": 1.0,
+    "instruction": "",
+    "seed": 0,
+    "language_hints": ["zh"],
+    "enable_aigc_tag": false
+  }
+}

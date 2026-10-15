@@ -1,0 +1,17 @@
+.env
+pipeline.config.json
+node_modules/
+.next/
+out/
+.remotion/
+.mcp-cache/
+*.tsbuildinfo
+/skills/
+/.agents/skills/
+/DEPLOYMENT_UBUNTU.md
+jobs/
+draft/
+data/
+public/ai_agent.wav
+public/profile-assets/
+.DS_Store

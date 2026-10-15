@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 286 64" fill="none">
+  <rect x="4" y="4" width="56" height="56" rx="17" fill="#10231B"/>
+  <path d="M17 25v-7h8M47 25v-7h-8M17 39v7h8M47 39v7h-8" stroke="#B8F34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m27 23 15 9-15 9V23Z" fill="#20C94D"/>
+  <path d="M22 51h20" stroke="#B8F34A" stroke-width="2" stroke-linecap="round"/>
+  <text x="73" y="42" fill="#10231B" font-family="Inter, 'Avenir Next', Arial, sans-serif" font-size="28" font-weight="650" letter-spacing="-1.2">We</text>
+  <circle cx="120" cy="31" r="2.6" fill="#20C94D"/>
+  <text x="128" y="42" fill="#176D3A" font-family="Inter, 'Avenir Next', Arial, sans-serif" font-size="28" font-weight="600" letter-spacing="-0.8">Video</text>
+</svg>

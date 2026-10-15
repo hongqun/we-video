@@ -1,0 +1,8 @@
+[
+  {"id":"ip/opening-stage","label":"IP 动态开场舞台","description":"固定首镜头，消费通用 content。","category":"presenter","requiresMedia":false,"renderer":"opening-stage","minDurationMs":1800,"adapted":true,"rollRole":"a-roll"},
+  {"id":"rve/text-reveal","label":"揭示文字","description":"逐步揭示核心文字。","category":"text","requiresMedia":false,"renderer":"text-reveal","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},
+  {"id":"rve/visual-image","label":"视觉要求图片","description":"按口播时间揭示人工审核配图。","category":"media","requiresMedia":true,"resourceType":"image","renderer":"visual-image","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},
+  {"id":"rve/text-highlight","label":"文字重点标注","description":"按口播锚点依次高亮关键词。","category":"content","requiresMedia":false,"renderer":"text-highlight","minDurationMs":2200,"adapted":true,"rollRole":"b-roll"},
+  {"id":"rve/generic-content","label":"通用内容卡","description":"承载主标题、副标题、正文和关键词。","category":"content","requiresMedia":false,"renderer":"generic-content","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},
+  {"id":"ip/closing-stage","label":"IP 动态结论舞台","description":"固定尾镜头，消费通用 content。","category":"presenter","requiresMedia":false,"renderer":"closing-stage","minDurationMs":1800,"adapted":true,"rollRole":"a-roll"}
+]

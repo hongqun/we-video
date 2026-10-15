@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../we-article/data/local/topics"
+		},
+		{
+			"path": "data/local/content"
+		}
+	],
+	"settings": {
+		"stm32cube-ide-clangd.path": "cube"
+	}
+}

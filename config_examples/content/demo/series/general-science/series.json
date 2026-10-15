@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "configVersion": "1",
+  "id": "general-science",
+  "title": "通用知识科普",
+  "description": "用准确、清晰、易懂的方式讲解科学与日常知识。",
+  "displayLabel": "知识科普",
+  "defaultTextModel": "deepseek-v4-flash",
+  "kind": "source",
+  "sourceLanguage": "zh",
+  "outputLanguage": "zh-CN",
+  "narration": {
+    "minSeconds": 60,
+    "targetSeconds": 75,
+    "maxSeconds": 90,
+    "hardMaxSeconds": 100,
+    "minScenes": 7,
+    "maxScenes": 12,
+    "hardMaxScenes": 14,
+    "cjkCharactersPerSecond": 5.3
+  }
+}

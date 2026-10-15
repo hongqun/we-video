@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="700" viewBox="0 0 1600 700" fill="none">
+  <defs>
+    <filter id="shadow" x="625" y="52" width="915" height="604" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="16"/>
+      <feGaussianBlur stdDeviation="18"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix values="0 0 0 0 0.063 0 0 0 0 0.137 0 0 0 0 0.106 0 0 0 0.14 0"/>
+      <feBlend in2="BackgroundImageFix" result="effect1_dropShadow"/>
+      <feBlend in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="700" rx="28" fill="#F4F8F1"/>
+  <circle cx="552" cy="84" r="214" fill="#E7F1E5"/>
+  <circle cx="1492" cy="646" r="224" fill="#E6F1E3"/>
+
+  <g>
+    <rect x="78" y="69" width="48" height="48" rx="15" fill="#10231B"/>
+    <path d="M91 88v-6h7M113 88v-6h-7M91 100v6h7M113 100v6h-7" stroke="#B8F34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m100 86 13 8-13 8V86Z" fill="#20C94D"/>
+    <path d="M95 110h17" stroke="#B8F34A" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="140" y="103" fill="#10231B" font-family="Inter, 'Avenir Next', Arial, sans-serif" font-size="30" font-weight="650" letter-spacing="-1.2">We</text>
+    <circle cx="190" cy="91" r="2.7" fill="#20C94D"/>
+    <text x="199" y="103" fill="#176D3A" font-family="Inter, 'Avenir Next', Arial, sans-serif" font-size="30" font-weight="600" letter-spacing="-0.8">Video</text>
+  </g>
+
+  <text x="80" y="209" fill="#10231B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700" letter-spacing="3">解说类视频创作工作台</text>
+  <text x="78" y="290" fill="#10231B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="48" font-weight="750" letter-spacing="-2">低成本</text>
+  <text x="80" y="351" fill="#176D3A" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="34" font-weight="650" letter-spacing="-1">高效生产视频</text>
+  <path d="M80 372h266" stroke="#20C94D" stroke-width="4" stroke-linecap="round"/>
+  <text x="80" y="421" fill="#60736B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="20">约 0.1 元/分钟，将文章和资料快速转成视频</text>
+  <text x="80" y="453" fill="#60736B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="20">口播、配音、字幕到画面规划，审阅后生成 MP4。</text>
+
+  <g font-family="PingFang SC, 'Microsoft YaHei', sans-serif">
+    <rect x="80" y="510" width="115" height="48" rx="14" fill="#E5F3E4"/>
+    <circle cx="102" cy="534" r="12" fill="#176D3A"/>
+    <path d="M100 527h5v8h-5zM100 538h5" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+    <text x="121" y="540" fill="#10231B" font-size="15" font-weight="650">文稿</text>
+    <path d="M203 534h17" stroke="#9BAD9F" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="m217 530 5 4-5 4" stroke="#9BAD9F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="229" y="510" width="115" height="48" rx="14" fill="#E5F3E4"/>
+    <circle cx="251" cy="534" r="12" fill="#176D3A"/>
+    <path d="M248 529v10M253 527v14M258 530v8" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="270" y="540" fill="#10231B" font-size="15" font-weight="650">配音</text>
+    <path d="M352 534h17" stroke="#9BAD9F" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="m366 530 5 4-5 4" stroke="#9BAD9F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="378" y="510" width="132" height="48" rx="14" fill="#E5F3E4"/>
+    <circle cx="400" cy="534" r="12" fill="#176D3A"/>
+    <rect x="394" y="528" width="5" height="5" rx="1" fill="#fff"/>
+    <rect x="401" y="528" width="5" height="5" rx="1" fill="#B8F34A"/>
+    <rect x="394" y="535" width="5" height="5" rx="1" fill="#B8F34A"/>
+    <rect x="401" y="535" width="5" height="5" rx="1" fill="#fff"/>
+    <text x="419" y="540" fill="#10231B" font-size="15" font-weight="650">视觉规划</text>
+    <path d="M518 534h17" stroke="#9BAD9F" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="m532 530 5 4-5 4" stroke="#9BAD9F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="544" y="510" width="88" height="48" rx="14" fill="#10231B"/>
+    <circle cx="566" cy="534" r="12" fill="#B8F34A"/>
+    <path d="m564 528 8 6-8 6v-12Z" fill="#10231B"/>
+    <text x="584" y="540" fill="#fff" font-size="15" font-weight="650">渲染</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="663" y="88" width="837" height="520" rx="24" fill="#fff"/>
+    <path d="M663 112a24 24 0 0 1 24-24h789a24 24 0 0 1 24 24v47H663v-47Z" fill="#FBFCFA"/>
+    <path d="M663 159h837" stroke="#E7EEE7"/>
+    <circle cx="692" cy="123" r="5" fill="#D5E2D7"/>
+    <circle cx="709" cy="123" r="5" fill="#D5E2D7"/>
+    <circle cx="726" cy="123" r="5" fill="#D5E2D7"/>
+    <text x="753" y="129" fill="#26382F" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="15" font-weight="650">视频工作台</text>
+    <rect x="1377" y="108" width="94" height="30" rx="15" fill="#EAF6E8"/>
+    <circle cx="1394" cy="123" r="4" fill="#20C94D"/>
+    <text x="1406" y="128" fill="#176D3A" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="12" font-weight="650">草稿已保存</text>
+
+    <rect x="685" y="181" width="174" height="392" rx="16" fill="#F7FAF6"/>
+    <text x="707" y="211" fill="#809187" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="12" font-weight="700" letter-spacing="1.4">创作流程</text>
+    <rect x="699" y="229" width="146" height="54" rx="12" fill="#E8F5E7"/>
+    <circle cx="720" cy="256" r="12" fill="#176D3A"/>
+    <text x="716" y="261" fill="#fff" font-family="Arial, sans-serif" font-size="12" font-weight="700">1</text>
+    <text x="741" y="261" fill="#10231B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="14" font-weight="650">文稿</text>
+    <path d="M720 283v23" stroke="#C6D6C8" stroke-width="1.5"/>
+    <circle cx="720" cy="321" r="12" fill="#D8E4D9"/>
+    <text x="716" y="326" fill="#567063" font-family="Arial, sans-serif" font-size="12" font-weight="700">2</text>
+    <text x="741" y="326" fill="#53665B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="14">配音</text>
+    <path d="M720 333v23" stroke="#C6D6C8" stroke-width="1.5"/>
+    <circle cx="720" cy="371" r="12" fill="#D8E4D9"/>
+    <text x="716" y="376" fill="#567063" font-family="Arial, sans-serif" font-size="12" font-weight="700">3</text>
+    <text x="741" y="376" fill="#53665B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="14">视觉规划</text>
+    <path d="M720 383v23" stroke="#C6D6C8" stroke-width="1.5"/>
+    <circle cx="720" cy="421" r="12" fill="#D8E4D9"/>
+    <text x="716" y="426" fill="#567063" font-family="Arial, sans-serif" font-size="12" font-weight="700">4</text>
+    <text x="741" y="426" fill="#53665B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="14">预览与渲染</text>
+    <rect x="703" y="480" width="138" height="1" fill="#E3EBE4"/>
+    <text x="707" y="511" fill="#73857A" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="12">中间成果随时可检查</text>
+    <text x="707" y="533" fill="#73857A" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="12">确认后再进入下一步</text>
+
+    <text x="886" y="204" fill="#66786E" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="13" font-weight="650">成片预览</text>
+    <rect x="886" y="222" width="588" height="272" rx="17" fill="#10231B"/>
+    <path d="M887 423c80-60 131-42 191-89 50-39 92-14 145-68 55-56 123-52 251-29v257H887V423Z" fill="#174630"/>
+    <path d="M887 448c117-50 183-19 267-67 62-35 127-17 187-43 58-26 102-19 133-6v162H887V448Z" fill="#20683F"/>
+    <path d="M887 474c92-33 177-11 252-29 80-20 164-6 235-17 45-7 77-2 100 7v59H887v-20Z" fill="#2E8550"/>
+    <rect x="918" y="244" width="230" height="64" rx="13" fill="#F4F8F1" fill-opacity=".95"/>
+    <text x="937" y="271" fill="#10231B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="16" font-weight="700">一段内容，一个清晰观点</text>
+    <text x="937" y="291" fill="#60736B" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="12">口播 · 字幕 · 画面节奏</text>
+    <circle cx="1180" cy="358" r="32" fill="#F4F8F1" fill-opacity=".94"/>
+    <path d="m1174 343 23 15-23 15v-30Z" fill="#176D3A"/>
+    <rect x="905" y="462" width="96" height="20" rx="10" fill="#10231B" fill-opacity=".72"/>
+    <text x="920" y="476" fill="#fff" font-family="Arial, sans-serif" font-size="11">00:18 / 01:12</text>
+
+    <text x="886" y="528" fill="#66786E" font-family="PingFang SC, 'Microsoft YaHei', sans-serif" font-size="12" font-weight="650">时间线</text>
+    <rect x="886" y="541" width="588" height="34" rx="9" fill="#F1F6F0"/>
+    <rect x="897" y="549" width="149" height="18" rx="5" fill="#CFE8CD"/>
+    <rect x="1052" y="549" width="112" height="18" rx="5" fill="#A8D9A5"/>
+    <rect x="1170" y="549" width="173" height="18" rx="5" fill="#D8E9D5"/>
+    <rect x="1349" y="549" width="113" height="18" rx="5" fill="#B8F34A"/>
+    <path d="M1136 538v39" stroke="#176D3A" stroke-width="2"/>
+    <circle cx="1136" cy="539" r="4" fill="#176D3A"/>
+  </g>
+
+  <text x="80" y="626" fill="#84948A" font-family="Arial, sans-serif" font-size="12" letter-spacing="2.4">SCRIPT · VOICE · VISUALS · VIDEO</text>
+</svg>

@@ -1,0 +1,62 @@
+import assert from "node:assert/strict";
+import {promises as fs} from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const testDataRoot = await fs.mkdtemp(path.join(os.tmpdir(), "talk-video-visual-plan-"));
+process.env.TALK_VIDEO_DATA_DIR = testDataRoot;
+try {
+  const jobs = await import("../lib/jobs");
+  const visualPlan = await import("../lib/visual-plan");
+  const coverImage = await import("../lib/cover-image");
+  const jobId = "2026-09-04 00:00:00.000";
+  const profileContext = {accountId: "tech123", seriesId: "tech-minute", accountVersion: "1", seriesVersion: "1"};
+  await jobs.initializeNarrationJob(jobId, profileContext, {textModel: "test", voiceId: "test"});
+  await jobs.updateJobState(jobId, {state: "awaiting_visual_review", error: null});
+  const directory = jobs.revisionDir(jobId, 1);
+  await jobs.atomicWriteJson(path.join(directory, "draft.json"), {title: "测试视频", summary: "测试摘要", captionStyle: "narration", narrationSegments: [{id: "narration-01", spokenText: "核心能力包括模型和工具。"}]});
+  await jobs.atomicWriteJson(path.join(directory, "audio", "narration.json"), {text: "核心能力包括模型和工具。", durationMs: 5000, spokenDurationMs: 4685, model: "test", voice: "test", captions: [{text: "核心能力包括模型和工具。", startMs: 0, endMs: 4685, timestampMs: 2000, confidence: null}], segments: [{id: "narration-01", startMs: 0, endMs: 5000, speechStartMs: 0, speechEndMs: 4685, pauseAfterMs: 315, transition: {kind: "fade", durationMs: 315}}]});
+  await jobs.atomicWriteJson(path.join(directory, "visual-resources.json"), {schemaVersion: "1.0", revision: 1, resources: []});
+  const profile = {id: "tech123/tech-minute", ...profileContext, title: "Tech123", subtitle: "科技", displayLabel: "TECH123", seriesTitle: "科技一分钟", seriesDescription: "test", narration: {minSeconds: 1, targetSeconds: 5, maxSeconds: 10, hardMaxSeconds: 10, minScenes: 1, maxScenes: 2, hardMaxScenes: 2, cjkCharactersPerSecond: 5}, workspaceName: "test", workspaceTitle: "test", workspaceDescription: "test", downloadPrefix: "test", userAgentSuffix: "test", logo: "logo.png", logoSrc: "logo.png", promptRoot: "test", presenter: {poses: [{id: "neutral" as const, label: "中立", src: "neutral.png", semanticTags: ["默认"], gestureDirection: "neutral" as const, safeSide: "both" as const}]}};
+  const input = {schemaVersion: "1.0" as const, revision: 1, visualStyle: "kinetic-lime" as const, scenes: [{id: "plan-01", segmentId: "narration-01", startMs: 0, endMs: 5000, transition: {kind: "fade" as const, durationMs: 315}, content: {title: "核心能力", subtitle: "", text: "模型和工具", keywords: ["模型", "工具"]}, templateId: "ip/opening-stage", presenter: {rollType: "a-roll" as const, mode: "hero" as const, poseId: "neutral", placement: "hero" as const, framing: "full" as const}}]};
+  const saved = await visualPlan.saveVisualPlan(jobId, input, profile);
+  assert.equal(saved.planVersion, 1);
+  assert.equal(saved.visualStyle, "kinetic-lime");
+  const storedPlan = await jobs.readJson<Record<string, unknown>>(path.join(directory, "visual-plan.json"));
+  const legacyPlan = Object.fromEntries(Object.entries(storedPlan).filter(([key]) => key !== "cover"));
+  await jobs.atomicWriteJson(path.join(directory, "visual-plan.json"), legacyPlan);
+  const recovered = await visualPlan.readVisualPlan(jobId);
+  assert.deepEqual(recovered.cover, {title: "测试视频", subtitle: "模型和工具", keywords: ["模型", "工具"], presenterPoseId: "neutral"});
+  const persistedRecovered = await jobs.readJson<{cover: unknown}>(path.join(directory, "visual-plan.json"));
+  assert.deepEqual(persistedRecovered.cover, recovered.cover);
+  for (const state of ["awaiting_visual_review", "ready", "completed", "failed"]) assert.doesNotThrow(() => visualPlan.assertVisualPlanEditableState(state));
+  assert.throws(() => visualPlan.assertVisualPlanEditableState("rendering"), /当前任务状态不允许修改镜头规划/);
+  await assert.rejects(() => fs.access(path.join(directory, "manifest.json")));
+  const updated = await visualPlan.saveVisualPlan(jobId, {...input, scenes: [{...input.scenes[0], content: {...input.scenes[0].content, title: "已修改"}}]}, profile);
+  assert.equal(updated.planVersion, 2);
+  const coverUpdated = await visualPlan.saveVisualPlan(jobId, {...input, cover: {title: "自定义封面", subtitle: "封面副标题", keywords: ["模型"], presenterPoseId: "neutral"}, scenes: [{...input.scenes[0], content: {...input.scenes[0].content, title: "已修改"}}]}, profile);
+  assert.equal(coverUpdated.cover?.title, "自定义封面");
+  assert.equal((await visualPlan.readVisualPlan(jobId)).scenes[0].content.title, "已修改");
+  const manifest = await visualPlan.writeVisualPreviewManifest(jobId, profile);
+  assert.equal(manifest.cover?.title, "自定义封面");
+  assert.equal(manifest.visualStyle, "kinetic-lime");
+  assert.equal(manifest.scenes[0]?.templateId, "ip/opening-stage");
+  assert.equal(manifest.scenes[0]?.content.title, "已修改");
+  assert.equal("templateData" in (await jobs.readJson<{scenes: Array<Record<string, unknown>>}>(path.join(directory, "visual-plan.json"))).scenes[0]!, false);
+  const onePixelPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+  const uploadedCover = await coverImage.saveCoverImage(jobId, new File([onePixelPng], "pet.png", {type: "image/png"}));
+  assert.deepEqual({imagePath: uploadedCover.imagePath, imageWidth: uploadedCover.imageWidth, imageHeight: uploadedCover.imageHeight}, {imagePath: "uploaded-images/cover.png", imageWidth: 1, imageHeight: 1});
+  const planWithImage = await visualPlan.readVisualPlan(jobId);
+  assert.equal(planWithImage.cover?.imagePath, "uploaded-images/cover.png");
+  assert.equal((await jobs.readJson<{resources: unknown[]}>(path.join(directory, "visual-resources.json"))).resources.length, 0);
+  const manifestWithImage = await visualPlan.writeVisualPreviewManifest(jobId, profile);
+  assert.equal(manifestWithImage.cover?.imagePath, "artifact://uploaded-images/cover.png");
+  await coverImage.deleteCoverImage(jobId);
+  assert.equal((await visualPlan.readVisualPlan(jobId)).cover?.imagePath, undefined);
+  await assert.rejects(() => fs.access(path.join(directory, "uploaded-images/cover.png")));
+  // 单数据任务不再以 revision 拒绝保存；并发控制只由 planVersion 负责。
+  await assert.doesNotReject(() => visualPlan.saveVisualPlan(jobId, {...input, revision: 2}, profile));
+  console.info("visual-plan.integration.test 通过：规划保存与确认后 Manifest 生成边界有效");
+} finally {
+  await fs.rm(testDataRoot, {recursive: true, force: true});
+}

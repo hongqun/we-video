@@ -1,0 +1,299 @@
+[
+  {
+    "title": "流程判断",
+    "spokenText": "先提交申请，再判断条件，最后进入处理流程。",
+    "graph": {
+      "kind": "relation-graph",
+      "nodes": [
+        {
+          "id": "a",
+          "type": "default",
+          "position": {
+            "x": 70,
+            "y": 350
+          },
+          "data": {
+            "label": "提交申请",
+            "shape": "pill",
+            "width": 220,
+            "height": 120,
+            "palette": "mint",
+            "cueText": "提交申请"
+          }
+        },
+        {
+          "id": "b",
+          "type": "default",
+          "position": {
+            "x": 390,
+            "y": 300
+          },
+          "data": {
+            "label": "判断条件",
+            "shape": "diamond",
+            "width": 240,
+            "height": 220,
+            "palette": "mint",
+            "cueText": "判断条件"
+          }
+        },
+        {
+          "id": "c",
+          "type": "default",
+          "position": {
+            "x": 760,
+            "y": 350
+          },
+          "data": {
+            "label": "处理流程",
+            "shape": "rectangle",
+            "width": 220,
+            "height": 120,
+            "palette": "mint",
+            "cueText": "处理流程"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "a-b",
+          "source": "a",
+          "target": "b",
+          "type": "smoothstep",
+          "strokeStyle": "solid",
+          "arrowType": "end"
+        },
+        {
+          "id": "b-c",
+          "source": "b",
+          "target": "c",
+          "type": "smoothstep",
+          "strokeStyle": "solid",
+          "arrowType": "end",
+          "label": "满足条件"
+        }
+      ]
+    }
+  },
+  {
+    "title": "概念关系",
+    "spokenText": "用户通过 Rest API 访问组织服务。",
+    "graph": {
+      "kind": "relation-graph",
+      "nodes": [
+        {
+          "id": "a",
+          "type": "default",
+          "position": {
+            "x": 80,
+            "y": 300
+          },
+          "data": {
+            "label": "用户",
+            "shape": "ellipse",
+            "width": 180,
+            "height": 180,
+            "palette": "mint",
+            "cueText": "用户"
+          }
+        },
+        {
+          "id": "b",
+          "type": "default",
+          "position": {
+            "x": 420,
+            "y": 310
+          },
+          "data": {
+            "label": "Rest API",
+            "shape": "hexagon",
+            "width": 240,
+            "height": 160,
+            "palette": "mint",
+            "cueText": "Rest API"
+          }
+        },
+        {
+          "id": "c",
+          "type": "default",
+          "position": {
+            "x": 770,
+            "y": 330
+          },
+          "data": {
+            "label": "组织服务",
+            "shape": "card",
+            "width": 220,
+            "height": 120,
+            "palette": "mint",
+            "cueText": "组织服务"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "a-b",
+          "source": "a",
+          "target": "b",
+          "type": "smoothstep",
+          "strokeStyle": "solid",
+          "arrowType": "end",
+          "label": "请求"
+        },
+        {
+          "id": "b-c",
+          "source": "b",
+          "target": "c",
+          "type": "smoothstep",
+          "strokeStyle": "solid",
+          "arrowType": "end",
+          "label": "调用"
+        }
+      ]
+    }
+  },
+  {
+    "title": "资源集合",
+    "spokenText": "资料汇入知识库，并整理成资源集合。",
+    "graph": {
+      "kind": "relation-graph",
+      "nodes": [
+        {
+          "id": "a",
+          "type": "default",
+          "position": {
+            "x": 60,
+            "y": 320
+          },
+          "data": {
+            "label": "资料",
+            "shape": "document",
+            "width": 210,
+            "height": 170,
+            "palette": "mint",
+            "cueText": "资料"
+          }
+        },
+        {
+          "id": "b",
+          "type": "default",
+          "position": {
+            "x": 420,
+            "y": 320
+          },
+          "data": {
+            "label": "知识库",
+            "shape": "cylinder",
+            "width": 200,
+            "height": 170,
+            "palette": "mint",
+            "cueText": "知识库"
+          }
+        },
+        {
+          "id": "c",
+          "type": "default",
+          "position": {
+            "x": 760,
+            "y": 320
+          },
+          "data": {
+            "label": "资源集合",
+            "shape": "stack",
+            "width": 240,
+            "height": 160,
+            "palette": "mint",
+            "cueText": "资源集合"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "a-b",
+          "source": "a",
+          "target": "b",
+          "type": "smoothstep",
+          "strokeStyle": "solid",
+          "arrowType": "end"
+        },
+        {
+          "id": "b-c",
+          "source": "b",
+          "target": "c",
+          "type": "smoothstep",
+          "strokeStyle": "solid",
+          "arrowType": "end"
+        }
+      ]
+    }
+  },
+  {
+    "title": "信息说明",
+    "spokenText": "先看概念定义，再看组成说明，最后查看配图说明。",
+    "graph": {
+      "kind": "relation-graph",
+      "nodes": [
+        {
+          "id": "a",
+          "type": "default",
+          "position": {
+            "x": 40,
+            "y": 280
+          },
+          "data": {
+            "label": "概念定义",
+            "shape": "info",
+            "width": 300,
+            "height": 200,
+            "palette": "mint",
+            "cueText": "概念定义",
+            "text": "保留上下文，说明概念的适用范围。"
+          }
+        },
+        {
+          "id": "b",
+          "type": "default",
+          "position": {
+            "x": 390,
+            "y": 280
+          },
+          "data": {
+            "label": "组成说明",
+            "shape": "list",
+            "width": 300,
+            "height": 240,
+            "palette": "mint",
+            "cueText": "组成说明",
+            "items": [
+              "主体与角色",
+              "关系与方向",
+              "边界与条件"
+            ]
+          }
+        },
+        {
+          "id": "c",
+          "type": "default",
+          "position": {
+            "x": 740,
+            "y": 280
+          },
+          "data": {
+            "label": "配图说明",
+            "shape": "image-card",
+            "width": 300,
+            "height": 260,
+            "palette": "mint",
+            "cueText": "配图说明",
+            "text": "透明图标保持原始比例。",
+            "icon": {
+              "src": "data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 60\"%3E%3Ccircle cx=\"30\" cy=\"30\" r=\"24\" fill=\"%236C9E86\"/%3E%3Crect x=\"70\" y=\"6\" width=\"44\" height=\"48\" rx=\"8\" fill=\"%237C91CD\"/%3E%3C/svg%3E",
+              "aspectRatio": 2
+            }
+          }
+        }
+      ],
+      "edges": []
+    }
+  }
+]

@@ -1,0 +1,1 @@
+export const MATH_BODY_DURATION_MS = 15_000;

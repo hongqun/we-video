@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" role="img" aria-label="Simplified world map">
+  <rect width="1000" height="500" fill="#f7faf6"/>
+  <g fill="#dce8e0" stroke="#91aaa0" stroke-width="2" stroke-linejoin="round">
+    <path d="M74 128 111 88 174 72 238 94 276 132 246 170 205 170 181 202 133 190 111 157 77 160Z"/>
+    <path d="M273 218 315 226 343 267 333 311 305 357 283 409 255 377 264 332 247 294Z"/>
+    <path d="M425 115 465 83 526 91 563 119 611 108 654 132 701 130 734 160 788 160 838 190 889 214 869 244 815 241 779 267 722 255 689 278 640 260 606 279 570 253 530 259 502 226 457 218 438 180Z"/>
+    <path d="M790 340 835 327 878 342 910 374 895 409 847 420 808 397 778 365Z"/>
+    <path d="M462 286 498 301 512 345 492 380 468 363 456 325Z"/>
+  </g>
+  <g fill="#8aa49a" opacity=".28"><path d="M24 456h952" stroke="#8aa49a" stroke-width="1" stroke-dasharray="5 12"/><path d="M500 30v440" stroke="#8aa49a" stroke-width="1" stroke-dasharray="5 12"/></g>
+</svg>

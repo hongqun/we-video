@@ -13,7 +13,8 @@ const main = async () => {
   if (command === "create") {
     const input = JSON.parse(await fs.readFile(required("--input"), "utf8")) as Parameters<typeof createNarration>[1];
     const profile = await readPlatformProfile(argument("--account-id"), argument("--series-id"));
-    await createNarration(jobId, input, profile, argument("--text-model") ?? profile.defaultTextModel ?? "deepseek-v4-flash");
+    // API 已同步初始化任务；worker 直接生成来源和草稿，避免重复初始化。
+    await createNarration(jobId, input, profile, argument("--text-model") ?? profile.defaultTextModel ?? "deepseek-v4-flash", false);
   } else if (command === "revise") {
     const input = JSON.parse(await fs.readFile(required("--input"), "utf8")) as {draft: Record<string, unknown>; feedback: string};
     const job = await readJob(jobId);

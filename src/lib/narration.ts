@@ -138,9 +138,11 @@ const requestModel = async (profile: PlatformProfile, source: Record<string, unk
   try { return JSON.parse(content) as Record<string, unknown>; } catch (error) { throw new Error(`DeepSeek 返回的内容不是有效 JSON：${String(error)}`); }
 };
 
-export const createNarration = async (jobId: string, request: NarrationSourceRequest, profile: PlatformProfile, model: string) => {
+export const createNarration = async (jobId: string, request: NarrationSourceRequest, profile: PlatformProfile, model: string, initializeJob = true) => {
   // 创建流程先固化原文，再生成并校验 Draft，确保后续审核始终有可追溯来源。
-  await initializeNarrationJob(jobId, {accountId: profile.accountId, seriesId: profile.seriesId, accountVersion: profile.accountVersion, seriesVersion: profile.seriesVersion}, {textModel: model});
+  if (initializeJob) {
+    await initializeNarrationJob(jobId, {accountId: profile.accountId, seriesId: profile.seriesId, accountVersion: profile.accountVersion, seriesVersion: profile.seriesVersion}, {textModel: model});
+  }
   try {
     const source = await prepareNarrationSource(request, profile.userAgentSuffix);
     await atomicWriteJson(path.join(jobDir(jobId), "source.json"), source);

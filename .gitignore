@@ -10,6 +10,9 @@ out/
 /.agents/skills/
 /DEPLOYMENT_UBUNTU.md
 jobs/
+!/src/app/api/jobs/
+/src/app/api/jobs/**
+!/src/app/api/jobs/route.ts
 draft/
 data/
 public/ai_agent.wav

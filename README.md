@@ -10,7 +10,11 @@ We-Video 是一个解说类视频创作工作台。它能够以低的成本（�
 
 We-Video把文章或资料自动转成口播稿，然后进行配音、字幕和视觉规划，最终渲染成 MP4文件。
 
-[查看效果](./We-Video解说类视频的低成本方案.mp4)
+
+
+https://github.com/user-attachments/assets/c35ecc91-e41a-4efd-b185-ddf2efff3b56
+
+
 
 按步骤保留中间成果，便于人工检查和修改：
 

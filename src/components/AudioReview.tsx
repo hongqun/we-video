@@ -4,7 +4,7 @@ import {useEffect, useRef, useState} from "react";
 import {Icon} from "./Icon";
 
 type TimedSegment = {id: string; startMs: number; endMs: number; speechStartMs?: number; speechEndMs?: number};
-type Narration = {durationMs: number; voice?: string; segments?: TimedSegment[]};
+type Narration = {durationMs: number; voice?: string; synthesis?: {rate?: number}; segments?: TimedSegment[]};
 
 const clock = (milliseconds: number) => {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));
@@ -18,9 +18,11 @@ export const AudioReview: React.FC<{
   busy: boolean;
   onApprove?: () => void;
   onReject?: () => void;
+  onRegenerate?: () => void;
+  stale?: boolean;
   approveLabel?: string;
   compact?: boolean;
-}> = ({src, narration, segments, busy, onApprove, onReject, approveLabel, compact = false}) => {
+}> = ({src, narration, segments, busy, onApprove, onReject, onRegenerate, stale = false, approveLabel, compact = false}) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const segmentRefs = useRef(new Map<string, HTMLButtonElement>());
   const pendingPlayRef = useRef<Promise<void> | null>(null);
@@ -82,10 +84,12 @@ export const AudioReview: React.FC<{
     <button type="button" disabled={busy || !onApprove} onClick={() => onApprove?.()}><Icon name="arrow-right" />进入音频试听</button>
   </div>;
   return <section className="panel audio-review" aria-labelledby="audio-review-title">
-    <div className="panel-heading"><div><p className="review-section-label">第 3 步 · 音频试听</p><h2 id="audio-review-title" className="icon-label"><Icon name="volume" />确认口播节奏</h2></div><span className="metadata">{narration.voice || "当前音色"} · {clock(durationMs)}</span></div>
+    <div className="panel-heading"><div><p className="review-section-label">第 3 步 · 音频试听</p><h2 id="audio-review-title" className="icon-label"><Icon name="volume" />确认口播节奏</h2></div><span className="metadata">{narration.voice || "当前音色"} · {narration.synthesis?.rate !== undefined ? `${narration.synthesis.rate.toFixed(2)}×` : "语速未记录"} · {clock(durationMs)}</span></div>
     {/* Native audio is intentional: this is a review control, outside the Remotion composition timeline. */}
     {/* eslint-disable-next-line @remotion/warn-native-media-tag */}
     <audio ref={audioRef} src={src} preload="metadata" onTimeUpdate={(event) => setCurrentMs(Math.round(event.currentTarget.currentTime * 1000))} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={() => setPlaybackError("音频文件加载失败，请刷新后重试。")} />
+    {/* 已生成参数与页面选择分开显示，旧音频过期后只能重新生成。 */}
+    {stale ? <p className="hint" role="status">稿件或配音参数已变化，当前播放的是旧音频，请重新生成配音后确认。</p> : null}
     <div className="audio-review-controls">
       <button type="button" className="secondary icon-only" aria-label={playing ? "暂停播放" : "播放音频"} title={playing ? "暂停播放" : "播放音频"} data-tooltip={playing ? "暂停" : "播放"} onClick={() => playing ? pausePlayback() : startPlayback()}><Icon name="play" /></button>
       <input aria-label="音频播放进度" type="range" min={0} max={durationMs || 1} value={Math.min(currentMs, durationMs)} onChange={(event) => seek(Number(event.target.value))} />
@@ -103,6 +107,6 @@ export const AudioReview: React.FC<{
         </button>;
       })}
     </div>
-    <div className="actions"><button type="button" className="secondary" disabled={busy || !onReject} onClick={() => onReject?.()}><Icon name="edit" />退回修改</button><button type="button" disabled={busy || !onApprove} onClick={() => onApprove?.()}><Icon name="arrow-right" />{approveLabel ?? "确认"}</button></div>
+    <div className="actions">{onRegenerate ? <button type="button" className="secondary" disabled={busy} onClick={onRegenerate}><Icon name="volume" />重新生成配音</button> : null}<button type="button" className="secondary" disabled={busy || !onReject} onClick={() => onReject?.()}><Icon name="edit" />退回修改</button><button type="button" disabled={busy || !onApprove} onClick={() => onApprove?.()}><Icon name="arrow-right" />{approveLabel ?? "确认"}</button></div>
   </section>;
 };

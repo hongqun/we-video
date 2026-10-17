@@ -1,3 +1,5 @@
+import type {Caption} from "@/remotion/schema";
+import {splitModelPlan} from "@/remotion/templates/model-scene-editing";
 import type {VisualPlan, VisualPlanScene} from "./visual-plan";
 
 export type TimedNarrationSegment = {id: string; startMs: number; endMs: number; speechStartMs?: number; speechEndMs?: number};
@@ -9,6 +11,7 @@ const cloneVisualPlanScene = (scene: VisualPlanScene): VisualPlanScene => ({
   content: {...scene.content, keywords: [...scene.content.keywords], ...(scene.content.emphasisBindings ? {emphasisBindings: scene.content.emphasisBindings.map((binding) => ({...binding}))} : {})},
   transition: {...scene.transition},
   presenter: {...scene.presenter},
+  ...(scene.modelScene ? {modelScene: structuredClone(scene.modelScene)} : {}),
   ...(scene.visualData ? {
     visualData: {
       ...scene.visualData,
@@ -24,7 +27,7 @@ export const visualPlanSceneIndexAtTime = (
   timeMs: number,
 ) => scenes.findIndex((scene) => timeMs >= scene.startMs && timeMs < scene.endMs);
 
-export const splitVisualPlanScene = (scenes: readonly VisualPlanScene[], index: number, splitAtMs: number): VisualPlanScene[] => {
+export const splitVisualPlanScene = (scenes: readonly VisualPlanScene[], index: number, splitAtMs: number, captions: Caption[] = [], fps = 30): VisualPlanScene[] => {
   const current = scenes[index];
   if (!current) throw new Error("未找到要拆分的视觉镜头");
   if (!Number.isInteger(splitAtMs) || splitAtMs <= current.startMs || splitAtMs >= current.endMs) throw new Error("拆分位置必须位于当前视觉镜头中间");
@@ -42,6 +45,10 @@ export const splitVisualPlanScene = (scenes: readonly VisualPlanScene[], index: 
     transition: {...noneTransition},
   };
   const retained: VisualPlanScene = {...cloneVisualPlanScene(current), endMs: splitAtMs, transition: {...noneTransition}};
+  if (current.templateId === "rve/3d-model-scene" && current.modelScene) {
+    const [left, right] = splitModelPlan(current.modelScene, current, splitAtMs, captions, fps);
+    retained.modelScene = left; inserted.modelScene = right;
+  }
   if (current.templateId === "ip/closing-stage") {
     return [...scenes.slice(0, index), {...retained, templateId: "rve/generic-content", presenter: middlePresenter}, inserted, ...scenes.slice(index + 1)];
   }

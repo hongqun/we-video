@@ -13,8 +13,14 @@ jobs/
 !/src/app/api/jobs/
 /src/app/api/jobs/**
 !/src/app/api/jobs/route.ts
+# 配音确认接口随流程变更一起纳入版本管理。
+!/src/app/api/jobs/[[]id]/
+/src/app/api/jobs/[[]id]/**
+!/src/app/api/jobs/[[]id]/approve/
+!/src/app/api/jobs/[[]id]/approve/route.ts
 draft/
 data/
 public/ai_agent.wav
 public/profile-assets/
 .DS_Store
+todo/

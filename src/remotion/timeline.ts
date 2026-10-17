@@ -2,6 +2,13 @@ import type {VideoScene} from "./schema";
 
 export type SceneFrameSpan = {from: number; to: number; durationInFrames: number};
 
+// 单镜编辑、预览与成片共用绝对帧边界；最后一个可播放帧是 durationInFrames - 1。
+export const sceneFrameSpan = (scene: Pick<VideoScene, "startMs" | "endMs">, fps: number): SceneFrameSpan => {
+  const from = Math.round(scene.startMs * fps / 1000);
+  const to = Math.max(from + 1, Math.round(scene.endMs * fps / 1000));
+  return {from, to, durationInFrames: to - from};
+};
+
 /** 所有边界只换算一次；相邻场景复用同一帧，末场强制覆盖到音频向上取整帧。 */
 export const narrationSceneFrameSpans = (
   scenes: Array<Pick<VideoScene, "startMs" | "endMs">>,
@@ -9,7 +16,7 @@ export const narrationSceneFrameSpans = (
   fps: number,
 ): SceneFrameSpan[] => {
   const narrationFrames = Math.ceil(narrationDurationMs / 1000 * fps);
-  const boundaries = scenes.map((scene, index) => index === 0 ? 0 : Math.round(scene.startMs / 1000 * fps));
+  const boundaries = scenes.map((scene, index) => index === 0 ? 0 : sceneFrameSpan(scene, fps).from);
   boundaries.push(narrationFrames);
   return scenes.map((_, index) => {
     const from = boundaries[index]!;

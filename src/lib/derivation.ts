@@ -12,7 +12,7 @@ import type {VisualResources} from "./visual-resources";
 import {assertTranslationText, splitApprovedTranslation, translationTextSchema, translationTokens, type TranslationReview, type TranslationText} from "./translation-review";
 
 type Draft = {title: string; shortTitle?: string; summary?: string; narrationSegments: Array<{id: string; spokenText: string; pauseAfter: string}>; [key: string]: unknown};
-type Plan = {scenes: Array<{id: string; content: Record<string, unknown>; visualData?: Record<string, unknown>; [key: string]: unknown}>; [key: string]: unknown};
+type Plan = {scenes: Array<{id: string; content: Record<string, unknown>; visualData?: Record<string, unknown>; modelScene?: Record<string, unknown>; [key: string]: unknown}>; [key: string]: unknown};
 type ParentSnapshot = {draft: Draft; visualPlan: Plan; visualResources?: VisualResources};
 
 export const preserveVisualPlanStructure = (source: Plan, translated: Plan): Plan => {
@@ -21,7 +21,7 @@ export const preserveVisualPlanStructure = (source: Plan, translated: Plan): Pla
     const translatedScene = translated.scenes[index];
     if (!translatedScene || translatedScene.segmentId !== scene.segmentId) throw new Error("英文派生翻译不能改变母稿镜头顺序");
     // 普通文案和关系图文字均由路径回填；模板、时间轴及图形结构不交给模型重写。
-    return {...scene, content: translatedScene.content, ...(scene.visualData ? {visualData: translatedScene.visualData ?? scene.visualData} : {})};
+    return {...scene, content: translatedScene.content, ...(scene.visualData ? {visualData: translatedScene.visualData ?? scene.visualData} : {}), ...(scene.modelScene ? {modelScene: translatedScene.modelScene ?? scene.modelScene} : {})};
   });
   return {...source, scenes};
 };
@@ -99,6 +99,7 @@ export const prepareEnglishTask = async (parentJobId: string, targetSeriesId: st
       atomicWriteJson(path.join(childDir, "translation-source.json"), {draft, visualPlan: plan, visualResources: resources}),
       atomicWriteJson(path.join(childDir, "visual-resources.json"), resources),
       fs.cp(path.join(parentDir, "uploaded-images"), path.join(childDir, "uploaded-images"), {recursive: true, force: false}).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }),
+      fs.cp(path.join(parentDir, "uploaded-models"), path.join(childDir, "uploaded-models"), {recursive: true, force: false}).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }),
     ]);
     const job = await readJob(childJobId);
     await atomicWriteJson(path.join(childDir, "job.json"), {...job, parentJobId, derivationKind: "translation", state: "awaiting_translation_review", error: null, updatedAt: new Date().toISOString()});
@@ -253,7 +254,7 @@ export const runTranslation = async (jobId: string, action: "generate" | "confir
     // 多边形属于资源文件，也必须翻译为对应确认段的原句；模型只接收文字，不接收坐标。
     const resources = parent.visualResources ?? await optionalTranslationFile<VisualResources>(path.join(directory, "visual-resources.json"));
     const resourceKey = (index: number) => `__resource_${index}`;
-    const sceneContents = Object.fromEntries(parent.visualPlan.scenes.map((scene) => [scene.id, {content: scene.content, ...(scene.visualData ? {visualData: scene.visualData} : {})}]));
+    const sceneContents = Object.fromEntries(parent.visualPlan.scenes.map((scene) => [scene.id, {content: scene.content, ...(scene.visualData ? {visualData: scene.visualData} : {}), ...(scene.modelScene ? {modelScene: scene.modelScene} : {})}]));
     for (const [index, resource] of (resources?.resources ?? []).entries()) {
       Object.assign(sceneContents, {[resourceKey(index)]: {polygons: resource.polygons.map(({text}) => ({text}))}});
     }
@@ -271,7 +272,7 @@ export const runTranslation = async (jobId: string, action: "generate" | "confir
     }))} : undefined;
     const translatedCover = translatedContents.__cover__ as {content: Record<string, unknown>} | undefined;
     const visualPlan = {...preserveVisualPlanStructure(parent.visualPlan, {...parent.visualPlan, scenes: parent.visualPlan.scenes.map((scene) => {
-      const translated = translatedContents[scene.id] as {content: Record<string, unknown>; visualData?: Record<string, unknown>};
+      const translated = translatedContents[scene.id] as {content: Record<string, unknown>; visualData?: Record<string, unknown>; modelScene?: Record<string, unknown>};
       return {...scene, ...translated};
     })}), ...(translatedCover ? {cover: translatedCover.content} : {})};
     // 先验证完整规划，避免状态已推进第二步后才在快照读取时暴露契约错误。

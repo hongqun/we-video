@@ -11,6 +11,7 @@ import {splitVisualPlanScene, visualPlanChanged, visualPlanSceneIndexAtTime, typ
 import {compatiblePoseForPlacement} from "@/lib/presenter-planning";
 import {presenterFramingLabels, presenterPlacementLabels, type PresenterFraming, type PresenterPlacement, type PresenterPoseId} from "@/remotion/presenter-config";
 import {Icon} from "./Icon";
+import {GlbModelPrompt} from "./GlbModelPrompt";
 import {CoverPreview} from "./CoverPreview";
 import {defaultCover} from "@/remotion/cover";
 import {buildRelationGraphFromKeywords, type RelationGraphData} from "@/remotion/templates/relation-graph";
@@ -20,13 +21,16 @@ import {ImagePreviewWithBoxes} from "./ImagePreviewWithBoxes";
 import {BoxTextReferenceDocument} from "./BoundingBoxTextEditor";
 import {visualResourceForScene} from "@/lib/visual-resource-selection";
 import {VISUAL_STYLE_OPTIONS, type VisualStyleId} from "@/remotion/visual-style";
+import {freshCameraPlan, resetModelPlan} from "@/remotion/templates/model-scene-editing";
+import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
 
 const TemplatePreview = dynamic(() => import("./TemplatePreview").then(({TemplatePreview: Component}) => Component), {ssr: false});
 const RelationGraphEditor = dynamic(() => import("./RelationGraphEditor").then(({RelationGraphEditor: Component}) => Component), {ssr: false});
+const ModelSceneEditor = dynamic(() => import("./ModelSceneEditor").then(({ModelSceneEditor: Component}) => Component), {ssr: false});
 type SpokenSegment = {id: string; spokenText: string};
 // 编辑器额外接收兼容姿态目录，正式渲染仍只使用已解析的 poses。
 type ProfileContext = {accountId: string; seriesId: string; outputLanguage?: string; presenter: NonNullable<RenderManifest["presenter"]> & {compatibilityPoses?: NonNullable<RenderManifest["presenter"]>["poses"]}};
-type Resource = {segmentId: string; sceneId?: string; imagePath?: string; imageWidth?: number; imageHeight?: number; polygons: Array<{text: string; points: Array<{x: number; y: number}>}>};
+type Resource = {segmentId: string; sceneId?: string; imagePath?: string; imageWidth?: number; imageHeight?: number; modelPath?: string; polygons: Array<{text: string; points: Array<{x: number; y: number}>}>};
 type Polygon = Resource["polygons"][number];
 type PlaybackMode = "step" | "full";
 const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
@@ -43,9 +47,10 @@ const saveInput = (plan: VisualPlan, title: string): VisualPlanSaveInput => {
   return {schemaVersion: "1.0", revision: plan.revision, ...(plan.feedback ? {feedback: plan.feedback} : {}), ...(plan.visualStyle ? {visualStyle: plan.visualStyle} : {}), cover: {...cover, keywords: cover.keywords.map((keyword) => keyword.trim()).filter(Boolean).slice(0, 8)}, scenes: plan.scenes};
 };
 
-export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: VisualPlan; audioSrc: string; segments: TimedNarrationSegment[]; captions: Caption[]; visualResources: {revision?: number; resources: Resource[]}; previewArtifactToken?: string; spokenSegments: SpokenSegment[]; profile: ProfileContext; brand: RenderManifest["brand"]; busy: boolean; canFinalize: boolean; coverImageBusy: boolean; onUploadCoverImage: (file: File) => Promise<void>; onDeleteCoverImage: () => Promise<void>; onGenerateCoverImageRequirement: (title: string) => Promise<void>; onGenerateVisualRequirement: (segmentId: string, spokenText: string, transparentBackground: boolean) => Promise<string>; onUploadImage: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteImage: (sceneId: string, segmentId: string) => Promise<void>; onSavePolygons: (sceneId: string, segmentId: string, polygons: Polygon[]) => Promise<void>; onSave: (plan: VisualPlanSaveInput) => Promise<VisualPlan>; onReplan: (feedback: string) => Promise<void>; onFinalize: (planVersion: number) => Promise<void>}> = ({jobId, title, plan, audioSrc, segments, captions, visualResources, previewArtifactToken, spokenSegments, profile, brand, busy, canFinalize, coverImageBusy, onUploadCoverImage, onDeleteCoverImage, onGenerateCoverImageRequirement, onGenerateVisualRequirement, onUploadImage, onDeleteImage, onSavePolygons, onSave, onReplan, onFinalize}) => {
+export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: VisualPlan; audioSrc: string; segments: TimedNarrationSegment[]; captions: Caption[]; visualResources: {revision?: number; resources: Resource[]}; previewArtifactToken?: string; spokenSegments: SpokenSegment[]; profile: ProfileContext; brand: RenderManifest["brand"]; busy: boolean; canFinalize: boolean; coverImageBusy: boolean; onUploadCoverImage: (file: File) => Promise<void>; onDeleteCoverImage: () => Promise<void>; onGenerateCoverImageRequirement: (title: string) => Promise<void>; onGenerateVisualRequirement: (segmentId: string, spokenText: string, transparentBackground: boolean) => Promise<string>; onUploadImage: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteImage: (sceneId: string, segmentId: string) => Promise<void>; onUploadModel: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteModel: (sceneId: string, segmentId: string) => Promise<void>; onSavePolygons: (sceneId: string, segmentId: string, polygons: Polygon[]) => Promise<void>; onSave: (plan: VisualPlanSaveInput) => Promise<VisualPlan>; onReplan: (feedback: string) => Promise<void>; onFinalize: (planVersion: number) => Promise<void>}> = ({jobId, title, plan, audioSrc, segments, captions, visualResources, previewArtifactToken, spokenSegments, profile, brand, busy, canFinalize, coverImageBusy, onUploadCoverImage, onDeleteCoverImage, onGenerateCoverImageRequirement, onGenerateVisualRequirement, onUploadImage, onDeleteImage, onUploadModel, onDeleteModel, onSavePolygons, onSave, onReplan, onFinalize}) => {
   const [value, setValue] = useState(plan);
   const [saved, setSaved] = useState(plan);
+  const incomingPlan = useRef(JSON.stringify(plan));
   const [selected, setSelected] = useState(0);
   const [relationEditorOpen, setRelationEditorOpen] = useState(false);
   const [relationEditorMaximized, setRelationEditorMaximized] = useState(false);
@@ -60,6 +65,8 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   const [requirementDialogOpen, setRequirementDialogOpen] = useState(false);
   const [requirementCopyStatus, setRequirementCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [imageMode, setImageMode] = useState<"original" | "boxes">("original");
+  const [modelEditorOpen, setModelEditorOpen] = useState(false);
+  const modelAsset = useRef<{sceneId: string; path?: string} | null>(null);
   const [resourcePolygons, setResourcePolygons] = useState<Polygon[]>([]);
   const [polygonTextEditor, setPolygonTextEditor] = useState<{index: number; text: string; saving: boolean; pendingPolygons?: Polygon[]; error?: string} | null>(null);
   const audio = useRef<HTMLAudioElement>(null);
@@ -70,7 +77,10 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   const pendingSeekRef = useRef<number | null>(null);
   const spokenTextRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    // 重新提取完成后，以服务端返回的新版本替换本地编辑副本。
+    // 轮询返回的新对象可能内容完全相同，不能因此覆盖尚未保存的模板选择。
+    const signature = JSON.stringify(plan);
+    if (incomingPlan.current === signature) return;
+    incomingPlan.current = signature;
     setValue(plan);
     setSaved(plan);
     setSelected((index) => Math.min(index, Math.max(0, plan.scenes.length - 1)));
@@ -93,6 +103,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   }, [selected]);
   useEffect(() => {
     setImageMode("original");
+    setModelEditorOpen(false);
     setRequirement(null);
     setRequirementDialogOpen(false);
     setPolygonTextEditor(null);
@@ -126,8 +137,10 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     const sceneResource = visualResourceForScene(visualResources, scene.id, scene.segmentId);
     const imagePath = sceneResource?.imagePath ? sceneImageUrl(jobId, sceneResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
     // 图片运行参数只在预览时由 scene.id 展开，不写回 visual-plan。
+    const modelPath = sceneResource?.modelPath ? sceneImageUrl(jobId, sceneResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
     const templateData = scene.templateId === "rve/visual-image" && imagePath && sceneResource?.imageWidth && sceneResource.imageHeight
       ? {imagePath, imageWidth: sceneResource.imageWidth, imageHeight: sceneResource.imageHeight, polygons: sceneResource.polygons}
+      : scene.templateId === "rve/3d-model-scene" && modelPath && scene.modelScene ? {modelPath, ...scene.modelScene}
       : scene.templateId === "rve/relation-graph" ? scene.visualData : undefined;
     const speechStartMs = Math.max(scene.startMs, sceneTiming.speechStartMs ?? sceneTiming.startMs);
     const speechEndMs = Math.min(scene.endMs, sceneTiming.speechEndMs ?? sceneTiming.endMs);
@@ -143,6 +156,22 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   // 镜头规划按 scene.id 取资源；旧任务没有 sceneId 时才回退到 segmentId。
   const currentResource = current ? visualResourceForScene(visualResources, current.id, current.segmentId) : undefined;
   const currentImagePath = currentResource?.imagePath ? sceneImageUrl(jobId, currentResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
+  const currentModelPath = currentResource?.modelPath ? sceneImageUrl(jobId, currentResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
+  useEffect(() => {
+    // 素材替换与草稿同步：只清除当前镜头的空间数据，避免旧锚点落到新模型。
+    const sceneId = current?.id;
+    if (!sceneId) return;
+    const previous = modelAsset.current;
+    const path = currentResource?.modelPath;
+    modelAsset.current = {sceneId, path};
+    const previousDigest = previous?.path?.match(/-([a-f0-9]{16})\.glb$/)?.[1];
+    const nextDigest = path?.match(/-([a-f0-9]{16})\.glb$/)?.[1];
+    // 拆分保存只改变文件归属，同内容复制不能清除刚保存的关键帧。
+    if (previous?.sceneId !== sceneId || previous.path === path || !path || (previousDigest && previousDigest === nextDigest)) return;
+    setModelEditorOpen(false);
+    setValue((old) => ({...old, scenes: old.scenes.map((item) => item.id === sceneId ? {...item, modelScene: resetModelPlan(item, item.modelScene)} : item)}));
+    setMessage("模型已更新，相机轨道已重置；保留的标注文字需要重新点选表面。");
+  }, [current?.id, currentResource?.modelPath]);
   useEffect(() => {
     setResourcePolygons(currentResource?.polygons ?? []);
   }, [current?.id, currentResource?.polygons]);
@@ -156,6 +185,10 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     const definition = templateById.get(scene.templateId);
     if (definition && !isTemplateAvailableForProfile(definition, profile)) return `第 ${index + 1} 个镜头：当前账号或专题不可用`;
     const status = getTemplateStatus(scene);
+    if (status.usable && scene.templateId === "rve/3d-model-scene") {
+      try { resolveModelSceneSchedule(scene, captions, scene.templateData); }
+      catch (error) { return `第 ${index + 1} 个镜头：${error instanceof Error ? error.message : "口播绑定无效"}`; }
+    }
     return status.usable ? null : `第 ${index + 1} 个镜头：${status.reason}`;
   }).find((item): item is string => Boolean(item));
   // 首场默认使用 IP 开场舞台，但允许用户改成任意可用的 B-roll 模板；尾场仍保持结论舞台。
@@ -340,7 +373,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       return;
     }
     try {
-      const nextScenes = splitVisualPlanScene(value.scenes, selected, Math.round(splitAtMs));
+      const nextScenes = splitVisualPlanScene(value.scenes, selected, Math.round(splitAtMs), captions, 30);
       audio.current?.pause();
       if (audio.current) audio.current.currentTime = splitAtMs / 1000;
       setTime(Math.round(splitAtMs));
@@ -417,8 +450,10 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
         {fixedEdge ? <div className="visual-plan-structure"><span>固定模板</span><strong>{templateById.get(current.templateId)?.label}</strong><small>最后镜头固定为结论 IP 舞台</small></div> : <div className="template-field"><label>可用模板</label><div className="compatible-template-picker">{availableTemplates.map((definition) => {
           const candidateResource = visualResourceForScene(visualResources, current.id, current.segmentId);
           const candidateImagePath = candidateResource?.imagePath ? sceneImageUrl(jobId, candidateResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
+          const candidateModelPath = candidateResource?.modelPath ? sceneImageUrl(jobId, candidateResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
           const candidateTemplateData = definition.id === "rve/visual-image" && candidateImagePath && candidateResource?.imageWidth && candidateResource.imageHeight
             ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
+            : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
             : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
           const candidatePresenter = definition.rollRole === "a-roll"
             ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
@@ -426,9 +461,23 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
           const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
           const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
-          const canSelectPendingImage = definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源";
-          return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingImage)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingImage ? "可先选择，待上传图片" : status.reason}</small></span></button>;
+          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene";
+          return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingMedia)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingMedia ? "可先选择，待完成素材与编排" : status.reason}</small></span></button>;
         })}</div></div>}
+        {current.templateId === "rve/3d-model-scene" ? <section className="visual-plan-image-resources" aria-label="当前镜头 3D 模型">
+          <div className="visual-plan-section-heading"><div><p className="review-section-label">3D 模型</p><h3>模型动作与标注</h3></div><span className="metadata">{currentModelPath ? "已上传" : "待上传"}</span></div>
+          <div className="visual-plan-image-actions"><label className="secondary cover-image-upload-label" title="上传 50MB 以内的自包含 GLB（支持 Draco）；暂不支持外部资源、Meshopt、KTX2。替换后会重置相机轨道及部件锚点，保留标注文字待重新绑定。"><Icon name="upload" />{currentModelPath ? "替换 GLB" : "上传 GLB"}<input type="file" accept=".glb,model/gltf-binary" disabled={locked} onChange={(event) => { const file = event.target.files?.[0]; if (file) void onUploadModel(current.id, current.segmentId, file); event.currentTarget.value = ""; }} /></label>{currentModelPath ? <button type="button" className="secondary" disabled={locked} title="删除当前镜头的模型素材；继续使用 3D 场景前需要重新上传 GLB。" onClick={() => void onDeleteModel(current.id, current.segmentId)}>删除模型</button> : null}<GlbModelPrompt key={current.id} jobId={jobId} segmentId={current.segmentId} spokenText={runtimeScene?.spokenText ?? ""} disabled={locked} /></div>
+          <p className="field-hint">支持 50MB 以内、自包含 GLB（支持 Draco）；暂不支持 Meshopt 和 KTX2。</p>
+          <p>旋转、平移或缩放到目标视角，再在时间轴记录相机关键帧与表面标注。</p>
+          <button type="button" disabled={locked || !currentModelPath || !runtimeScene} title="打开大预览，调整相机、记录关键帧和编辑部件标注；窗口内可直接保存修改。" onClick={() => { audio.current?.pause(); setPlaying(false); setModelEditorOpen(true); }}>打开三维镜头编辑器</button>
+          {current.modelScene?.annotations.some((a) => !a.anchor) ? <p role="status" className="field-hint">存在尚未绑定模型表面的标注，请在编辑器中重新点选。</p> : null}
+          {modelEditorOpen && runtimeScene && currentModelPath ? <ModelSceneEditor key={current.id} plan={current.modelScene ?? freshCameraPlan(current)} scene={runtimeScene} captions={captions} src={currentModelPath} audioSrc={audioSrc} initialTimeMs={time} onClose={() => setModelEditorOpen(false)} onApply={async (modelScene) => {
+            // 三维编辑器的保存直接落盘，只有请求成功后才更新工作台和已保存基线。
+            const next = await onSave(saveInput({...value, scenes: value.scenes.map((scene) => scene.id === current.id ? {...scene, modelScene} : scene)}, title));
+            incomingPlan.current = JSON.stringify(next);
+            setValue(next); setSaved(next); setMessage("三维镜头修改已保存。");
+          }} /> : null}
+        </section> : null}
         {current.templateId === "rve/visual-image" ? <section className="visual-plan-image-resources" aria-label="当前镜头图片资源">
           <div className="visual-plan-section-heading"><div><p className="review-section-label">图片资源</p><h3>视觉要求图片</h3></div><span className="metadata">{currentImagePath ? "已上传" : "待上传"}</span></div>
           <div className="visual-plan-image-actions">

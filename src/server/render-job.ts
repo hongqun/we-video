@@ -11,8 +11,9 @@ import {artifactManifestSchema, type RenderManifest} from "../remotion/schema";
 import {resolveManifestMedia} from "../lib/manifest-media";
 import {assertNarrationFrameCoverage, narrationSceneFrameSpans} from "../remotion/timeline";
 import {getTemplateStatus} from "../remotion/templates/registry";
-import {formatFrameCorruptions, inspectRenderedFrameIntegrity, renderBrowserConfig} from "../lib/render-integrity";
+import {formatFrameCorruptions, inspectRenderedFrameIntegrity, renderBrowserConfig, modelRenderGl} from "../lib/render-integrity";
 import {buildVisualImageSchedule} from "../remotion/templates/visual-image";
+import {resolveModelSceneSchedule} from "../remotion/templates/model-scene-timing";
 
 const VISUAL_IMAGE_WRITER = path.join(REMOTION_PUBLIC_DIR, "template-assets", "visual-image", "writer_1.svg");
 
@@ -28,6 +29,12 @@ const assertRenderPreflight = async (manifest: RenderManifest) => {
       // 渲染前复用确认阶段的严格调度校验，禁止失配图片静默降级。
       buildVisualImageSchedule({scene, captions: manifest.captions, data: scene.templateData});
       await fs.access(VISUAL_IMAGE_WRITER).catch(() => { throw new Error("渲染前检查失败：visual-image 缺少手写笔资源 writer_1.svg"); });
+    }
+    if (scene.templateId === "rve/3d-model-scene") {
+      const schedule = resolveModelSceneSchedule(scene, manifest.captions, scene.templateData, manifest.video.fps);
+      const modelPath = schedule.data.modelPath.replace(/^artifact:\/\//u, "");
+      if (!modelPath.startsWith("uploaded-models/") || modelPath.includes("..")) throw new Error(`渲染前检查失败：${scene.id} 的模型路径无效`);
+      await fs.access(path.join(jobDir(manifest.jobId), modelPath)).catch(() => { throw new Error(`渲染前检查失败：${scene.id} 的 GLB 文件不存在`); });
     }
   }));
 };
@@ -99,6 +106,8 @@ const main = async () => {
     createRenderArtifactToken(manifest.jobId),
   );
   const directory = jobDir(manifest.jobId);
+  const has3dScene = manifest.contentMode !== "math" && manifest.scenes.some((scene) => scene.templateId === "rve/3d-model-scene");
+  let chromiumOptions: {gl: ReturnType<typeof modelRenderGl>} | undefined;
   const outputLocation = path.join(directory, "output.mp4");
   const renderAttemptId = `${process.pid}-${Date.now()}`;
   const temporaryOutputLocations = [1, 2].map((attempt) => path.join(
@@ -123,6 +132,8 @@ const main = async () => {
     });
   };
   try {
+    chromiumOptions = has3dScene ? {gl: modelRenderGl(process.env.REMOTION_3D_GL)} : undefined;
+    if (chromiumOptions) console.info(`[3D render] GL=${chromiumOptions.gl}, concurrency=1`);
     const browserConfig = await resolveBrowserConfig();
     const serveUrl = await bundle({entryPoint: REMOTION_ENTRY, publicDir: REMOTION_PUBLIC_DIR});
     const composition = await selectComposition({
@@ -131,6 +142,7 @@ const main = async () => {
       inputProps: props,
       browserExecutable: browserConfig.browserExecutable,
       chromeMode: browserConfig.chromeMode,
+      chromiumOptions,
       timeoutInMilliseconds: 60_000,
     });
     const renderAttempt = async (attempt: 1 | 2, concurrency: "50%" | 1) => {
@@ -147,7 +159,8 @@ const main = async () => {
         inputProps: props,
         browserExecutable: browserConfig.browserExecutable,
         chromeMode: browserConfig.chromeMode,
-        concurrency,
+        chromiumOptions,
+        concurrency: has3dScene ? 1 : concurrency,
         timeoutInMilliseconds: 60_000,
         // PNG 中间帧消除 JPEG 块效应；最终仍由 Remotion 编码为标准 H.264 成片。
         imageFormat: "png",
@@ -188,7 +201,7 @@ const main = async () => {
     await atomicWriteJson(jobPath, {
       ...job,
       state: "failed",
-      error: error instanceof Error ? error.message : "渲染失败",
+      error: `${has3dScene ? `[3D GL=${chromiumOptions?.gl ?? "配置校验失败"}] ` : ""}${error instanceof Error ? error.message : "渲染失败"}`,
       updatedAt: new Date().toISOString(),
     });
     throw error;

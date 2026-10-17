@@ -2,6 +2,7 @@
   "name": "we-video",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "set -a; . ./.env; set +a; next dev --hostname 0.0.0.0 --port 3100",
     "profile:sync": "node scripts/sync-profile-assets.mjs",
@@ -10,7 +11,7 @@
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1 --port 3100",
     "lint": "eslint src && tsc --noEmit",
-    "test": "set -a; . ./.env; set +a; node --import tsx src/tests/contracts.test.ts && node --import tsx src/tests/filename.test.ts && node --import tsx src/tests/render-integrity.test.ts && node --import tsx src/tests/tts.test.ts && node --import tsx src/tests/narration.test.ts && node --import tsx src/tests/template-contracts.test.ts && npm run test:translation && npm run test:relation-graph && npm run test:captions && npm run test:visual-image && npm run test:visual-plan && npm run test:visual-plan-integration",
+    "test": "set -a; . ./.env; set +a; node --import tsx src/tests/contracts.test.ts && node --import tsx src/tests/filename.test.ts && node --import tsx src/tests/render-integrity.test.ts && node --import tsx src/tests/tts.test.ts && node --import tsx src/tests/narration.test.ts && node --import tsx src/tests/template-contracts.test.ts && npm run test:translation && npm run test:relation-graph && npm run test:captions && npm run test:visual-image && npm run test:visual-plan && npm run test:visual-plan-integration && npm run test:model-scene",
     "test:translation": "node --import tsx src/tests/translation.test.ts",
     "test:captions": "node --import tsx src/tests/captions.test.ts",
     "test:visual-image": "node --import tsx src/tests/visual-image.test.ts",
@@ -19,7 +20,8 @@
     "test:visual-plan-integration": "esbuild src/tests/visual-plan.integration.test.ts --bundle --format=esm --platform=node --packages=external --outfile=node_modules/.cache/talk-video/visual-plan.integration.test.mjs --log-level=error && node node_modules/.cache/talk-video/visual-plan.integration.test.mjs",
     "studio": "remotion studio src/remotion/index.ts",
     "render:job": "tsx src/server/render-job.ts",
-    "talk:approve": "tsx src/server/talk-worker.ts"
+    "talk:approve": "tsx src/server/talk-worker.ts",
+    "test:model-scene": "esbuild src/tests/model-scene.test.ts --bundle --format=esm --platform=node --packages=external --outfile=node_modules/.cache/talk-video/model-scene.test.mjs --log-level=error && node node_modules/.cache/talk-video/model-scene.test.mjs"
   },
   "dependencies": {
     "@iconify-json/logos": "^1.2.14",
@@ -28,6 +30,7 @@
     "@iconify-json/simple-icons": "^1.2.93",
     "@iconify-json/solar": "^1.2.10",
     "@iconify/utils": "^3.1.4",
+    "@react-three/fiber": "^9.8.2",
     "@remotion/bundler": "4.0.505",
     "@remotion/captions": "4.0.505",
     "@remotion/cli": "4.0.505",
@@ -35,6 +38,8 @@
     "@remotion/media": "4.0.505",
     "@remotion/player": "4.0.505",
     "@remotion/renderer": "4.0.505",
+    "@remotion/three": "4.0.505",
+    "@types/three": "^0.180.0",
     "@xyflow/react": "^12.11.6",
     "katex": "^0.16.47",
     "lucide-react": "^1.31.0",
@@ -44,6 +49,7 @@
     "remotion": "4.0.505",
     "remotion-animated": "^2.2.0",
     "sharp": "^0.35.3",
+    "three": "^0.180.0",
     "ws": "^8.21.0",
     "zod": "4.4.3"
   },

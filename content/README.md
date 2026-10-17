@@ -51,3 +51,13 @@ TALK_VIDEO_PROFILES_DIR=data/local/content
 - 添加账号：创建新的账号目录和至少一个专题，再更新 `.env` 中的账号与专题 ID。
 
 默认资源同步会按当前账号及专题读取 Logo、人物形象和音乐。运行开发服务或构建前，先确认所选配置和资源文件齐全。
+
+## GLB 模型提示词
+
+在个人专题目录 `data/local/content/<accountId>/series/<seriesId>/` 中创建 `glb-model-template.md`。工作台的“3D 模型 → 查看 GLB 提示词”会读取该模板，供复制到外部生成工具；无需先上传 GLB，也不会调用 AI 或写入镜头规划。参考图片需自行上传到外部生成工具，生成结果仍需通过工作台的 GLB 校验。
+
+模板沿用 `promptRoots()` 的配置顺序：显式 `TALK_VIDEO_PROMPT_DIR` 覆盖目录、任务所属专题、派生专题的母专题，全部缺失时使用系统内置简化模板。任务所属专题来自 `job.json`，不使用当前环境选择的账号或专题。空文件或读取错误会报错，不会被默认模板掩盖。个人模板留在本地内容库，不提交到公开仓库。
+
+使用 `{{NARRATION_CONTEXT}}` 放置可选上下文。界面默认附带当前镜头裁剪后的口播，可关闭；未设置占位符的自定义模板会在末尾追加上下文。系统只拼装提供的口播，不从整篇文章自动扩展内容。口播只帮助识别型号与重点部件，外观以参考图片为准；不得据此虚构内部结构或标签，图文矛盾时先请求澄清。不要将具体口播直接写死在模板中，以免绕过开关。
+
+通用示例见 `config_examples/content/demo/series/general-science/glb-model-template.md`。输出需为不超过 50MB 的自包含普通 GLB 2.0，禁止外部资源、Draco、Meshopt、KTX2；建议模型居中、Y 向上、正面朝 +Z。

@@ -2,12 +2,13 @@ import type {VideoScene} from "../schema";
 import type {PresenterFraming, PresenterPlacement} from "../presenter-config";
 import {visualImageDataSchema} from "./visual-image";
 import {relationGraphDataSchema} from "./relation-graph-schema";
+import {modelSceneDataSchema} from "./model-scene-schema";
 
 export type TemplateCategory = "presenter" | "text" | "content" | "media";
 export type TemplatePresentationMode = "standard" | "immersive" | "visual-first";
 export type SupportingTextPlacement = "header" | "content" | "hidden";
 export type TitleMotion = "reveal" | "typewriter";
-export type TemplateRenderer = "opening-stage" | "closing-stage" | "text-reveal" | "visual-image" | "text-highlight" | "generic-content" | "relation-graph";
+export type TemplateRenderer = "opening-stage" | "closing-stage" | "text-reveal" | "visual-image" | "text-highlight" | "generic-content" | "relation-graph" | "3d-model-scene";
 
 export type TemplateDefinition = {
   id: string;
@@ -15,7 +16,7 @@ export type TemplateDefinition = {
   description: string;
   category: TemplateCategory;
   requiresMedia: boolean;
-  resourceType?: "image";
+  resourceType?: "image" | "model";
   renderer: TemplateRenderer;
   minDurationMs: number;
   fields: string[];
@@ -36,6 +37,7 @@ export const templateRegistry: TemplateDefinition[] = [
   {id: "ip/opening-stage", label: "IP 动态开场舞台", description: "默认首镜头，可按需替换。", category: "presenter", requiresMedia: false, renderer: "opening-stage", minDurationMs: 1800, fields: [], adapted: true, presentationMode: "immersive", supportingTextPlacement: "hidden", titleMotion: "reveal", rollRole: "a-roll", companionPlacements: [], companionFraming: "full"},
   {id: "rve/text-reveal", label: "揭示文字", description: "逐步揭示核心文字。", category: "text", requiresMedia: false, renderer: "text-reveal", minDurationMs: 1800, fields: [], presentationMode: "immersive", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/visual-image", label: "视觉要求图片", description: "按口播时间揭示人工审核配图。", category: "media", requiresMedia: true, resourceType: "image", renderer: "visual-image", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
+  {id: "rve/3d-model-scene", label: "3D Model Scene", description: "按口播编排 GLB 模型环绕、特写与标注。", category: "media", requiresMedia: true, resourceType: "model", renderer: "3d-model-scene", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/text-highlight", label: "文字重点标注", description: "按口播锚点依次高亮关键词。", category: "content", requiresMedia: false, renderer: "text-highlight", minDurationMs: 2200, fields: [], presentationMode: "standard", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/generic-content", label: "通用内容卡", description: "承载主标题、副标题、正文和关键词。", category: "content", requiresMedia: false, renderer: "generic-content", minDurationMs: 1800, fields: [], presentationMode: "standard", supportingTextPlacement: "header", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/relation-graph", label: "关系图", description: "拖拽节点并按口播关键词逐步呈现关系。", category: "content", requiresMedia: false, renderer: "relation-graph", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
@@ -53,7 +55,8 @@ export const getTemplateStatus = (scene: VideoScene) => {
   if (!definition.adapted) return {definition, reason: "模板尚未完成适配", usable: false};
   if (!isTemplateCompatible(scene, definition)) return {definition, reason: "模板不允许用于当前镜头", usable: false};
   if (scene.endMs - scene.startMs < definition.minDurationMs) return {definition, reason: `镜头不足 ${(definition.minDurationMs / 1000).toFixed(1)} 秒`, usable: false};
-  if (definition.requiresMedia && !visualImageDataSchema.safeParse(scene.templateData).success) return {definition, reason: "缺少完整图片资源", usable: false};
+  if (definition.resourceType === "image" && !visualImageDataSchema.safeParse(scene.templateData).success) return {definition, reason: "缺少完整图片资源", usable: false};
+  if (definition.resourceType === "model" && !modelSceneDataSchema.safeParse(scene.templateData).success) return {definition, reason: "缺少 GLB 模型或编排", usable: false};
   if (definition.renderer === "relation-graph" && !relationGraphDataSchema.safeParse(scene.templateData).success) return {definition, reason: "关系图尚未编排", usable: false};
   return {definition, reason: "可用", usable: true};
 };

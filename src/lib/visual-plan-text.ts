@@ -38,6 +38,35 @@ export const spokenTextForTimeRange = (captions: readonly Caption[], startMs: nu
   }, "");
 };
 
+// 连续口播保留字符时间映射，供播放着色、点击定位及绑定片段标记共用。
+export const narrationDocumentForTimeRange = (captions: readonly Caption[], startMs: number, endMs: number) => {
+  let text = "";
+  const times: Array<{startMs: number; endMs: number}> = [];
+  for (const caption of captions) {
+    if (caption.endMs <= startMs || caption.startMs >= endMs) continue;
+    const characters = Array.from(caption.text);
+    const from = captionTextBoundary(caption, Math.max(startMs, caption.startMs));
+    const to = captionTextBoundary(caption, Math.min(endMs, caption.endMs));
+    const chunk = characters.slice(from, to).join("");
+    if (!chunk) continue;
+    const previous = text.split(/\s+/u).at(-1) ?? "";
+    if (text && needsCaptionWordSpace(previous, chunk)) {
+      text += " "; times.push({startMs: caption.startMs, endMs: caption.startMs});
+    }
+    for (let index = from; index < to; index++) {
+      const character = characters[index]!;
+      const span = {
+        startMs: Math.max(startMs, caption.startMs + (caption.endMs - caption.startMs) * index / characters.length),
+        endMs: Math.min(endMs, caption.startMs + (caption.endMs - caption.startMs) * (index + 1) / characters.length),
+      };
+      text += character;
+      // Intl.Segmenter 的 index 使用 UTF-16；emoji 的两个代码单元指向同一时间。
+      for (let unit = 0; unit < character.length; unit++) times.push(span);
+    }
+  }
+  return {text, times};
+};
+
 // 编辑器光标对应字幕内部的字符位置，字幕是整词时间戳时也能得到稳定的拆分时间。
 export const timeForSpokenTextOffset = (captions: readonly Caption[], startMs: number, endMs: number, offset: number) => {
   let consumed = 0;

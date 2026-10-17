@@ -39,6 +39,15 @@ export const renderBrowserConfig = (configuredExecutable: string | undefined): R
   };
 };
 
+// 同时传给 composition 查询与实际渲染，拒绝拼错的后端配置。
+export const modelRenderGl = (configured: string | undefined) => {
+  const supported = ["angle", "egl", "swiftshader", "swangle", "vulkan", "angle-egl"] as const;
+  const value = configured?.trim() || "swangle";
+  const backend = supported.find((item) => item === value);
+  if (!backend) throw new Error(`REMOTION_3D_GL 无效：${value}；可选 ${supported.join(", ")}`);
+  return backend;
+};
+
 /** 解析 FFmpeg metadata=print 输出，只保留逐帧平均亮度差。 */
 export const parseFrameDifferences = (metadata: string): FrameDifference[] => {
   const differences: FrameDifference[] = [];

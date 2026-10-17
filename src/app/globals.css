@@ -3475,6 +3475,11 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-asset-external > div { display: grid; gap: 7px; grid-template-columns: repeat(9, minmax(0, 1fr)); }
 .visual-asset-external img { height: 30px; width: 30px; }
 .visual-asset-message { color: #526c62; }
+.visual-plan-model-row { align-items: end; border: 1px solid var(--line); border-radius: 10px; display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; padding: 12px; }
+.visual-plan-model-row > strong { min-width: 58px; }
+.visual-plan-model-row label { flex: 1 1 160px; }
+.visual-plan-model-picker { background: #e8eee9; border: 1px solid var(--line); border-radius: 12px; margin-top: 12px; overflow: hidden; }
+.visual-plan-model-picker > div:first-child { align-items: center; display: flex; justify-content: space-between; padding: 10px 12px; }
 .visual-plan-actions { grid-template-columns: auto minmax(180px, 1fr) minmax(180px, 1fr) auto auto; align-items: end; }
 @media (max-width: 980px) { .visual-plan-body { grid-template-columns: 1fr; } .visual-plan-cover-editor { grid-template-columns: 1fr; } .visual-plan-preview { position: static; } }
 @media (max-width: 760px) { .visual-style-options { grid-template-columns: 1fr; } }
@@ -4210,3 +4215,138 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
   .translation-columns { grid-template-columns: minmax(0, 1fr); }
   .translation-column .translation-fulltext { min-height: 360px; }
 }
+
+/* 三维镜头工作区固定在视窗内，视口收缩，参数与长轨道仅在各自区域滚动。 */
+.model-editor-backdrop {position: fixed; inset: 0; z-index: 120; background: #111c2abb; display: grid; place-items: center; padding: 16px;}
+.model-editor {width: min(1320px, 100%); height: calc(100dvh - 32px); max-height: 940px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; background: #f7f9fa; color: #20352e; border-radius: 12px; box-shadow: 0 20px 80px #0005; padding: 12px; gap: 8px; text-align: left;}
+.model-editor.is-maximized {width: 100%; max-height: none; height: 100dvh; border-radius: 0;}
+.model-editor-backdrop:has(.is-maximized) {padding: 0;}
+.model-editor header, .model-editor-toolbar {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;}
+.model-editor > header {flex: 0 0 auto;}
+.model-editor h2, .model-editor h3, .model-editor p {margin: 0;}
+.model-editor h2 {font-size: 18px; line-height: 1.3;}
+.model-editor h3 {font-size: 14px;}
+.model-editor header small {font-size: 11px;}
+.model-editor-actions {display: flex; align-items: center; gap: 6px; flex-wrap: wrap;}
+.model-editor button {min-height: 28px; padding: 4px 9px; font-size: 12px; line-height: 1.3;}
+.model-editor-body {flex: 1 1 0; min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 12px;}
+.model-editor-stage {min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 6px;}
+.model-editor-viewport {min-width: 0; min-height: 0; container-type: size; display: flex; align-items: center; justify-content: center; overflow: hidden;}
+/* 同时受可用宽、高约束，保留与成片一致的 952:700 画幅。 */
+.model-editor-viewport > div {width: min(100cqw, calc(100cqh * 952 / 700)) !important; flex: 0 0 auto;}
+.model-editor-stage canvas {touch-action: none;}
+.model-editor-stage > .field-hint {font-size: 11px; line-height: 1.3;}
+.model-editor-toolbar {font-size: 12px;}
+.model-editor-toolbar > div {display: flex; gap: 6px;}
+.model-editor-inspector {min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; border-left: 1px solid #d6dfdc; padding-left: 12px;}
+.model-editor-inspector > h3, .model-editor-inspector > p, .model-editor-inspector > button, .model-editor-inspector > section, .model-editor-inspector > label:has(input:not([type="number"]):not([type="color"]):not([type="checkbox"])) {grid-column: 1 / -1;}
+.model-editor label {min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; line-height: 1.3;}
+.model-editor input, .model-editor select {min-width: 0; width: 100%; padding: 4px 6px; border: 1px solid #bdcbc6; border-radius: 5px; background: white; color: #20352e; font-size: 12px; line-height: 1.3;}
+.model-editor input[type="checkbox"] {width: auto;}
+.model-editor input[type="range"] {padding: 0; margin: 0; accent-color: #267b64;}
+.model-editor-timeline {flex: 0 0 auto; min-width: 0; border-top: 1px solid #c9d7d1; padding-top: 8px; display: flex; flex-direction: column; gap: 4px;}
+.model-editor-timeline > .model-editor-actions > span {font-size: 12px; font-variant-numeric: tabular-nums;}
+.model-camera-track {position: relative; height: 28px; margin: 0 10px; background: #dce7e3; border-radius: 5px;}
+.model-camera-track button {position: absolute; top: 0; transform: translateX(-50%); min-width: 16px; padding: 0 3px; background: transparent; color: #2b6251; border: 0; cursor: grab;}
+.model-camera-track button.is-selected {color: #b46d00; background: #ffdfa1; z-index: 2;}
+.model-playhead {position: absolute; height: 100%; border-left: 2px solid #d17a15; pointer-events: none; z-index: 3;}
+.model-annotation-track {display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-height: 59px; overflow: auto; overscroll-behavior: contain;}
+.model-annotation-track:empty, .model-caption-document:empty {display: none;}
+.model-annotation-track button {max-width: 100%; white-space: nowrap;}
+/* 口播与关键帧优先多行展示，超多内容只在局部纵向滚动，保留预览高度。 */
+.model-editor-fields {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;}
+.model-editor-fields label:has(input[type="checkbox"]) {grid-column: 1 / -1; flex-direction: row; align-items: center;}
+.model-auto-panel {background: #edf3f0; padding: 8px; border: 1px solid #adc4ba; border-radius: 6px; display: grid; gap: 8px; font-size: 12px;}
+.model-editor-error, .model-load-error {background: #fff0e9; color: #843414; padding: 8px; border-radius: 6px;}
+.model-editor > .model-editor-error {flex: 0 0 auto; max-height: 42px; overflow: auto; font-size: 12px;}
+.model-load-error {position: absolute; inset: 12px; z-index: 3;}
+.model-load-status {position: absolute; top: 12px; left: 12px; pointer-events: none; font-size: 14px;}
+.model-retry {position: absolute; right: 12px; bottom: 12px; z-index: 4;}
+.model-editor :focus-visible {outline: 3px solid #d98c23; outline-offset: 2px;}
+.model-time-ruler {display: flex; justify-content: space-between; padding: 0 10px; font-size: 10px; color: #526f62; font-variant-numeric: tabular-nums;}
+.model-annotation-row {position: relative; width: 100%; min-height: 28px; flex: 0 0 28px; overflow: hidden; background: #edf1f4; border-radius: 5px;}
+.model-annotation-row button {position: absolute; top: 0; overflow: hidden; text-overflow: ellipsis; text-align: left;}
+@media (max-width: 850px) {
+  .model-editor-backdrop {padding: 8px;}
+  .model-editor {height: calc(100dvh - 16px); padding: 8px;}
+  .model-editor-body {grid-template-columns: minmax(0, 1fr) 240px; gap: 8px;}
+  .model-editor-inspector {padding-left: 8px;}
+}
+@media (max-width: 600px) {
+  .model-editor-body {grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 0.65fr);}
+  .model-editor-inspector {border-left: 0; border-top: 1px solid #c9d7d1; padding: 8px 0 0;}
+  .model-editor header {align-items: flex-start;}
+  .model-editor h2 {font-size: 16px;}
+  .model-editor-stage > .field-hint {display: none;}
+  .model-editor-stage {grid-template-rows: auto minmax(0, 1fr) auto;}
+}
+@media (max-height: 620px) {
+  .model-editor {gap: 6px; padding: 8px;}
+  .model-editor header small, .model-editor-stage > .field-hint {display: none;}
+  .model-editor-stage {grid-template-rows: auto minmax(0, 1fr) auto;}
+  .model-annotation-track {max-height: 28px;}
+}
+
+/* 关键帧数量和时间独立可见，密集点或同帧更新也能确认记录结果。 */
+.model-keyframe-list {display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; max-height: min(96px, 14dvh); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;}
+.model-keyframe-list > strong, .model-keyframe-list > button {flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere;}
+.model-keyframe-list > strong {font-size: 12px; margin-right: 4px;}
+/* 首帧绿、尾帧紫、中间帧蓝；选中项用暖黄色和边框共同强调。 */
+.model-keyframe-list > .model-keyframe-chip {border: 1px solid #b8d2e7; background: #eaf3fc; color: #28567d; font-variant-numeric: tabular-nums;}
+.model-keyframe-list > .model-keyframe-chip.is-start {background: #e4f3e9; color: #246344; border-color: #aad2b9;}
+.model-keyframe-list > .model-keyframe-chip.is-end {background: #f0eafb; color: #69458d; border-color: #cbb7e1;}
+.model-keyframe-list > .model-keyframe-chip.is-selected {background: #fff0c7; color: #775013; border-color: #c68a21; box-shadow: inset 0 0 0 1px #c68a21;}
+.model-editor > .model-editor-notice {flex: 0 0 auto; margin: 0; padding: 5px 8px; border-radius: 5px; background: #e6f3ec; color: #225d46; font-size: 12px;}
+
+/* 默认铺满视窗，工具栏合并，参数面板可收起，给三维画面留下完整高度。 */
+.model-editor-stage {grid-template-rows: auto minmax(0, 1fr) auto;}
+.model-editor-body.is-inspector-collapsed {grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);}
+.model-editor-toolbar {align-items: center;}
+.model-editor-toolbar > span {flex: 0 0 auto;}
+.model-editor-toolbar > .model-editor-actions {flex: 1; justify-content: flex-end; flex-wrap: wrap;}
+.model-editor-inspector .model-annotation-presets {grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;}
+.model-annotation-presets button {padding: 4px; background: #e7eee8; border: 1px solid transparent;}
+.model-annotation-presets button.is-selected {border-color: #267b64; box-shadow: inset 0 0 0 1px #267b64;}
+.model-annotation-presets button > span {display: block; width: 100%; padding: 5px 2px; border: 1px solid; border-radius: 6px; font-size: 11px;}
+.model-editor-inspector > .model-checkbox {grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 6px;}
+.model-editor-inspector input[type="color"] {height: 28px; padding: 2px;}
+.model-editor-timeline {gap: 3px; padding-top: 6px;}
+.model-camera-track button.is-boundary {cursor: pointer; font-size: 16px; color: #1a6350;}
+@media (max-height: 620px), (max-width: 600px) {
+  .model-editor-stage {grid-template-rows: auto minmax(0, 1fr);}
+}
+.model-editor-transport {display: flex; align-items: center; gap: 12px; min-width: 0;}
+.model-editor-transport > .model-editor-actions {flex: 0 1 auto; min-width: 0; max-width: 100%;}
+.model-editor-transport > input[type="range"] {flex: 1 1 auto; min-width: 100px;}
+.model-editor-transport .model-editor-actions > span {font-size: 12px; font-variant-numeric: tabular-nums;}
+.model-editor .model-annotation-track {max-height: 28px;}
+@media (max-width: 850px) {
+  .model-editor-transport {flex-wrap: wrap; gap: 4px;}
+  .model-editor-transport > input[type="range"] {flex-basis: 100%;}
+}
+
+/* 连续口播自然折行；播放进度改文字颜色，绑定沿用文档高亮和末尾编号。 */
+.model-caption-document {min-width: 0; max-height: min(108px, 16dvh); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 5px 8px; border-radius: 8px; background: #f1f5f2;}
+.model-caption-document p {margin: 0; color: #7a857e; font-size: 13px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere;}
+.model-caption-document p > span {cursor: pointer;}
+.model-caption-document .is-played {color: #20664b;}
+.model-caption-document .is-current {color: #173c2d; text-decoration: underline; text-underline-offset: 3px;}
+.model-caption-document .is-reference {background: #e3edf9; box-shadow: inset 0 -2px #8aafd4;}
+.model-caption-document .is-current-reference {background: #e5f3ba; box-shadow: inset 0 -2px #769b32;}
+.model-caption-document sup {font-size: 9px; color: #426522; padding-inline: 2px; user-select: none;}
+
+/* 参数说明图标常驻，浮层独立于面板滚动区域，不挤占预览。 */
+.model-parameter-name {display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px;}
+.model-editor .model-parameter-tip {display: inline-flex; align-items: center; justify-content: center; flex: 0 0 18px; width: 18px; height: 18px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #537464; font-size: 16px; line-height: 1; cursor: help;}
+.model-editor .model-parameter-tip:hover, .model-editor .model-parameter-tip:focus-visible {background: #dcebcf; color: #1e4d37; outline: 2px solid #6d9766; outline-offset: 1px;}
+.model-parameter-tooltip {position: fixed; z-index: 10000; box-sizing: border-box; width: min(280px, calc(100vw - 24px)); padding: 10px 12px; border: 1px solid #496957; border-radius: 8px; background: #203c2e; color: #fff; box-shadow: 0 4px 16px #142d3033; font-size: 13px; font-weight: 400; line-height: 1.65; white-space: normal; overflow-wrap: anywhere; pointer-events: none;}
+
+/* GLB 提示词窗口固定外框，长正文只在文本区域滚动。 */
+.glb-prompt-dialog {display: flex; flex-direction: column; gap: 12px; width: min(760px, calc(100vw - 32px)); max-width: 760px; height: min(760px, calc(100dvh - 48px)); overflow: hidden;}
+.glb-prompt-dialog > * {flex-shrink: 0;}
+.glb-prompt-dialog p {margin: 0;}
+.glb-prompt-dialog .glb-prompt-context {display: flex; align-items: center; gap: 8px;}
+.glb-prompt-dialog .glb-prompt-context input {width: auto; margin: 0;}
+.glb-prompt-dialog .glb-prompt-body {display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; overflow: hidden;}
+.glb-prompt-body textarea {flex: 1; min-height: 0; width: 100%; resize: none; overflow-y: auto; overflow-x: hidden; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 14px; line-height: 1.7;}
+.glb-prompt-dialog .actions {flex-wrap: wrap;}

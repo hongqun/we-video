@@ -65,6 +65,8 @@ export type ReviewAudioStatusInput = {
   jobState: string;
   manifest: ArtifactManifest | null;
   voiceId?: string;
+  rate?: number;
+  generatedAudio?: {voice?: string; synthesis?: {rate?: number}} | null;
 };
 
 export const reviewAudioStatus = ({
@@ -74,11 +76,16 @@ export const reviewAudioStatus = ({
   jobState,
   manifest,
   voiceId,
+  rate,
+  generatedAudio,
 }: ReviewAudioStatusInput): ReviewAudioStatus => {
   if (jobState === "synthesizing") return "synthesizing";
   if (jobState === "planning_visuals") return "planning";
-  if (jobState === "awaiting_audio_review") return "review";
   if (draftChanged) return "stale";
+  // 优先比较音频产物的实际参数，待审核状态也不能掩盖设置变化。
+  if (generatedAudio && ((voiceId && generatedAudio.voice !== voiceId) ||
+    (rate !== undefined && generatedAudio.synthesis?.rate !== rate))) return "stale";
+  if (jobState === "awaiting_audio_review") return generatedAudio ? "review" : "missing";
   if (!manifest || manifest.revision !== selectedRevision) {
     return jobState === "failed" ? "failed" : "missing";
   }

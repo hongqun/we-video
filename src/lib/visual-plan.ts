@@ -10,10 +10,13 @@ import {defaultCover} from "@/remotion/cover";
 import {isTemplateAvailableForProfile, templateById} from "@/remotion/templates/registry";
 import {normalizeVisualPlanVisibleText, spokenTextForTimeRange} from "./visual-plan-text";
 import {buildVisualImageSchedule} from "@/remotion/templates/visual-image";
-import {readVisualResources, type VisualResources} from "./visual-resources";
+import {readVisualResources, copySplitModelResources, type VisualResources} from "./visual-resources";
 import {visualResourceForScene} from "./visual-resource-selection";
 import {relationGraphDataSchema} from "@/remotion/templates/relation-graph-schema";
 import {relationGraphNodeCue, relationGraphNodeDisplayName} from "@/remotion/templates/relation-graph";
+import {modelScenePlanSchema} from "@/remotion/templates/model-scene-schema";
+import {ensureCameraBoundaries} from "@/remotion/templates/model-scene-editing";
+import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
 
 const presenterPlanSchema = z.object({rollType: rollTypeSchema, mode: presenterModeSchema, poseId: presenterPoseIdSchema, placement: presenterPlacementSchema, framing: presenterFramingSchema.optional()}).strict();
 
@@ -27,6 +30,7 @@ export const visualPlanSceneSchema = z.object({
   content: visualPlanContentSchema,
   templateId: z.string().min(1),
   visualData: relationGraphDataSchema.optional(),
+  modelScene: modelScenePlanSchema.optional(),
   presenter: presenterPlanSchema,
 }).strict();
 export const visualPlanSchema = z.object({schemaVersion: z.literal("1.0"), revision: z.number().int().positive().default(1), planVersion: z.number().int().positive(), createdAt: z.string().datetime(), feedback: z.string().trim().min(1).optional(), visualStyle: visualStyleSchema.optional(), cover: coverSchema.optional(), scenes: z.array(visualPlanSceneSchema).min(1)}).strict();
@@ -111,6 +115,14 @@ export const readVisualPlan = async (jobId: string, revision?: number) => {
 
 const templateDataForManifest = (scene: VisualPlanScene, resources: VisualResources, allowIncompleteImage = false): Record<string, unknown> | undefined => {
   if (scene.templateId === "rve/relation-graph") return scene.visualData ? relationGraphDataSchema.parse(scene.visualData) : undefined;
+  if (scene.templateId === "rve/3d-model-scene") {
+    const resource = visualResourceForScene(resources, scene.id, scene.segmentId);
+    if (!scene.modelScene || !resource?.modelPath) {
+      if (allowIncompleteImage) return undefined;
+      throw new Error(`镜头 ${scene.segmentId} 缺少模型或编排`);
+    }
+    return {modelPath: `artifact://${resource.modelPath}`, ...modelScenePlanSchema.parse(scene.modelScene)};
+  }
   if (scene.templateId !== "rve/visual-image") return undefined;
   const resource = visualResourceForScene(resources, scene.id, scene.segmentId);
   if (!resource?.imagePath || !resource.imageWidth || !resource.imageHeight) {
@@ -208,6 +220,9 @@ export const validateVisualPlan = (plan: VisualPlan, draft: Draft, narration: Na
         if (node.data.cueText && !relationGraphNodeCue(runtimeScenes[index]!, narration.captions, node)) throw new Error(`视觉场景 ${runtimeScenes[index]!.id}（口播段落 ${scene.segmentId}）的关系图节点“${relationGraphNodeDisplayName(node)}”（口播绑定“${node.data.cueText}”）未匹配到当前口播，请修改或清空该节点的口播绑定`);
       });
     }
+    if (scene.templateId === "rve/3d-model-scene" && runtimeScenes[index]!.templateData) {
+      resolveModelSceneSchedule(runtimeScenes[index]!, narration.captions, runtimeScenes[index]!.templateData);
+    }
   });
 };
 
@@ -217,6 +232,7 @@ export const saveVisualPlan = async (jobId: string, input: VisualPlanSaveInput, 
   const plan = normalizeCover(normalizeVisualPlanVisibleText(visualPlanSchema.parse({...parsedInput, planVersion: (current?.planVersion ?? 0) + 1, createdAt: new Date().toISOString()}), draft.narrationSegments), draft.title);
   validateVisualPlan(plan, draft, narration, profile, resources, {allowIncompleteImage: true});
   await fs.rm(path.join(jobDir(jobId), "visual-plans"), {recursive: true, force: true});
+  await copySplitModelResources(jobId, plan.scenes, resources);
   await atomicWriteJson(currentPlanPath(jobId), plan);
   // 镜头结构变化后，旧 Manifest 与成片不再代表当前任务。
   await Promise.all([
@@ -239,7 +255,9 @@ export const retimeCopiedVisualPlan = async (jobId: string) => {
     const duration = next.endMs - next.startMs;
     const startRatio = (scene.startMs - oldStart) / (oldEnd - oldStart);
     const endRatio = (scene.endMs - oldStart) / (oldEnd - oldStart);
-    return {...scene, startMs: Math.round(next.startMs + duration * startRatio), endMs: Math.round(next.startMs + duration * endRatio)};
+    const retimed = {...scene, startMs: Math.round(next.startMs + duration * startRatio), endMs: Math.round(next.startMs + duration * endRatio)};
+    if (retimed.templateId === "rve/3d-model-scene" && retimed.modelScene) retimed.modelScene = ensureCameraBoundaries(retimed.modelScene, retimed, narration.captions);
+    return retimed;
   });
   const next = visualPlanSchema.parse({...plan, planVersion: plan.planVersion + 1, createdAt: new Date().toISOString(), scenes});
   await atomicWriteJson(currentPlanPath(jobId), next);

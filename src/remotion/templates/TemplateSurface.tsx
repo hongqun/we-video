@@ -6,6 +6,7 @@ import {VisualImage} from "./VisualImage";
 import {TemplateHighlight} from "./TemplateAdapters";
 import {GenericContent} from "./GenericContent";
 import {RelationGraph} from "./RelationGraph";
+import {ModelScene} from "./ModelScene";
 
 // 模板总入口只保留当前流水线白名单，公共场景框架仍由 SceneFrame 承载。
 export const getListCueStarts = (scene: VideoScene, captions: Caption[], items: string[]): number[] => {
@@ -47,6 +48,7 @@ export const TemplateSurface: React.FC<{scene: VideoScene; captions?: Caption[]}
     case "visual-image": rendered = <VisualImage scene={scene} captions={captions} />; break;
     case "generic-content": rendered = <GenericContent scene={scene} />; break;
     case "relation-graph": rendered = <RelationGraph scene={scene} captions={captions} />; break;
+    case "3d-model-scene": rendered = <ModelScene scene={scene} captions={captions} />; break;
     default: return null;
   }
   return <SceneFrame scene={scene} presentationMode={status.definition?.presentationMode} supportingTextPlacement={status.definition?.supportingTextPlacement} consumesMainAsset={Boolean(status.definition?.requiresMedia)}>{rendered}</SceneFrame>;

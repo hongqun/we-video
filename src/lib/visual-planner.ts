@@ -79,7 +79,8 @@ export const runContractPlanning = async ({modelCall, segments, presenterPoses, 
     const previousTemplate = currentPlan?.scenes.find((scene) => scene.segmentId === segment.id)?.templateId;
     const middleDefault = previousTemplate && !previousTemplate.startsWith("ip/") ? previousTemplate : segment.imagePath ? "rve/visual-image" : "rve/generic-content";
     // 初始镜头由服务端固化时间和转场，后续人工切分不会回到模型输出层。
-    return {id: `plan-${String(index + 1).padStart(2, "0")}`, segmentId: segment.id, startMs: segment.startMs, endMs: segment.endMs, transition: {kind: selectSceneTransition({templateId: middleDefault}, index, segments.length), durationMs: 315}, content: extracted.content, templateId: middleDefault};
+    const previousScene = currentPlan?.scenes.find((scene) => scene.segmentId === segment.id);
+    return {id: previousScene?.id ?? `plan-${String(index + 1).padStart(2, "0")}`, segmentId: segment.id, startMs: segment.startMs, endMs: segment.endMs, transition: {kind: selectSceneTransition({templateId: middleDefault}, index, segments.length), durationMs: 315}, content: extracted.content, templateId: middleDefault, ...(middleDefault === "rve/3d-model-scene" && previousScene?.modelScene ? {modelScene: previousScene.modelScene} : {})};
   });
   return {scenes: attachPresenterPlan(base, base.map(() => "neutral"), presenterPoses, base.map(() => "hidden")), diagnostics: [{phase: "content-extraction", status: "success", contentLength: response.contentLength, finishReason: response.finishReason}]};
 };

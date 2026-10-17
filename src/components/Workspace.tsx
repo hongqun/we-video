@@ -204,8 +204,8 @@ type Snapshot = {
   manifest: ArtifactManifest | null;
   visualPlan?: VisualPlan | null;
   previewArtifactToken?: string;
-  visualResources?: {revision?: number; resources: Array<{segmentId: string; sceneId?: string; imagePath?: string; imageWidth?: number; imageHeight?: number; polygons: Array<{text: string; points: Array<{x: number; y: number}>}>}>} | null;
-  audioPreview?: {src: string; narration: {durationMs: number; voice?: string; captions?: Caption[]; segments?: Array<{id: string; startMs: number; endMs: number; speechStartMs?: number; speechEndMs?: number}>}} | null;
+  visualResources?: {revision?: number; resources: Array<{segmentId: string; sceneId?: string; imagePath?: string; imageWidth?: number; imageHeight?: number; modelPath?: string; polygons: Array<{text: string; points: Array<{x: number; y: number}>}>}>} | null;
+  audioPreview?: {src: string; narration: {durationMs: number; voice?: string; synthesis?: {rate?: number}; captions?: Caption[]; segments?: Array<{id: string; startMs: number; endMs: number; speechStartMs?: number; speechEndMs?: number}>}} | null;
   outputReady: boolean;
 };
 type VisualResourcesPayload = NonNullable<Snapshot["visualResources"]>;
@@ -243,6 +243,8 @@ const formatCommitTime = (value: string): string => {
 // 音频进入试听审核后已经有完整快照，停止轮询以免服务端旧草稿覆盖用户正在编辑的内容。
 const ACTIVE_STATES = new Set(["drafting", "translating", "segmenting_translation", "synthesizing", "planning_visuals", "finalizing_visuals", "rendering"]);
 const EDITOR_LOCKED_STATES = new Set(["drafting", "translating", "segmenting_translation", "synthesizing", "planning_visuals", "finalizing_visuals", "rendering"]);
+// 已生成配音的稳定阶段均允许主动重做，后台工作进行时保持锁定。
+const AUDIO_REGENERATE_STATES = new Set(["awaiting_script_review", "awaiting_review", "awaiting_audio_review", "awaiting_visual_resources", "awaiting_visual_review", "ready", "completed", "failed"]);
 const DIRECT_APPROVE_STATES = new Set(["awaiting_script_review", "awaiting_review", "awaiting_audio_review", "failed"]);
 // 与后端 render 路由保持一致：仅 ready/completed/failed 可启动渲染。
 // 其余状态（含 rendering/synthesizing/drafting/awaiting_review）一律禁用按钮，
@@ -891,7 +893,7 @@ export const Workspace: React.FC = () => {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [draft, step]);
-  const trigger = async (action: "approve" | "render") => {
+  const trigger = async (action: "approve" | "render", regenerateAudio = false) => {
     // 配置未就绪时不提交旧任务残留的音色或语速。
     if (action === "approve" && !mathDraft && loadedSettingsKey !== settingsKey) {
       setError("配音配置尚未加载完成，请稍后重试");
@@ -932,13 +934,13 @@ export const Workspace: React.FC = () => {
       if (action === "approve") {
         const savedSnapshot = await autoSaveCurrentDraft();
         if (!voiceId) throw new Error("请先选择配音音色");
-        if (!DIRECT_APPROVE_STATES.has(savedSnapshot?.job.state ?? snapshot.job.state)) {
+        if (!(regenerateAudio ? AUDIO_REGENERATE_STATES : DIRECT_APPROVE_STATES).has(savedSnapshot?.job.state ?? snapshot.job.state)) {
           throw new Error("当前稿件状态不允许生产配音，请稍后重试");
         }
         const response = await fetch(`/api/jobs/${jobId}/approve`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({voiceId, rate: speechRate}),
+          body: JSON.stringify({voiceId, rate: speechRate, regenerateAudio}),
         });
         const value = await readApiJson<{error?: string; state?: string}>(response);
         if (!response.ok) throw new Error(value.error ?? "生产配音失败");
@@ -1209,7 +1211,7 @@ export const Workspace: React.FC = () => {
         if (!current) return current;
         const previous = current.visualResources?.resources.find((item) => item.sceneId === sceneId)
           ?? current.visualResources?.resources.find((item) => !item.sceneId && item.segmentId === segmentId);
-        const resource = {segmentId, sceneId, imagePath: result.imagePath!, imageWidth: result.imageWidth!, imageHeight: result.imageHeight!, polygons: previous?.polygons ?? []};
+        const resource = {...previous, segmentId, sceneId, imagePath: result.imagePath!, imageWidth: result.imageWidth!, imageHeight: result.imageHeight!, polygons: previous?.polygons ?? []};
         return {...current, visualResources: {revision: (current.visualResources?.revision ?? 1) + 1, resources: [...(current.visualResources?.resources ?? []).filter((item) => item.sceneId !== sceneId), resource]}};
       });
       setError(null);
@@ -1225,7 +1227,8 @@ export const Workspace: React.FC = () => {
       // 建立场景级空资源，明确屏蔽旧的 segment 图片，并保持当前镜头模板不变。
       setSnapshot((current) => {
         if (!current) return current;
-        const resource = {segmentId, sceneId, polygons: []};
+        const previous = current.visualResources?.resources.find((item) => item.sceneId === sceneId);
+        const resource = {segmentId, sceneId, ...(previous?.modelPath ? {modelPath: previous.modelPath} : {}), polygons: []};
         return {...current, visualResources: {revision: (current.visualResources?.revision ?? 1) + 1, resources: [...(current.visualResources?.resources ?? []).filter((item) => item.sceneId !== sceneId), resource]}};
       });
       setError(null);
@@ -1239,6 +1242,42 @@ export const Workspace: React.FC = () => {
     const result = await readApiJson<{error?: string; resources?: VisualResourcesPayload}>(response);
     if (!response.ok) throw new Error(result.error ?? "保存多边形失败");
     if (result.resources) setSnapshot((current) => current ? {...current, visualResources: result.resources!} : current);
+  };
+  // GLB 与图片共用任务级资源快照，但每个镜头独立存放模型。
+  const uploadSceneModel = async (sceneId: string, segmentId: string, file: File) => {
+    if (!jobId || !snapshot || draftChanged) { setError("请先保存口播稿，再上传模型"); return; }
+    try {
+      const body = new FormData(); body.append("model", file); body.append("sceneId", sceneId);
+      const response = await fetch(`/api/model-assets/${jobId}/${encodeURIComponent(segmentId)}`, {method: "POST", body});
+      const result = await readApiJson<{error?: string; modelPath?: string}>(response);
+      if (!response.ok || !result.modelPath) throw new Error(result.error ?? "模型上传失败");
+      setSnapshot((current) => {
+        if (!current) return current;
+        const previous = current.visualResources?.resources.find((item) => item.sceneId === sceneId);
+        const resource = {...previous, segmentId, sceneId, modelPath: result.modelPath!, polygons: previous?.polygons ?? []};
+        return {...current, job: {...current.job, state: "awaiting_visual_review"}, manifest: null, outputReady: false, visualResources: {revision: (current.visualResources?.revision ?? 1) + 1, resources: [...(current.visualResources?.resources ?? []).filter((item) => item.sceneId !== sceneId), resource]}};
+      });
+      setRevisionView((current) => current ? {...current, manifest: null, outputReady: false} : current);
+      setError(null);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "模型上传失败"); }
+  };
+  const deleteSceneModel = async (sceneId: string, segmentId: string) => {
+    if (!jobId || !snapshot || !window.confirm("确定删除当前镜头的 GLB 模型吗？")) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/model-assets/${jobId}/${encodeURIComponent(segmentId)}`, {method: "DELETE", headers: {"Content-Type": "application/json"}, body: JSON.stringify({sceneId})});
+      const result = await readApiJson<{error?: string}>(response);
+      if (!response.ok) throw new Error(result.error ?? "模型删除失败");
+      setSnapshot((current) => {
+        if (!current) return current;
+        const previous = current.visualResources?.resources.find((item) => item.sceneId === sceneId);
+        const resource = {...previous, segmentId, sceneId, modelPath: undefined, polygons: previous?.polygons ?? []};
+        return {...current, job: {...current.job, state: "awaiting_visual_review"}, manifest: null, outputReady: false, visualResources: {revision: (current.visualResources?.revision ?? 1) + 1, resources: [...(current.visualResources?.resources ?? []).filter((item) => item.sceneId !== sceneId), resource]}};
+      });
+      setRevisionView((current) => current ? {...current, manifest: null, outputReady: false} : current);
+      setError(null);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "模型删除失败"); }
+    finally { setBusy(false); }
   };
   const selectTemplate = (index: number, id: string) => {
     const template = templateRegistry.find((item) => item.id === id);
@@ -1282,6 +1321,8 @@ export const Workspace: React.FC = () => {
         // 与第五步预览共用同一份 manifest，避免快照兜底时误判为未生成配音。
         manifest: previewManifest,
         voiceId: voiceId || snapshot.job.generation?.voiceId,
+        rate: speechRate,
+        generatedAudio: snapshot.audioPreview?.narration,
       })
     : "missing";
   const editorLocked = Boolean(
@@ -1820,6 +1861,11 @@ export const Workspace: React.FC = () => {
               />
               <small className="hint">0.5× 较慢 · 1.0× 标准 · 1.5× 较快</small>
             </label>
+            {/* 固定在配音设置旁展示入口，避免用户必须到试听页底部寻找。 */}
+            {snapshot.audioPreview ? <>
+              <button type="button" className="secondary" disabled={busy || loadedSettingsKey !== settingsKey || !AUDIO_REGENERATE_STATES.has(snapshot.job.state) || Boolean(pendingDraft) || audioDraftChanged} onClick={() => void trigger("approve", true)}><Icon name="volume" />重新生成配音</button>
+              <p className="hint">按当前音色和语速重新生成，完成后需重新确认音频与画面。{audioDraftChanged ? "请先保存稿件修改。" : ""}</p>
+            </> : null}
           </>}
         </section>
       )}
@@ -2030,7 +2076,7 @@ export const Workspace: React.FC = () => {
             <footer className="script-review-footer">
               <div>{saveStatus === "saving" ? <span className="save-status is-saving">保存中…</span> : null}{saveStatus === "saved" && !draftChanged ? <span className="save-status is-saved">已保存</span> : null}{saveStatus === "failed" ? <span className="save-status is-failed">保存失败</span> : null}{draftChanged ? <span className="hint">有未保存修改</span> : null}</div>
               <div className="script-review-footer-actions">
-                {snapshot.audioPreview && !isHistoricalRevision ? <AudioReview compact src={snapshot.audioPreview.src} narration={snapshot.audioPreview.narration} segments={draft.narrationSegments ?? draft.scenes.map((scene, index) => ({id: `narration-${String(index + 1).padStart(2, "0")}`, spokenText: scene.spokenText}))} busy={busy} onApprove={audioStatus === "review" ? () => setStep(3) : undefined} /> : null}
+                {snapshot.audioPreview && !isHistoricalRevision && audioStatus !== "stale" ? <AudioReview compact src={snapshot.audioPreview.src} narration={snapshot.audioPreview.narration} segments={draft.narrationSegments ?? draft.scenes.map((scene, index) => ({id: `narration-${String(index + 1).padStart(2, "0")}`, spokenText: scene.spokenText}))} busy={busy} onApprove={audioStatus === "review" || audioStatus === "ready" ? () => setStep(3) : undefined} /> : null}
                 <div className="actions">
                 <button className="secondary" disabled={busy || editorLocked || Boolean(pendingDraft) || !draftChanged} onClick={() => void saveDraft()}><Icon name="save" />保存口播稿</button>
                 {/* 第二步只负责确认口播并进入第三步，视觉资源准备在音频确认后进入第四步。 */}
@@ -2066,7 +2112,9 @@ export const Workspace: React.FC = () => {
             narration={snapshot.audioPreview.narration}
             segments={draft.narrationSegments ?? draft.scenes.map((scene, index) => ({id: `narration-${String(index + 1).padStart(2, "0")}`, spokenText: scene.spokenText}))}
             busy={busy}
-            onApprove={snapshot.job.state === "awaiting_audio_review" ? () => void trigger("approve") : undefined}
+            onApprove={audioStatus === "review" ? () => void trigger("approve") : undefined}
+            onRegenerate={AUDIO_REGENERATE_STATES.has(snapshot.job.state) && loadedSettingsKey === settingsKey && !pendingDraft && !audioDraftChanged ? () => void trigger("approve", true) : undefined}
+            stale={audioStatus === "stale"}
             onReject={snapshot.job.state === "awaiting_audio_review" ? () => void rejectAudio() : undefined}
             approveLabel={snapshot.job.error ? "重新开始规划" : undefined}
           />
@@ -2111,6 +2159,8 @@ export const Workspace: React.FC = () => {
           onGenerateVisualRequirement={generateVisualRequirementInline}
           onUploadImage={uploadSceneImage}
           onDeleteImage={deleteSceneImage}
+          onUploadModel={uploadSceneModel}
+          onDeleteModel={deleteSceneModel}
           onSavePolygons={saveScenePolygons}
           onSave={saveVisualPlan}
           onReplan={replanVisuals}

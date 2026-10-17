@@ -103,7 +103,8 @@ const main = async () => {
   const props = resolveManifestAssets(
     manifest,
     origin,
-    createRenderArtifactToken(manifest.jobId),
+    // 使用有签名期限的成片令牌，避免后段镜头加载资源时预览令牌已过期。
+    createRenderArtifactToken(manifest.jobId, "render"),
   );
   const directory = jobDir(manifest.jobId);
   const has3dScene = manifest.contentMode !== "math" && manifest.scenes.some((scene) => scene.templateId === "rve/3d-model-scene");

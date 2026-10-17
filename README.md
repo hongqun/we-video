@@ -23,6 +23,14 @@ https://github.com/user-attachments/assets/c35ecc91-e41a-4efd-b185-ddf2efff3b56
 3. **视觉规划**：组织画面、素材和字幕节奏。
 4. **预览与渲染**：在We-Video中预览成片效果，用户确认后生成 MP4文件。
 
+## 效果示例
+### 3D 模型讲解
+
+
+https://github.com/user-attachments/assets/8ce4361f-9ddd-4b2c-9de7-99c0a0a18d72
+
+
+
 ## 快速开始
 
 需要 Node.js 20 或更高版本。先安装依赖并建立本地配置：

@@ -1,0 +1,25 @@
+{
+  // 使用项目脚本启动开发服务，保留环境变量加载和素材同步步骤。
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Next.js：全栈调试",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}",
+      "serverReadyAction": {
+        "pattern": "Ready in",
+        "uriFormat": "http://localhost:3100",
+        "action": "debugWithChrome"
+      }
+    },
+    {
+      "name": "Remotion：启动 Studio",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run studio",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

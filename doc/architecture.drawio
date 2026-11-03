@@ -105,6 +105,9 @@
         <mxCell id="translation" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1eef8;strokeColor=#c9bddd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;翻译派生&lt;/b&gt;&lt;br&gt;已有母稿 → 翻译审核 → 重新配音&lt;br&gt;复用并调整母稿镜头规划" vertex="1">
           <mxGeometry height="85" width="340" x="40" y="680" as="geometry" />
         </mxCell>
+        <mxCell id="math" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1eef8;strokeColor=#c9bddd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;数学视频分支(removed:80fd654)&lt;/b&gt;&lt;br&gt;公式草稿与参数 → 人工确认 → 数学清单&lt;br&gt;进入同一 Remotion 渲染入口" vertex="1">
+          <mxGeometry height="85" width="340" x="410" y="680" as="geometry" />
+        </mxCell>
         <mxCell id="note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ffffff;fontColor=#203247;fontSize=15;spacing=8;fontSize=13;fontColor=#718096;align=left;" value="各方框为可单独移动和取舍的模块；箭头表示主流程及直接调用。配置与任务数据供各阶段使用。" vertex="1">
           <mxGeometry height="55" width="1040" x="40" y="1330" as="geometry" />
         </mxCell>

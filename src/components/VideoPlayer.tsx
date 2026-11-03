@@ -5,8 +5,6 @@ import type {PlayerRef} from "@remotion/player";
 import {memo, useEffect, useRef, type RefObject} from "react";
 import type {ArtifactManifest} from "@/remotion/schema";
 import {ShortVideo} from "@/remotion/ShortVideo";
-import {MathVideo} from "@/remotion/MathVideo";
-import {mathDurationInFrames} from "@/remotion/math-timing";
 
 type VideoPlayerProps = {
   manifest: ArtifactManifest;
@@ -45,23 +43,6 @@ export const VideoPlayer = memo(function VideoPlayer({manifest, playerRef, onFra
     };
   }, [onFrameChange, onPlaybackStateChange, onSeek, ref]);
 
-  if (manifest.contentMode === "math") {
-    const durationInFrames = mathDurationInFrames(manifest.formula.plot.drawDurationMs, manifest.video.outroDurationMs, manifest.video.fps);
-    return <Player
-      ref={ref}
-      className="math-player"
-      component={MathVideo}
-      inputProps={manifest}
-      durationInFrames={durationInFrames}
-      compositionWidth={manifest.video.width}
-      compositionHeight={manifest.video.height}
-      fps={manifest.video.fps}
-      controls
-      showVolumeControls={false}
-      initialVolume={1}
-      style={{aspectRatio: `${manifest.video.width} / ${manifest.video.height}`, maxHeight: 720, width: "100%"}}
-    />;
-  }
   const durationInFrames = Math.ceil(
     ((manifest.narration.durationMs + manifest.video.outroDurationMs) / 1000) * manifest.video.fps,
   );

@@ -35,7 +35,6 @@ const cleanupNarrationArtifacts = async (directory: string) => {
 
 const main = async () => {
   const job = await readJob(jobId);
-  if (job.contentMode === "math") throw new Error("数学任务不使用 Talk TTS Worker");
   const directory = jobDir(jobId);
   artifactDirectory = directory;
   const profile = await readJobPlatformProfile(job.contentProfile);

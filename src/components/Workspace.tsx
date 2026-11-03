@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type {ArtifactManifest, Caption, CaptionStyle, RenderManifest, VideoScene} from "@/remotion/schema";
-import type {MathRenderManifest} from "@/remotion/math-schema";
-import katex from "katex";
-import "katex/dist/katex.min.css";
 import { videoDownloadFilename } from "@/lib/filename";
 import { ReviewPreview } from "./ReviewPreview";
 import { AudioReview } from "./AudioReview";
@@ -21,9 +18,6 @@ const VideoPlayer = dynamic(
   () => import("./VideoPlayer").then(({VideoPlayer: Component}) => Component),
   {ssr: false},
 );
-import {ensureMathSummaryTags, formatFormulaForDisplay, formulaCatalog, formulaGroups, type MathFormulaId} from "@/math/formulas";
-import {DEFAULT_MATH_MUSIC_OPTIONS, MATH_MUSIC_MANIFEST_URL, isMathMusicManifest, type MathMusicOption} from "@/math/music";
-import {MATH_OUTRO_VARIANTS, type MathOutroVariant} from "@/remotion/math-outro-variants";
 import {audioDraftSignature, narrationWorkflowStep, reviewAudioStatus, type ReviewAudioStatus} from "@/lib/review";
 import {TranslationReview} from "./TranslationReview";
 import type {TranslationReview as TranslationReviewData, TranslationText} from "@/lib/translation-review";
@@ -145,15 +139,6 @@ const DraftMetadataEditor: React.FC<DraftMetadataEditorProps> = ({
   </section>
 );
 
-type MathDraft = Draft & {
-  contentMode: "math";
-  resolution?: "1080x1260" | "1080x1920";
-  formulaId: MathFormulaId;
-  formulaLatex: string;
-  parameters: Record<string, number>;
-  plot: {xMin: number; xMax: number; yMin: number; yMax: number; drawDurationMs: number};
-  summary: string;
-};
 type Settings = {
   textModels: Array<"deepseek-v4-flash" | "deepseek-v4-pro">;
   defaultTextModel: "deepseek-v4-flash" | "deepseek-v4-pro";
@@ -327,22 +312,15 @@ const readApiJson = async <T,>(response: Response): Promise<T> => {
   }
 };
 
-const renderFormula = (latex: string) => katex.renderToString(formatFormulaForDisplay(latex), {throwOnError: false, displayMode: true});
 
 export const Workspace: React.FC = () => {
   const [profile, setProfile] = useState<PlatformProfile | null>(null);
   const [sourceProfiles, setSourceProfiles] = useState<SourceProfile[]>([]);
   const [sourceSeriesId, setSourceSeriesId] = useState("");
   const [appVersion, setAppVersion] = useState(buildInfo.version);
-  const [contentMode, setContentMode] = useState<"narration" | "math">("narration");
   const [sourceType, setSourceType] = useState<"text" | "url" | "script">("text");
   const [sourceLanguage, setSourceLanguage] = useState("auto");
   const [input, setInput] = useState("");
-  const [mathInstruction, setMathInstruction] = useState("");
-  const [mathFormulaSelection, setMathFormulaSelection] = useState<MathFormulaId | "auto">("auto");
-  const [mathResolution, setMathResolution] = useState<"1080x1260" | "1080x1920">("1080x1260");
-  const [mathHistory, setMathHistory] = useState<Array<MathDraft & {signature: string; createdAt: string}>>([]);
-  const [mathHistoryOpen, setMathHistoryOpen] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loadedSettingsKey, setLoadedSettingsKey] = useState("");
   const selectedSourceAccountId = sourceProfiles.find((item) => item.seriesId === sourceSeriesId)?.accountId;
@@ -351,9 +329,6 @@ export const Workspace: React.FC = () => {
   const [voiceId, setVoiceId] = useState("");
   // 服务端设置加载前的占位值与正式默认语速保持一致，避免初始化时误判用户改动。
   const [speechRate, setSpeechRate] = useState(0.95);
-  const [mathMusicOptions, setMathMusicOptions] = useState<MathMusicOption[]>(DEFAULT_MATH_MUSIC_OPTIONS);
-  const [mathMusicSrc, setMathMusicSrc] = useState(DEFAULT_MATH_MUSIC_OPTIONS[0].id);
-  const [mathOutroVariant, setMathOutroVariant] = useState<MathOutroVariant>("orbit-trace");
   const [jobId, setJobId] = useState<string | null>(null);
   const settingsKey = jobId ? `job:${jobId}` : `source:${selectedSourceAccountId ?? ""}:${sourceSeriesId}`;
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -427,17 +402,6 @@ export const Workspace: React.FC = () => {
   }, [snapshot?.job.contentProfile?.accountId, snapshot?.job.contentProfile?.seriesId]);
 
   useEffect(() => {
-    void fetch(MATH_MUSIC_MANIFEST_URL, {cache: "no-store"})
-      .then(readApiJson<unknown>)
-      .then((value) => {
-        if (!isMathMusicManifest(value) || !value.options.length) return;
-        setMathMusicOptions(value.options);
-        setMathMusicSrc((current) => value.options.some((option) => option.id === current) ? current : value.options[0].id);
-      })
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
     void fetch("/api/version", {cache: "no-store"})
       .then(readApiJson<{version?: string; error?: string}>)
       .then((value) => {
@@ -490,17 +454,6 @@ export const Workspace: React.FC = () => {
     );
   }, [refreshRecentJobs]);
 
-  const refreshMathHistory = useCallback(async () => {
-    const response = await fetch("/api/math/history", {cache: "no-store"});
-    const value = await readApiJson<{history?: Array<MathDraft & {signature: string; createdAt: string}>; error?: string}>(response);
-    if (!response.ok) throw new Error(value.error ?? "读取公式历史失败");
-    setMathHistory(value.history ?? []);
-  }, []);
-
-  useEffect(() => {
-    if (contentMode === "math") void refreshMathHistory().catch(() => undefined);
-  }, [contentMode, refreshMathHistory]);
-
   const refresh = useCallback(async () => {
     if (!jobId) return;
     const response = await fetch(`/api/jobs/${jobId}`, { cache: "no-store" });
@@ -541,15 +494,13 @@ export const Workspace: React.FC = () => {
 
   const createJob = async () => {
     // 文稿模式只提交原文入口和模型选择，视觉规划与文稿生成在后端分阶段执行。
-    if (!settings && contentMode === "narration") return;
+    if (!settings) return;
     setBusy(true);
     setError(null);
     // 新任务切换上下文时清掉上一任务遗留的编辑提示。
     setScriptNotice(null);
     try {
-      const body = contentMode === "math"
-        ? {type: "math", accountId: "tech123", seriesId: "math-beautiful", instruction: mathInstruction, formulaId: mathFormulaSelection, resolution: mathResolution}
-        : sourceType === "url"
+      const body = sourceType === "url"
           ? { type: "url", url: input, accountId: sourceProfiles.find((item) => item.seriesId === sourceSeriesId)?.accountId, seriesId: sourceSeriesId, sourceLanguage, textModel }
           : sourceType === "script"
             ? { type: "script", text: input, accountId: sourceProfiles.find((item) => item.seriesId === sourceSeriesId)?.accountId, seriesId: sourceSeriesId, sourceLanguage, textModel }
@@ -574,10 +525,6 @@ export const Workspace: React.FC = () => {
       setScriptEditorOpen(false);
       setSaveStatus("idle");
       setStep(2);
-      if (contentMode === "math") {
-        setMathOutroVariant("orbit-trace");
-        await refreshMathHistory();
-      }
       void refreshRecentJobs();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "生成草稿失败");
@@ -630,12 +577,6 @@ export const Workspace: React.FC = () => {
       setRevisionView(revisionViewFromSnapshot(value));
       setDraft(normalizeDraftForReview(value.draft));
       setPendingDraft(normalizeDraftForReview(value.pendingDraft?.draft ?? null));
-      if (value.manifest?.contentMode === "math") {
-        setMathOutroVariant(value.manifest.outroVariant);
-        setMathMusicSrc(value.manifest.musicSrc);
-      } else {
-        setMathOutroVariant("orbit-trace");
-      }
       if (value.job.generation?.voiceId) setVoiceId(value.job.generation.voiceId);
       if (value.job.generation?.rate) setSpeechRate(value.job.generation.rate);
       setScriptEditorOpen(false);
@@ -775,19 +716,6 @@ export const Workspace: React.FC = () => {
     });
     setScriptNotice(null);
   };
-  const deleteMathHistory = async (signature?: string) => {
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/math/history${signature ? `?signature=${encodeURIComponent(signature)}` : ""}`, {method: "DELETE"});
-      const value = await readApiJson<{error?: string}>(response);
-      if (!response.ok) throw new Error(value.error ?? "删除公式历史失败");
-      await refreshMathHistory();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "删除公式历史失败");
-    } finally {
-      setBusy(false);
-    }
-  };
   const autoSaveCurrentDraft = async () => {
     if (!draftChanged) return snapshot;
     setSaveStatus("saving");
@@ -895,7 +823,7 @@ export const Workspace: React.FC = () => {
   }, [draft, step]);
   const trigger = async (action: "approve" | "render", regenerateAudio = false) => {
     // 配置未就绪时不提交旧任务残留的音色或语速。
-    if (action === "approve" && !mathDraft && loadedSettingsKey !== settingsKey) {
+    if (action === "approve" && loadedSettingsKey !== settingsKey) {
       setError("配音配置尚未加载完成，请稍后重试");
       return;
     }
@@ -903,34 +831,6 @@ export const Workspace: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      const mathSettingsMatchManifest = draft?.contentMode === "math" && revisionView?.manifest?.contentMode === "math" &&
-        revisionView.manifest.outroVariant === mathOutroVariant && revisionView.manifest.musicSrc === mathMusicSrc;
-      if (action === "approve" && draft?.contentMode === "math" && !draftChanged && mathSettingsMatchManifest && (snapshot.job.state === "ready" || snapshot.job.state === "completed")) {
-        const renderResponse = await fetch(`/api/jobs/${jobId}/render`, {method: "POST"});
-        const renderValue = await readApiJson<{error?: string; state?: string}>(renderResponse);
-        if (!renderResponse.ok) throw new Error(renderValue.error ?? "启动渲染失败");
-        await refresh();
-        setStep(3);
-        return;
-      }
-      if (action === "approve" && draft?.contentMode === "math") {
-        await autoSaveCurrentDraft();
-        const response = await fetch(`/api/jobs/${jobId}/approve`, {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({musicSrc: mathMusicSrc, outroVariant: mathOutroVariant}),
-        });
-        const value = await readApiJson<{error?: string; state?: string}>(response);
-        if (!response.ok) throw new Error(value.error ?? "确认公式失败");
-        if (value.state === "ready") {
-          const renderResponse = await fetch(`/api/jobs/${jobId}/render`, {method: "POST"});
-          const renderValue = await readApiJson<{error?: string; state?: string}>(renderResponse);
-          if (!renderResponse.ok) throw new Error(renderValue.error ?? "启动渲染失败");
-          setStep(3);
-        }
-        await refresh();
-        return;
-      }
       if (action === "approve") {
         const savedSnapshot = await autoSaveCurrentDraft();
         if (!voiceId) throw new Error("请先选择配音音色");
@@ -959,7 +859,7 @@ export const Workspace: React.FC = () => {
       const value = await readApiJson<{ error?: string; state?: string }>(response);
       if (!response.ok) throw new Error(value.error ?? "操作失败");
       await refresh();
-      setStep(mathWorkflow ? 3 : 6);
+      setStep(6);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "操作失败");
     } finally {
@@ -1337,43 +1237,16 @@ export const Workspace: React.FC = () => {
   const scriptDialogTemplate = scriptDialogScene
     ? templateRegistry.find((item) => item.id === scriptDialogScene.templateId)
     : undefined;
-  const mathDraft = draft?.contentMode === "math" ? draft as MathDraft : null;
-  const mathPreviewManifest = useMemo<MathRenderManifest | null>(() => {
-    if (!mathDraft || !snapshot) return null;
-    return {
-      schemaVersion: "1.0",
-      contentMode: "math",
-      jobId: snapshot.job.jobId,
-      revision: snapshot.job.currentRevision,
-      contentProfile: snapshot.job.contentProfile,
-      title: mathDraft.title,
-      summary: ensureMathSummaryTags(mathDraft.summary, formulaCatalog[mathDraft.formulaId]),
-      outroVariant: mathOutroVariant,
-      video: {width: 1080, height: mathDraft.resolution === "1080x1260" ? 1260 : 1920, fps: 30, outroDurationMs: 3000},
-      formula: {id: mathDraft.formulaId, latex: mathDraft.formulaLatex, parameters: mathDraft.parameters, plot: mathDraft.plot},
-      musicSrc: mathMusicSrc,
-      brand: {
-        logoSrc: profile?.logoSrc ?? "profile-assets/tech123/logo.png",
-        title: profile?.title ?? "Tech123",
-        subtitle: profile?.subtitle ?? "科学·科技·科创",
-        label: profile?.displayLabel ?? "TECH123 · 数学之美",
-        downloadPrefix: profile?.downloadPrefix ?? "tech123-math",
-      },
-    };
-  }, [mathDraft, mathMusicSrc, mathOutroVariant, profile, snapshot]);
-  const mathWorkflow = contentMode === "math" || mathDraft !== null || previewManifest?.contentMode === "math";
   const stateStep = narrationWorkflowStep(snapshot?.job.state);
   // 渲染阶段失败：manifest 已定稿（音频、镜头规划齐全），失败只发生在导出环节。
   // 这类任务应停留在第 5 步重试渲染，而不是被打回第二步锁死后续操作。
-  const failedAtRender = snapshot?.job.state === "failed" && previewManifest !== null && !mathWorkflow;
-  const workflowStep = mathWorkflow ? step : failedAtRender ? 5 : stateStep;
-  const maxStep = mathWorkflow ? (previewManifest ? 3 : draft ? 2 : 1) : failedAtRender ? 5 : stateStep;
+  const failedAtRender = snapshot?.job.state === "failed" && previewManifest !== null;
+  const workflowStep = failedAtRender ? 5 : stateStep;
+  const maxStep = failedAtRender ? 5 : stateStep;
   useEffect(() => {
-    if (!mathWorkflow && snapshot?.job.state) setStep(failedAtRender ? 5 : stateStep);
-  }, [mathWorkflow, snapshot?.job.jobId, snapshot?.job.state, stateStep, failedAtRender]);
-  const visibleSteps = mathWorkflow
-    ? [{step: 1, label: "素材"}, {step: 2, label: "审稿"}, {step: 3, label: "成片交付"}]
-    : steps.map((label, index) => ({step: index + 1, label: index === 0 && snapshot?.translation ? "翻译对照" : label}));
+    if (snapshot?.job.state) setStep(failedAtRender ? 5 : stateStep);
+  }, [snapshot?.job.jobId, snapshot?.job.state, stateStep, failedAtRender]);
+  const visibleSteps = steps.map((label, index) => ({step: index + 1, label: index === 0 && snapshot?.translation ? "翻译对照" : label}));
   const deliverySummary = previewManifest?.summary?.trim() ?? "";
   const rawVisibleError = error ?? snapshot?.job.error ?? "";
   // 失败原因（含 worker 侧音频合成失败，只落在 job.error）必须始终展示在顶部横幅，避免静默失败。
@@ -1718,93 +1591,8 @@ export const Workspace: React.FC = () => {
           </div>
         </div>
       ) : null}
-      {step === 2 && mathDraft && snapshot ? (
-        <section className="panel math-review">
-          <div className="panel-heading">
-            <div>
-              <h2 className="icon-label"><Icon name="sparkles" />公式审稿</h2>
-              <p className="hint">随机生成结果 · 可用自然语言微调</p>
-            </div>
-            <span className="metadata">版本 {snapshot.job.currentRevision}</span>
-          </div>
-          <h3>{mathDraft.title}</h3>
-          <p>{ensureMathSummaryTags(mathDraft.summary, formulaCatalog[mathDraft.formulaId])}</p>
-          <section className="math-review-preview">
-            <div className="math-history-heading"><strong>实时预览</strong><span className="hint">公式与配乐均来自当前草稿</span></div>
-            {mathPreviewManifest ? <VideoPlayer manifest={mathPreviewManifest} /> : null}
-          </section>
-          <section className="math-outro-picker" aria-labelledby="math-outro-picker-title">
-            <div className="math-history-heading">
-              <strong id="math-outro-picker-title">片尾动效</strong>
-              <span className="hint">固定 3 秒 · 切换后实时预览</span>
-            </div>
-            <div className="math-outro-options" role="radiogroup" aria-label="数学片尾动效">
-              {MATH_OUTRO_VARIANTS.map((variant) => (
-                <button
-                  key={variant.id}
-                  type="button"
-                  className={`math-outro-option${mathOutroVariant === variant.id ? " is-selected" : ""}`}
-                  aria-checked={mathOutroVariant === variant.id}
-                  role="radio"
-                  disabled={busy || editorLocked}
-                  onClick={() => setMathOutroVariant(variant.id)}
-                >
-                  <span className="math-outro-option-title">{variant.label}</span>
-                  <span className="math-outro-option-description">{variant.description}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-          <label>
-            成片分辨率
-            <select
-              value={mathDraft.resolution ?? "1080x1920"}
-              disabled={busy || editorLocked}
-              onChange={(event) => setDraft({
-                ...mathDraft,
-                resolution: event.target.value as "1080x1260" | "1080x1920",
-              })}
-            >
-              <option value="1080x1260">1080×1260 · 与口播一致</option>
-              <option value="1080x1920">1080×1920 · 竖屏</option>
-            </select>
-          </label>
-          <DraftMetadataEditor
-            draft={mathDraft}
-            busy={busy}
-            disabled={editorLocked}
-            draftChanged={draftChanged}
-            saveStatus={saveStatus}
-            onChange={(patch) => setDraft({...mathDraft, ...patch})}
-            onSave={() => void saveDraft()}
-          />
-          <div className="math-formula-card">
-            <div className="math-formula-display" aria-label="公式" dangerouslySetInnerHTML={{__html: renderFormula(mathDraft.formulaLatex)}} />
-            <div className="math-formula-source">{mathDraft.formulaLatex}</div>
-            <div className="math-parameter-grid">
-              {Object.entries(mathDraft.parameters).map(([key, value]) => <div className="math-parameter" key={key}><span>{key}</span><strong>{Number(value).toFixed(3)}</strong></div>)}
-            </div>
-          </div>
-          <label>
-            自然语言微调
-            <textarea rows={3} value={feedback} disabled={busy || EDITOR_LOCKED_STATES.has(snapshot.job.state)} onChange={(event) => setFeedback(event.target.value)} placeholder="例如：换一个更复杂的公式，参数变化慢一点。" />
-          </label>
-          <div className="actions">
-            <button className="secondary" disabled={busy || !feedback.trim() || EDITOR_LOCKED_STATES.has(snapshot.job.state)} onClick={() => void submitFeedback()}>重新生成公式</button>
-            <button disabled={busy || !(DIRECT_APPROVE_STATES.has(snapshot.job.state) || snapshot.job.state === "ready" || snapshot.job.state === "completed")} onClick={() => void trigger("approve")}><Icon name="arrow-right" />{snapshot.job.state === "completed" ? "再次导出" : "确认公式并导出"}</button>
-          </div>
-          <div className="math-history-heading">
-            <button className="math-history-toggle" type="button" aria-expanded={mathHistoryOpen} onClick={() => setMathHistoryOpen((open) => !open)}>
-              <span><strong>公式历史</strong><span className="hint">{mathHistory.length} 条</span></span>
-              <span className="icon-label">{mathHistoryOpen ? "收起" : "展开"}<Icon name={mathHistoryOpen ? "chevron-up" : "chevron-down"} /></span>
-            </button>
-            {mathHistoryOpen ? <button className="secondary" disabled={busy || !mathHistory.length} onClick={() => void deleteMathHistory()}>清空历史</button> : null}
-          </div>
-          {mathHistoryOpen ? (mathHistory.length ? <div className="math-history-list">{mathHistory.slice(0, 8).map((item) => <div className="math-history-item" key={item.signature}><span>{item.title}</span><button className="secondary" disabled={busy} onClick={() => void deleteMathHistory(item.signature)}>删除</button></div>)}</div> : <p className="hint">暂无公式历史。</p>) : null}
-        </section>
-      ) : null}
       {step === 2 && draft && snapshot ? <div className="review-meta-grid">
-      { !mathDraft ? (
+      <>
         <section className="panel caption-settings">
           <div>
             <strong className="icon-label"><Icon name="edit" />字幕样式</strong>
@@ -1824,18 +1612,13 @@ export const Workspace: React.FC = () => {
             <option value="impact">重点强调 · 深色卡片</option>
           </select>
         </section>
-      ) : null}
+      </>
       {(
         <section className="panel audio-settings">
           <div>
-            <strong className="icon-label"><Icon name="volume" />{mathDraft ? "配乐选择" : "配音选择"}</strong>
+            <strong className="icon-label"><Icon name="volume" />配音选择</strong>
           </div>
-          {mathDraft ? <>
-            <select value={mathMusicSrc} onChange={(event) => setMathMusicSrc(event.target.value)} disabled={busy || EDITOR_LOCKED_STATES.has(snapshot.job.state)}>
-              {mathMusicOptions.map((music) => <option key={music.id} value={music.id}>{music.label}</option>)}
-            </select>
-            <p className="hint">公式模式不使用 TTS，只播放选定的背景音乐。后续可继续增加配乐。</p>
-          </> : <>
+          <>
             <select
               value={voiceId}
               onChange={(event) => setVoiceId(event.target.value)}
@@ -1866,10 +1649,10 @@ export const Workspace: React.FC = () => {
               <button type="button" className="secondary" disabled={busy || loadedSettingsKey !== settingsKey || !AUDIO_REGENERATE_STATES.has(snapshot.job.state) || Boolean(pendingDraft) || audioDraftChanged} onClick={() => void trigger("approve", true)}><Icon name="volume" />重新生成配音</button>
               <p className="hint">按当前音色和语速重新生成，完成后需重新确认音频与画面。{audioDraftChanged ? "请先保存稿件修改。" : ""}</p>
             </> : null}
-          </>}
+          </>
         </section>
       )}
-      {draftStats && !mathDraft ? (
+      {draftStats ? (
         <section className="panel draft-stats" aria-labelledby="draft-stats-title">
           <div className="draft-stats-heading">
             <strong id="draft-stats-title">稿件概览</strong>
@@ -1956,46 +1739,24 @@ export const Workspace: React.FC = () => {
               <p className="review-section-label">第 1 步 · 素材输入</p>
               <h2>新建视频</h2>
             </div>
-            <span className="input-panel-mode-hint">{contentMode === "math" ? "数学动画模式" : "生成后不可更换模型"}</span>
+            <span className="input-panel-mode-hint">生成后不可更换模型</span>
           </div>
           {/* 仅重排创建页的信息层级，字段仍绑定原有状态，确保生成流程不变。 */}
           <div className="input-panel-body">
             <div className="input-panel-source">
               <div className="input-panel-content-heading">
                 <div>
-                  <strong>{contentMode === "math" ? "创作要求" : sourceType === "text" ? "文章正文" : sourceType === "script" ? "口播稿原文" : "网页链接"}</strong>
-                  <span className="input-panel-source-subtitle">{contentMode === "math" ? "用一句话描述你想呈现的数学动画" : sourceType === "text" ? "粘贴文章，系统将自动整理为口播稿" : sourceType === "script" ? "保留原稿正文，只生成发布文案和段落边界" : "输入公开网页链接，系统将读取页面内容"}</span>
+                  <strong>{sourceType === "text" ? "文章正文" : sourceType === "script" ? "口播稿原文" : "网页链接"}</strong>
+                  <span className="input-panel-source-subtitle">{sourceType === "text" ? "粘贴文章，系统将自动整理为口播稿" : sourceType === "script" ? "保留原稿正文，只生成发布文案和段落边界" : "输入公开网页链接，系统将读取页面内容"}</span>
                 </div>
-                <span>{contentMode === "math" ? "可选" : sourceType === "url" ? input.trim() ? "已填写" : "等待输入" : `${Array.from(input).length} 字`}</span>
+                <span>{sourceType === "url" ? input.trim() ? "已填写" : "等待输入" : `${Array.from(input).length} 字`}</span>
               </div>
-              {contentMode === "math" ? <textarea value={mathInstruction} onChange={(event) => setMathInstruction(event.target.value)} placeholder="例如：换一种近期没用过的复杂曲线，参数变化慢一点。留空即随机生成。" rows={8} /> : sourceType === "url" ? <input value={input} onChange={(event) => setInput(event.target.value)} placeholder="https://example.com/article" /> : <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={sourceType === "script" ? "可用 # 一级标题指定标题；其余内容将原样作为口播稿" : "粘贴文章正文，建议 8 个字符以上"} rows={8} />}
-              <p className="hint">{contentMode === "math" ? "留空会随机生成公式；生成后仍可在审稿阶段微调。" : sourceType === "text" ? "系统会根据正文提炼标题、摘要和分段口播稿。" : sourceType === "script" ? "第一个 # 一级标题将直接用作标题且不配音；其余正文只提取摘要、短标题并在原文字符之间分段。" : "仅支持可公开访问的网页链接。"}</p>
+              {sourceType === "url" ? <input value={input} onChange={(event) => setInput(event.target.value)} placeholder="https://example.com/article" /> : <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={sourceType === "script" ? "可用 # 一级标题指定标题；其余内容将原样作为口播稿" : "粘贴文章正文，建议 8 个字符以上"} rows={8} />}
+              <p className="hint">{sourceType === "text" ? "系统会根据正文提炼标题、摘要和分段口播稿。" : sourceType === "script" ? "第一个 # 一级标题将直接用作标题且不配音；其余正文只提取摘要、短标题并在原文字符之间分段。" : "仅支持可公开访问的网页链接。"}</p>
             </div>
             <aside className="input-panel-settings" aria-label="生成设置">
               <p className="input-panel-settings-title">生成设置</p>
-              <label>
-                内容模式
-                <select value={contentMode} onChange={(event) => setContentMode(event.target.value as "narration" | "math")}>
-                  <option value="narration">口播 · 科技一分钟</option>
-                  <option value="math">公式 · 数学之美</option>
-                </select>
-              </label>
-              {contentMode === "math" ? <>
-                <label>
-                  公式选择
-                  <select value={mathFormulaSelection} onChange={(event) => setMathFormulaSelection(event.target.value as MathFormulaId | "auto")} disabled={busy}>
-                    <option value="auto">自动轮换 · 避开近期重复</option>
-                    {formulaGroups.map((group) => <optgroup key={group.label} label={group.label}>{group.formulaIds.map((formulaId) => <option key={formulaId} value={formulaId}>{formulaCatalog[formulaId].name}</option>)}</optgroup>)}
-                  </select>
-                </label>
-                <label>
-                  成片分辨率
-                  <select value={mathResolution} onChange={(event) => setMathResolution(event.target.value as "1080x1260" | "1080x1920")} disabled={busy}>
-                    <option value="1080x1260">1080×1260 · 与口播一致</option>
-                    <option value="1080x1920">1080×1920 · 竖屏</option>
-                  </select>
-                </label>
-              </> : <>
+              <>
                 <label>
                   母稿专栏
                   <select value={sourceSeriesId} onChange={(event) => setSourceSeriesId(event.target.value)} disabled={busy || !sourceProfiles.length}>
@@ -2025,22 +1786,22 @@ export const Workspace: React.FC = () => {
                     {settings?.textModels.map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
-              </>}
+              </>
             </aside>
           </div>
           <div className="actions input-panel-actions">
             <button
-              disabled={busy || (contentMode === "narration" && (!settings || input.trim().length < 8))}
+              disabled={busy || !settings || input.trim().length < 8}
               onClick={createJob}
             >
               <Icon name="sparkles" />
-              {busy ? "处理中…" : contentMode === "math" ? "随机生成公式" : "生成草稿"}
+              {busy ? "处理中…" : "生成草稿"}
             </button>
           </div>
         </section>
       ) : null}
 
-      {step === 2 && draft && snapshot && !mathDraft ? (
+      {step === 2 && draft && snapshot ? (
         <section className="script-review-workspace" aria-label="口播稿审核">
           <article className="script-review-editor panel">
             <header className="script-review-header">
@@ -2100,7 +1861,7 @@ export const Workspace: React.FC = () => {
         </section>
       ) : null}
 
-      {step === 3 && draft && snapshot && !mathDraft && !isHistoricalRevision ? (
+      {step === 3 && draft && snapshot && !isHistoricalRevision ? (
         snapshot.job.state === "synthesizing" || !snapshot.audioPreview ? (
           <section className="panel audio-review audio-review-progress" aria-live="polite">
             <div className="panel-heading"><div><p className="review-section-label">第 3 步 · 音频试听</p><h2 className="icon-label"><Icon name="volume" />正在合成口播音频</h2></div><span className="status status-synthesizing">合成中</span></div>
@@ -2258,7 +2019,7 @@ export const Workspace: React.FC = () => {
         </div>
       ) : null}
 
-      {!mathWorkflow && step === 5 && previewManifest && snapshot ? (
+      {step === 5 && previewManifest && snapshot ? (
         <section className="panel preview">
           <div className="panel-heading">
             <h2 className="icon-label"><Icon name="play" />视频预览</h2>
@@ -2318,7 +2079,7 @@ export const Workspace: React.FC = () => {
         </section>
       ) : null}
 
-      {(mathWorkflow ? step === 3 : step === 6) && previewManifest && revisionView && snapshot ? (
+      {step === 6 && previewManifest && revisionView && snapshot ? (
         <section className="panel delivery">
           <div className="panel-heading">
             <h2 className="icon-label"><Icon name="download" />成片交付</h2>
@@ -2332,9 +2093,7 @@ export const Workspace: React.FC = () => {
                     : "等待开始渲染"}
             </span>
           </div>
-          <p>成片规格：{previewManifest.contentMode === "math"
-            ? `${previewManifest.video.width}×${previewManifest.video.height}（${previewManifest.video.height === 1260 ? "与口播一致" : "9:16"}）`
-            : "1080×1260"} · 30 FPS · 片尾 3 秒</p>
+          <p>成片规格：1080×1260 · 30 FPS · 片尾 3 秒</p>
           <section
             className="summary-card delivery-title-card"
             aria-labelledby="video-delivery-title"
@@ -2377,7 +2136,7 @@ export const Workspace: React.FC = () => {
             <div className="summary-heading">
               <div>
                 <h3 id="video-summary-title">
-                  {previewManifest.contentMode === "math" ? "公式介绍" : "视频摘要"}
+                  {"视频摘要"}
                 </h3>
                 <span>
                   {deliverySummary ? `${Array.from(deliverySummary).length} 字` : "未生成"} · 版本 {previewManifest.revision}
@@ -2389,7 +2148,7 @@ export const Workspace: React.FC = () => {
                 disabled={!deliverySummary}
                 onClick={() => void copySummary()}
               >
-                <Icon name="copy" />{previewManifest.contentMode === "math" ? "复制介绍" : "复制摘要"}
+                <Icon name="copy" />{"复制摘要"}
               </button>
             </div>
             <textarea
@@ -2397,11 +2156,11 @@ export const Workspace: React.FC = () => {
               rows={5}
               value={deliverySummary}
               placeholder="当前版本暂无摘要"
-              aria-label={previewManifest.contentMode === "math" ? "公式介绍" : "视频摘要"}
+              aria-label={"视频摘要"}
             />
             {deliverySummary && summaryCopyStatus === "copied" ? (
               <span className="copy-status success" role="status" aria-live="polite">
-                {previewManifest.contentMode === "math" ? "介绍已复制" : "摘要已复制"}
+                {"摘要已复制"}
               </span>
             ) : deliverySummary && summaryCopyStatus === "failed" ? (
               <span className="copy-status failed" role="status" aria-live="polite">
@@ -2410,24 +2169,10 @@ export const Workspace: React.FC = () => {
             ) : null}
           </section>
           <div className="actions">
-            <button className="secondary" onClick={() => setStep(mathWorkflow ? 2 : 5)}>
-              <Icon name="arrow-right" className="icon-flip" />{mathWorkflow ? "返回审稿" : "返回预览"}
+            <button className="secondary" onClick={() => setStep(5)}>
+              <Icon name="arrow-right" className="icon-flip" />返回预览
             </button>
-            {!revisionView.outputReady && mathWorkflow ? (
-              <button
-                disabled={
-                  busy ||
-                  false ||
-                  !RENDERABLE_STATES.has(snapshot.job.state)
-                }
-                onClick={() => trigger("render")}
-              >
-                <Icon name="play" />
-                {snapshot.job.state === "rendering"
-                  ? `渲染中 ${snapshot.job.renderProgress ?? 0}%`
-                  : "生成成片"}
-              </button>
-            ) : revisionView.outputReady ? (
+            {revisionView.outputReady ? (
               <a
                 className="button-link"
                 href={`/api/jobs/${encodeURIComponent(snapshot.job.jobId)}/artifacts/output.mp4`}
@@ -2437,7 +2182,7 @@ export const Workspace: React.FC = () => {
               </a>
             ) : <span className="metadata">{snapshot.job.state === "rendering" ? "请稍候，渲染完成后即可下载" : "当前暂无可下载成片"}</span>}
           </div>
-          {!mathWorkflow && snapshot.job.state === "completed" && snapshot.job.contentProfile.seriesId === "tech-minute" ? <div className="actions"><button disabled={busy} onClick={() => void deriveEnglishVideo()}><Icon name="arrow-right" />派生英文视频</button></div> : null}
+          {snapshot.job.state === "completed" && snapshot.job.contentProfile.seriesId === "tech-minute" ? <div className="actions"><button disabled={busy} onClick={() => void deriveEnglishVideo()}><Icon name="arrow-right" />派生英文视频</button></div> : null}
         </section>
       ) : null}
       {visualRequirementDialog ? (

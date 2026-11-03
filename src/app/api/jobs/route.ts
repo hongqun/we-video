@@ -7,9 +7,6 @@ import {JOBS_ROOT} from "@/lib/paths";
 import {initializeNarrationJob, jobDir, readJob, readJson} from "@/lib/jobs";
 import {requireAuth} from "@/lib/auth";
 import {profileContext, readPlatformProfile} from "@/lib/profile";
-import {atomicWriteJson} from "@/lib/jobs";
-import {createMathDraft, mathResolutionSchema} from "@/math/service";
-import {mathFormulaIdSchema} from "@/math/formulas";
 import {newJobId} from "@/lib/job-id";
 
 export const runtime = "nodejs";
@@ -18,7 +15,6 @@ const requestSchema = z.discriminatedUnion("type", [
   z.object({type: z.literal("text"), text: z.string().min(20), title: z.string().optional(), accountId: z.string().optional(), seriesId: z.string().optional(), sourceLanguage: z.enum(["auto", "zh", "en", "mixed"]).default("auto"), textModel: z.enum(["deepseek-v4-flash", "deepseek-v4-pro"])}),
   z.object({type: z.literal("url"), url: z.string().url(), accountId: z.string().optional(), seriesId: z.string().optional(), sourceLanguage: z.enum(["auto", "zh", "en", "mixed"]).default("auto"), textModel: z.enum(["deepseek-v4-flash", "deepseek-v4-pro"])}),
   z.object({type: z.literal("script"), text: z.string().min(20), accountId: z.string().optional(), seriesId: z.string().optional(), sourceLanguage: z.enum(["auto", "zh", "en", "mixed"]).default("auto"), textModel: z.enum(["deepseek-v4-flash", "deepseek-v4-pro"])}),
-  z.object({type: z.literal("math"), accountId: z.string().optional(), seriesId: z.string().optional(), instruction: z.string().trim().max(1000).optional(), formulaId: z.union([mathFormulaIdSchema, z.literal("auto")]).optional(), resolution: mathResolutionSchema.default("1080x1260")}),
 ]);
 
 // 文稿入口同时接受粘贴文本和网页地址；模型白名单由配置读取后再次校验。
@@ -58,20 +54,6 @@ export async function POST(request: Request) {
   let inputFile: string | null = null;
   try {
     const body = requestSchema.parse(await request.json());
-    if (body.type === "math") {
-      const profile = await readPlatformProfile(body.accountId, body.seriesId);
-      if (profile.seriesId !== "math-beautiful") throw new Error("数学模式必须使用数学之美专题");
-      const draft = await createMathDraft(profile.accountId, profile.seriesId, body.instruction ?? "", body.formulaId, body.resolution);
-      const directory = jobDir(jobId);
-      await atomicWriteJson(`${directory}/source.json`, {type: "math", instruction: body.instruction ?? "", detectedLanguage: "zh", originalText: ""});
-      await atomicWriteJson(`${directory}/draft.json`, draft);
-      await atomicWriteJson(`${jobDir(jobId)}/job.json`, {
-        jobId, state: "awaiting_review", error: null,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        contentMode: "math", contentProfile: profileContext(profile),
-      });
-      return NextResponse.json({jobId, state: "awaiting_review", contentProfile: profileContext(profile), contentMode: "math"}, {status: 202});
-    }
     const profile = await readPlatformProfile(body.accountId, body.seriesId);
     if (profile.kind !== "source") throw new Error("派生专栏不能直接输入素材，请先完成中文母稿视频");
     const settings = await readPipelineSettings(profile);

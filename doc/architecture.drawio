@@ -1,2 +1,132 @@
-<?xml version='1.0' encoding='utf-8'?>
-<mxGraphModel dx="1160" dy="1420" grid="1" gridSize="10" page="1" pageWidth="1160" pageHeight="1420" adaptiveColors="auto"><root><mxCell id="0" /><mxCell id="1" parent="0" /><mxCell id="title" value="&lt;b&gt;We-Video 系统架构&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px&quot;&gt;以解说视频创作为主线，各阶段保留人工编辑与审核&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f4f7fa;strokeColor=#f4f7fa;fontColor=#203247;fontSize=15;spacing=8;fontSize=23;align=left;" vertex="1" parent="1"><mxGeometry x="30" y="20" width="1100" height="65" as="geometry" /></mxCell><mxCell id="workbench" value="&lt;b&gt;创作工作台&lt;/b&gt;&lt;br&gt;输入、编辑、审核、预览与下载" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;fontSize=16;" vertex="1" parent="1"><mxGeometry x="40" y="120" width="300" height="75" as="geometry" /></mxCell><mxCell id="input" value="&lt;b&gt;输入资料&lt;/b&gt;&lt;br&gt;文本 / 网页 / 口播稿" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="40" y="260" width="200" height="100" as="geometry" /></mxCell><mxCell id="draft" value="&lt;b&gt;① 文稿&lt;/b&gt;&lt;br&gt;生成、修改与审核&lt;br&gt;口播稿与分段" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fa;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="320" y="260" width="200" height="100" as="geometry" /></mxCell><mxCell id="audio" value="&lt;b&gt;② 配音&lt;/b&gt;&lt;br&gt;合成与审核&lt;br&gt;音频、字幕与时间轴" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fa;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="600" y="260" width="200" height="100" as="geometry" /></mxCell><mxCell id="visual" value="&lt;b&gt;③ 视觉规划&lt;/b&gt;&lt;br&gt;镜头、模板与素材&lt;br&gt;编辑并确认" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fa;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="880" y="260" width="200" height="100" as="geometry" /></mxCell><mxCell id="manifest" value="&lt;b&gt;渲染清单&lt;/b&gt;&lt;br&gt;汇总音频、字幕、镜头&lt;br&gt;品牌与资源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e5;strokeColor=#e7c496;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="880" y="510" width="200" height="100" as="geometry" /></mxCell><mxCell id="render" value="&lt;b&gt;④ 合成与输出&lt;/b&gt;&lt;br&gt;Remotion 预览 / 后台渲染&lt;br&gt;输出 MP4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e5;strokeColor=#e7c496;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="600" y="510" width="200" height="100" as="geometry" /></mxCell><mxCell id="result" value="&lt;b&gt;成片&lt;/b&gt;&lt;br&gt;预览与下载" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="320" y="510" width="200" height="100" as="geometry" /></mxCell><mxCell id="flow1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" edge="1" source="input" target="draft" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="flow2" value="确认" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" edge="1" source="draft" target="audio" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="flow3" value="确认" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" edge="1" source="audio" target="visual" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="flow4" value="确认" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" edge="1" source="visual" target="manifest" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="flow5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" edge="1" source="manifest" target="render" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="flow6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" edge="1" source="render" target="result" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="model" value="&lt;b&gt;DeepSeek&lt;/b&gt;&lt;br&gt;文稿与视觉内容生成" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="320" y="390" width="200" height="65" as="geometry" /></mxCell><mxCell id="tts" value="&lt;b&gt;百炼 TTS&lt;/b&gt;&lt;br&gt;语音与时间信息" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="600" y="390" width="200" height="65" as="geometry" /></mxCell><mxCell id="draft-model" value="调用" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" edge="1" source="draft" target="model" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="audio-tts" value="调用" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" edge="1" source="audio" target="tts" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="templates" value="&lt;b&gt;镜头模板&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f8fc;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;align=left;verticalAlign=top;spacingTop=12;spacingLeft=15;" vertex="1" parent="1"><mxGeometry x="820" y="700" width="260" height="290" as="geometry" /></mxCell><mxCell id="template0" value="IP 动态开场舞台" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="10" y="45" width="110" height="44" as="geometry" /></mxCell><mxCell id="template1" value="IP 动态结论舞台" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="130" y="45" width="110" height="44" as="geometry" /></mxCell><mxCell id="template2" value="揭示文字" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="10" y="101" width="110" height="44" as="geometry" /></mxCell><mxCell id="template3" value="文字重点标注" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="130" y="101" width="110" height="44" as="geometry" /></mxCell><mxCell id="template4" value="通用内容卡" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="10" y="157" width="110" height="44" as="geometry" /></mxCell><mxCell id="template5" value="关系图" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="130" y="157" width="110" height="44" as="geometry" /></mxCell><mxCell id="template6" value="视觉要求图片" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="10" y="213" width="110" height="44" as="geometry" /></mxCell><mxCell id="template7" value="3D Model Scene" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" vertex="1" parent="templates"><mxGeometry x="130" y="213" width="110" height="44" as="geometry" /></mxCell><mxCell id="visual-templates" value="选择 / 编排" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=1;entryY=0.2;" edge="1" source="visual" target="templates" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1120" y="310" /><mxPoint x="1120" y="758" /></Array></mxGeometry></mxCell><mxCell id="assets" value="&lt;b&gt;素材与配置&lt;/b&gt;&lt;br&gt;账号、专题、品牌与提示词&lt;br&gt;图片 / GLB / 静态素材&lt;br&gt;.env 与 pipeline.config.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="40" y="1060" width="340" height="105" as="geometry" /></mxCell><mxCell id="jobs" value="&lt;b&gt;任务数据 · jobs/&lt;/b&gt;&lt;br&gt;状态、草稿、音频、规划、素材&lt;br&gt;清单和成片按任务保存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="410" y="1060" width="340" height="105" as="geometry" /></mxCell><mxCell id="translation" value="&lt;b&gt;翻译派生&lt;/b&gt;&lt;br&gt;已有母稿 → 翻译审核 → 重新配音&lt;br&gt;复用并调整母稿镜头规划" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1eef8;strokeColor=#c9bddd;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="40" y="680" width="340" height="85" as="geometry" /></mxCell><mxCell id="math" value="&lt;b&gt;数学视频分支&lt;/b&gt;&lt;br&gt;公式草稿与参数 → 人工确认 → 数学清单&lt;br&gt;进入同一 Remotion 渲染入口" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1eef8;strokeColor=#c9bddd;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="410" y="680" width="340" height="85" as="geometry" /></mxCell><mxCell id="note" value="各方框为可单独移动和取舍的模块；箭头表示主流程及直接调用。配置与任务数据供各阶段使用。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ffffff;fontColor=#203247;fontSize=15;spacing=8;fontSize=13;fontColor=#718096;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="1330" width="1040" height="55" as="geometry" /></mxCell><mxCell id="api" value="&lt;b&gt;应用 API&lt;/b&gt;&lt;br&gt;鉴权、确认、任务状态与文件访问" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="425" y="120" width="300" height="75" as="geometry" /></mxCell><mxCell id="worker" value="&lt;b&gt;后台执行&lt;/b&gt;&lt;br&gt;文稿 / 翻译 / 配音 / 规划 / 渲染 Worker" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="810" y="120" width="300" height="75" as="geometry" /></mxCell><mxCell id="ui-api" value="请求 / 轮询" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" edge="1" source="workbench" target="api" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="api-worker" value="调度" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" edge="1" source="api" target="worker" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="contracts" value="&lt;b&gt;数据契约&lt;/b&gt;&lt;br&gt;文稿与渲染清单的结构约束" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="40" y="1200" width="340" height="75" as="geometry" /></mxCell><mxCell id="runtime" value="&lt;b&gt;共享运行资源&lt;/b&gt;&lt;br&gt;路径、状态、素材访问与公共处理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" vertex="1" parent="1"><mxGeometry x="410" y="1200" width="340" height="75" as="geometry" /></mxCell></root></mxGraphModel>
+<mxfile host="Electron">
+  <diagram id="Asnvu5ib-c35kVvcOV9C" name="Page-1">
+    <mxGraphModel dx="1846" dy="1031" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1160" pageHeight="1420" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f4f7fa;strokeColor=#f4f7fa;fontColor=#203247;fontSize=15;spacing=8;fontSize=23;align=left;" value="&lt;b&gt;We-Video 系统架构&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px&quot;&gt;以解说视频创作为主线，各阶段保留人工编辑与审核&lt;/font&gt;" vertex="1">
+          <mxGeometry height="65" width="1100" x="30" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="workbench" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;fontSize=16;" value="&lt;b&gt;创作工作台&lt;/b&gt;&lt;br&gt;输入、编辑、审核、预览与下载" vertex="1">
+          <mxGeometry height="75" width="300" x="40" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="input" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;输入资料&lt;/b&gt;&lt;br&gt;文本 / 网页 / 口播稿" vertex="1">
+          <mxGeometry height="100" width="200" x="40" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="draft" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fa;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;① 文稿&lt;/b&gt;&lt;br&gt;生成、修改与审核&lt;br&gt;口播稿与分段" vertex="1">
+          <mxGeometry height="100" width="200" x="320" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="audio" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fa;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;② 配音&lt;/b&gt;&lt;br&gt;合成与审核&lt;br&gt;音频、字幕与时间轴" vertex="1">
+          <mxGeometry height="100" width="200" x="600" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="visual" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fa;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;③ 视觉规划&lt;/b&gt;&lt;br&gt;镜头、模板与素材&lt;br&gt;编辑并确认" vertex="1">
+          <mxGeometry height="100" width="200" x="880" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="manifest" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e5;strokeColor=#e7c496;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;渲染清单&lt;/b&gt;&lt;br&gt;汇总音频、字幕、镜头&lt;br&gt;品牌与资源" vertex="1">
+          <mxGeometry height="100" width="200" x="880" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="render" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e5;strokeColor=#e7c496;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;④ 合成与输出&lt;/b&gt;&lt;br&gt;Remotion 预览 / 后台渲染&lt;br&gt;输出 MP4" vertex="1">
+          <mxGeometry height="100" width="200" x="600" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="result" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;成片&lt;/b&gt;&lt;br&gt;预览与下载" vertex="1">
+          <mxGeometry height="100" width="200" x="320" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="flow1" edge="1" parent="1" source="input" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" target="draft" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow2" edge="1" parent="1" source="draft" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" target="audio" value="确认">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow3" edge="1" parent="1" source="audio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" target="visual" value="确认">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow4" edge="1" parent="1" source="visual" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" target="manifest" value="确认">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow5" edge="1" parent="1" source="manifest" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" target="render" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow6" edge="1" parent="1" source="render" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitPerimeter=1;entryPerimeter=1;" target="result" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="model" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;DeepSeek&lt;/b&gt;&lt;br&gt;文稿与视觉内容生成" vertex="1">
+          <mxGeometry height="65" width="200" x="320" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="tts" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;百炼 TTS&lt;/b&gt;&lt;br&gt;语音与时间信息" vertex="1">
+          <mxGeometry height="65" width="200" x="600" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="draft-model" edge="1" parent="1" source="draft" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="model" value="调用">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="audio-tts" edge="1" parent="1" source="audio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="tts" value="调用">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="templates" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f8fc;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;align=left;verticalAlign=top;spacingTop=12;spacingLeft=15;" value="&lt;b&gt;镜头模板&lt;/b&gt;" vertex="1">
+          <mxGeometry height="290" width="260" x="820" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="template0" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="IP 动态开场舞台" vertex="1">
+          <mxGeometry height="44" width="110" x="10" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="template1" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="IP 动态结论舞台" vertex="1">
+          <mxGeometry height="44" width="110" x="130" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="template2" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="揭示文字" vertex="1">
+          <mxGeometry height="44" width="110" x="10" y="101" as="geometry" />
+        </mxCell>
+        <mxCell id="template3" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="文字重点标注" vertex="1">
+          <mxGeometry height="44" width="110" x="130" y="101" as="geometry" />
+        </mxCell>
+        <mxCell id="template4" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="通用内容卡" vertex="1">
+          <mxGeometry height="44" width="110" x="10" y="157" as="geometry" />
+        </mxCell>
+        <mxCell id="template5" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="关系图" vertex="1">
+          <mxGeometry height="44" width="110" x="130" y="157" as="geometry" />
+        </mxCell>
+        <mxCell id="template6" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="视觉要求图片" vertex="1">
+          <mxGeometry height="44" width="110" x="10" y="213" as="geometry" />
+        </mxCell>
+        <mxCell id="template7" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="3D Model Scene" vertex="1">
+          <mxGeometry height="44" width="110" x="130" y="213" as="geometry" />
+        </mxCell>
+        <mxCell id="visual-templates" edge="1" parent="1" source="visual" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=1;entryY=0.2;" target="templates" value="选择 / 编排">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="310" />
+              <mxPoint x="1120" y="758" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="assets" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;素材与配置&lt;/b&gt;&lt;br&gt;账号、专题、品牌与提示词&lt;br&gt;图片 / GLB / 静态素材&lt;br&gt;.env 与 pipeline.config.json" vertex="1">
+          <mxGeometry height="105" width="340" x="40" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="jobs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;任务数据 · jobs/&lt;/b&gt;&lt;br&gt;状态、草稿、音频、规划、素材&lt;br&gt;清单和成片按任务保存" vertex="1">
+          <mxGeometry height="105" width="340" x="410" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="translation" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1eef8;strokeColor=#c9bddd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;翻译派生&lt;/b&gt;&lt;br&gt;已有母稿 → 翻译审核 → 重新配音&lt;br&gt;复用并调整母稿镜头规划" vertex="1">
+          <mxGeometry height="85" width="340" x="40" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ffffff;fontColor=#203247;fontSize=15;spacing=8;fontSize=13;fontColor=#718096;align=left;" value="各方框为可单独移动和取舍的模块；箭头表示主流程及直接调用。配置与任务数据供各阶段使用。" vertex="1">
+          <mxGeometry height="55" width="1040" x="40" y="1330" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;应用 API&lt;/b&gt;&lt;br&gt;鉴权、确认、任务状态与文件访问" vertex="1">
+          <mxGeometry height="75" width="300" x="425" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="worker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;后台执行&lt;/b&gt;&lt;br&gt;文稿 / 翻译 / 配音 / 规划 / 渲染 Worker" vertex="1">
+          <mxGeometry height="75" width="300" x="810" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-api" edge="1" parent="1" source="workbench" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="api" value="请求 / 轮询">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="api-worker" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="worker" value="调度">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="contracts" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;数据契约&lt;/b&gt;&lt;br&gt;文稿与渲染清单的结构约束" vertex="1">
+          <mxGeometry height="75" width="340" x="40" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="runtime" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;共享运行资源&lt;/b&gt;&lt;br&gt;路径、状态、素材访问与公共处理" vertex="1">
+          <mxGeometry height="75" width="340" x="410" y="1200" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

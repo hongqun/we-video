@@ -1,20 +1,13 @@
 import {promises as fs} from "node:fs";
-import path from "node:path";
 import {NextResponse} from "next/server";
 import {z} from "zod";
-import {assertTranslationReviewed, atomicWriteJson, jobDir, readJob, readJson, recordJobApproval, updateJobGeneration, updateJobState} from "@/lib/jobs";
+import {assertTranslationReviewed, jobDir, readJob, readJson, recordJobApproval, updateJobGeneration, updateJobState} from "@/lib/jobs";
 import {readPipelineSettings} from "@/lib/pipeline-settings";
 import {startTypeScriptApprove} from "@/lib/processes";
 import {narrationSegmentsForDraft} from "@/lib/tts";
 import {requireAuth} from "@/lib/auth";
-import {profileContext, readJobPlatformProfile} from "@/lib/profile";
-import {mathDraftSchema} from "@/math/service";
-import {ensureMathSummaryTags, formulaCatalog} from "@/math/formulas";
-import {isAllowedMathMusicSrc, isMathMusicManifest, MATH_MUSIC_DEFAULT_SRC, MATH_MUSIC_MANIFEST_RELATIVE_PATH} from "@/math/music";
-import {mathManifestSchema} from "@/remotion/math-schema";
+import {readJobPlatformProfile} from "@/lib/profile";
 import {renderManifestSchema} from "@/remotion/schema";
-import {mathOutroVariantSchema} from "@/remotion/math-outro-variants";
-import {REMOTION_PUBLIC_DIR} from "@/lib/paths";
 
 export const runtime = "nodejs";
 
@@ -24,18 +17,8 @@ const requestSchema = z.object({
   voiceId: z.string().min(1).optional(),
   rate: z.number().min(0.5).max(1.5).optional(),
   regenerateAudio: z.boolean().optional(),
-  musicSrc: z.string().min(1).optional(),
-  outroVariant: mathOutroVariantSchema.optional(),
   basePlanVersion: z.number().int().positive().optional(),
 });
-const MATH_MUSIC_MANIFEST_PATH = path.join(REMOTION_PUBLIC_DIR, MATH_MUSIC_MANIFEST_RELATIVE_PATH);
-
-const readMathMusicManifest = async () => {
-  const value: unknown = JSON.parse(await fs.readFile(MATH_MUSIC_MANIFEST_PATH, "utf8"));
-  if (!isMathMusicManifest(value) || !value.options.length) throw new Error("数学配乐清单为空或格式无效");
-  return value;
-};
-
 export async function POST(request: Request, context: {params: Promise<{id: string}>}) {
   const unauthorized = await requireAuth();
   if (unauthorized) return unauthorized;
@@ -45,27 +28,6 @@ export async function POST(request: Request, context: {params: Promise<{id: stri
     await assertTranslationReviewed(id);
     const job = await readJob(id);
     const requestBody = requestSchema.parse(await request.json());
-    if (job.contentMode === "math") {
-      if (!new Set(["awaiting_review", "failed", "ready", "completed"]).has(job.state)) throw new Error(`当前状态 ${job.state} 不能确认公式`);
-      const profile = await readJobPlatformProfile(job.contentProfile);
-      const draft = mathDraftSchema.parse(await readJson<unknown>(`${jobDir(id)}/draft.json`));
-      const requestedMusicSrc = requestBody.musicSrc ?? draft.musicSrc;
-      const musicManifest = await readMathMusicManifest();
-      const musicSrc = requestedMusicSrc === "profile-assets/tech123/math-beautiful/happybeat.ogg" ? MATH_MUSIC_DEFAULT_SRC : requestedMusicSrc;
-      if (!isAllowedMathMusicSrc(musicManifest, musicSrc)) throw new Error("不支持的数学配乐");
-      const videoHeight = draft.resolution === "1080x1260" ? 1260 : 1920;
-      const manifest = mathManifestSchema.parse({
-        ...draft, summary: ensureMathSummaryTags(draft.summary, formulaCatalog[draft.formulaId]), jobId: id, revision: 1, contentProfile: profileContext(profile),
-        formula: {id: draft.formulaId, latex: draft.formulaLatex, parameters: draft.parameters, plot: draft.plot},
-        outroVariant: requestBody.outroVariant ?? "orbit-trace",
-        video: {width: 1080, height: videoHeight, fps: 30, outroDurationMs: 3000},
-        musicSrc,
-        brand: {logoSrc: profile.logoSrc, title: profile.title, subtitle: profile.subtitle, label: profile.displayLabel, downloadPrefix: profile.downloadPrefix},
-      });
-      await atomicWriteJson(`${jobDir(id)}/manifest.json`, manifest);
-      await updateJobState(id, {state: "ready", error: null});
-      return NextResponse.json({jobId: id, state: "ready"});
-    }
     const directory = jobDir(id);
     const hasNarrationArtifact = await fs.access(`${directory}/audio/narration.json`).then(() => true).catch(() => false);
     // 重新生成与确认音频必须显式区分，不能把新参数静默用于确认旧产物。

@@ -2,11 +2,6 @@ import {Composition} from "remotion";
 import {calculateVideoMetadata} from "./metadata";
 import {renderManifestSchema} from "./schema";
 import {ShortVideo} from "./ShortVideo";
-import {MathVideo} from "./MathVideo";
-import {mathManifestSchema} from "./math-schema";
-import {mathDurationInFrames} from "./math-timing";
-import {MATH_BODY_DURATION_MS} from "../math/duration";
-import {MATH_MUSIC_DEFAULT_SRC} from "../math/music";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -53,35 +48,6 @@ export const RemotionRoot: React.FC = () => {
           presenterFraming: "full",
         }],
         brand: {logoSrc: "profile-assets/tech123/logo.png", title: "Tech123", subtitle: "科学·科技·科创", label: "TECH123 · 科技一分钟", downloadPrefix: "tech123-video"},
-        }}
-      />
-      <Composition
-        id="TechMathVideo"
-        component={MathVideo}
-        durationInFrames={mathDurationInFrames(MATH_BODY_DURATION_MS, 3000, 30)}
-        fps={30}
-        width={1080}
-        height={1260}
-        schema={mathManifestSchema}
-        calculateMetadata={({props}) => ({
-          durationInFrames: mathDurationInFrames(props.formula.plot.drawDurationMs, props.video.outroDurationMs, props.video.fps),
-          width: props.video.width,
-          height: props.video.height,
-          fps: props.video.fps,
-        })}
-        defaultProps={{
-          schemaVersion: "1.0",
-          contentMode: "math",
-          jobId: "math-sample",
-          revision: 1,
-          contentProfile: {accountId: "tech123", seriesId: "math-beautiful", accountVersion: "1", seriesVersion: "1"},
-          title: "帕斯卡蜗线",
-          summary: "帕斯卡蜗线的参数化绘制。",
-          outroVariant: "orbit-trace",
-          video: {width: 1080, height: 1260, fps: 30, outroDurationMs: 3000},
-          formula: {id: "limacon", latex: "r = b + a\\cos\\theta", parameters: {a: 5, b: 4}, plot: {xMin: -10, xMax: 10, yMin: -8, yMax: 8, drawDurationMs: MATH_BODY_DURATION_MS}},
-          musicSrc: MATH_MUSIC_DEFAULT_SRC,
-          brand: {logoSrc: "profile-assets/tech123/logo.png", title: "Tech123", subtitle: "科学·科技·科创", label: "TECH123 · 数学之美", downloadPrefix: "tech123-math"},
         }}
       />
     </>

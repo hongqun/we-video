@@ -1,7 +1,6 @@
 import {z} from "zod";
 // 注意：remotion 渲染打包（rspack）不解析 tsconfig 的 @/ 别名，此处必须用相对路径。
 import {TRANSITION_KINDS} from "../lib/scene-transitions";
-import {mathManifestSchema, type MathRenderManifest} from "./math-schema";
 import {PRESENTER_FRAMINGS, PRESENTER_GESTURE_DIRECTIONS, PRESENTER_PLACEMENTS, PRESENTER_SAFE_SIDES} from "./presenter-config";
 import {VISUAL_STYLE_IDS} from "./visual-style";
 
@@ -220,5 +219,5 @@ export type VideoScene = z.infer<typeof sceneSchema>;
 export type Caption = z.infer<typeof captionSchema>;
 export type CaptionStyle = z.infer<typeof captionStyleSchema>;
 export type VisualStyle = z.infer<typeof visualStyleSchema>;
-export const artifactManifestSchema = z.union([renderManifestSchema, mathManifestSchema]);
-export type ArtifactManifest = RenderManifest | MathRenderManifest;
+export const artifactManifestSchema = renderManifestSchema;
+export type ArtifactManifest = RenderManifest;

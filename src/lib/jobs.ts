@@ -50,7 +50,7 @@ export const atomicWriteJson = async (file: string, value: unknown) => {
 };
 
 export const normalizeArtifactManifest = (value: unknown): unknown => {
-  // 数学 manifest 同时支持 1080×1260 和 1080×1920，不能再把前者归一化为后者。
+  // 渲染清单保持原始字段，交由 schema 校验。
   return value;
 };
 
@@ -64,7 +64,7 @@ export type JobRecord = {
   updatedAt: string;
   renderProgress?: number;
   contentProfile: ContentProfileContext;
-  contentMode?: "narration" | "math";
+  contentMode?: "narration";
   generation?: {textModel?: string; voiceId?: string; rate?: number};
   generationProgress?: {text: string; updatedAt: string};
   // 派生任务保存母稿关系；任务目录内的内容从此完全独立。
@@ -132,7 +132,6 @@ export const resolveManifestAssets = (
   renderToken?: string,
 ): ArtifactManifest => {
   const prefix = `artifact://`;
-  if (manifest.contentMode === "math") return manifest;
   const audioSrc = manifest.narration.audioSrc.startsWith(prefix)
     ? `${origin}/api/jobs/${encodeURIComponent(manifest.jobId)}/artifacts/${manifest.narration.audioSrc.slice(prefix.length)}${renderToken ? `?renderToken=${encodeURIComponent(renderToken)}` : ""}`
     : manifest.narration.audioSrc;

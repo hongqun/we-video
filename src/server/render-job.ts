@@ -96,10 +96,9 @@ const main = async () => {
   const rawManifest = await readJson<unknown>(resolvedManifestPath);
   const normalizedManifest = normalizeArtifactManifest(rawManifest);
   let manifest = artifactManifestSchema.parse(normalizedManifest);
-  if (manifest.contentMode !== "math") {
-    manifest = await resolveManifestMedia(manifest, jobDir(manifest.jobId));
-    await assertRenderPreflight(manifest);
-  }
+  // 口播清单统一解析素材并执行渲染前校验。
+  manifest = await resolveManifestMedia(manifest, jobDir(manifest.jobId));
+  await assertRenderPreflight(manifest);
   const props = resolveManifestAssets(
     manifest,
     origin,
@@ -107,7 +106,7 @@ const main = async () => {
     createRenderArtifactToken(manifest.jobId, "render"),
   );
   const directory = jobDir(manifest.jobId);
-  const has3dScene = manifest.contentMode !== "math" && manifest.scenes.some((scene) => scene.templateId === "rve/3d-model-scene");
+  const has3dScene = manifest.scenes.some((scene) => scene.templateId === "rve/3d-model-scene");
   let chromiumOptions: {gl: ReturnType<typeof modelRenderGl>} | undefined;
   const outputLocation = path.join(directory, "output.mp4");
   const renderAttemptId = `${process.pid}-${Date.now()}`;
@@ -139,7 +138,7 @@ const main = async () => {
     const serveUrl = await bundle({entryPoint: REMOTION_ENTRY, publicDir: REMOTION_PUBLIC_DIR});
     const composition = await selectComposition({
       serveUrl,
-      id: "contentMode" in manifest && manifest.contentMode === "math" ? "TechMathVideo" : "TechShortVideo",
+      id: "TechShortVideo",
       inputProps: props,
       browserExecutable: browserConfig.browserExecutable,
       chromeMode: browserConfig.chromeMode,
@@ -172,7 +171,7 @@ const main = async () => {
       const renderedOutput = await fs.stat(output);
       if (!renderedOutput.isFile() || renderedOutput.size === 0) throw new Error("渲染输出为空，未发布成片");
       await assertRenderedMedia(output, {width: composition.width, height: composition.height, fps: composition.fps, durationInFrames: composition.durationInFrames});
-      const corruptions = manifest.contentMode === "math" ? [] : await inspectRenderedFrameIntegrity(output);
+      const corruptions = await inspectRenderedFrameIntegrity(output);
       return {output, corruptions};
     };
 

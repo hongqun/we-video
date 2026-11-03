@@ -3370,6 +3370,14 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .relation-cue-warning { color: #a56222; }
 @media (max-width: 980px) { .relation-graph-modal-window { width: min(960px, calc(100vw - 16px)); } }
 @media (max-width: 900px) { .relation-graph-editor { grid-template-columns: 1fr; } .relation-graph-inspector { grid-column: 1; grid-template-columns: 1fr; } .relation-graph-inspector > * { grid-column: 1 !important; } }
+/* 封面编辑默认收起，展开后沿用原有双栏布局。 */
+.visual-plan-cover-disclosure { grid-column: 1 / -1; }
+.visual-plan-cover-disclosure > summary { align-items: center; background: #f7faf9; border: 1px solid #d8e7e1; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; padding: 15px; }
+.visual-plan-cover-disclosure > summary > span:first-child { display: grid; gap: 3px; }
+.visual-plan-cover-chevron { display: inline-block; margin-left: 8px; transition: transform .15s; }
+.visual-plan-cover-disclosure[open] .visual-plan-cover-chevron { transform: rotate(180deg); }
+.visual-plan-cover-disclosure[open] > summary { border-radius: 12px 12px 0 0; }
+.visual-plan-cover-disclosure[open] > .visual-plan-cover-editor { border-radius: 0 0 12px 12px; border-top: 0; }
 .visual-plan-cover-editor { background: #f7faf9; border: 1px solid #d8e7e1; border-radius: 12px; display: grid; gap: 18px; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(220px, .42fr); padding: 15px; }
 /* 风格卡只预告色彩、材质和构图，不伪装业务数据或状态控件。 */
 .visual-style-picker { background: #f7faf9; border: 1px solid #d8e7e1; border-radius: 12px; display: grid; gap: 12px; grid-column: 1 / -1; margin: 0; min-width: 0; padding: 15px; }
@@ -3412,7 +3420,17 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-plan-cover-image-thumb { background: #eaf1ed; border: 1px solid var(--line); border-radius: 8px; height: 110px; object-fit: contain; width: 110px; }
 .visual-plan-scenes-heading { border-top: 1px solid #e8e1f3; display: grid; gap: 3px; grid-column: 1 / -1; padding-top: 16px; }
 .visual-plan-scenes-heading p { margin: 0; }
-.visual-plan-editor { display: grid; gap: 14px; }
+.visual-plan-editor { display: grid; gap: 9px; }
+/* 压缩镜头字段与模板卡片的纵向空间，保留多行输入和手动调整高度。 */
+.visual-plan-editor > .template-field .compatible-template-picker { gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 200px; }
+.visual-plan-editor > .template-field .template-option { min-height: 46px; padding: 5px 9px; }
+.visual-plan-editor > .template-field .template-option > span { gap: 1px; }
+.visual-plan-editor > label { gap: 3px; }
+.visual-plan-editor > label > input, .visual-plan-two-columns input, .visual-plan-two-columns select { min-height: 36px; padding: 6px 9px; }
+.visual-plan-editor > label > textarea { min-height: 52px; padding: 6px 9px; line-height: 1.45; }
+.visual-plan-editor > label > textarea[rows="3"] { min-height: 66px; }
+/* 覆盖通用模板字段的排序，让镜头规划先显示模板选择。 */
+.visual-plan-editor > .template-field { order: 0; }
 .visual-plan-editor .actions { grid-column: 1 / -1; }
 .visual-plan-structure-actions { align-items: center; border-bottom: 1px solid #e8e1f3; padding-bottom: 12px; }
 .visual-plan-spoken { background: #faf8ff; border-left: 3px solid #8b66cb; border-radius: 0 9px 9px 0; padding: 12px 14px; }
@@ -3424,8 +3442,8 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-plan-structure p { color: #32485e; line-height: 1.6; margin: 5px 0; }
 .visual-plan-structure small { color: #65778a; display: block; line-height: 1.5; }
 .visual-plan-fallback { background: #fff8e9; border: 1px solid #ecd39a; border-radius: 9px; color: #75520b; margin: 0; padding: 10px 12px; }
-.visual-plan-two-columns { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.visual-plan-two-columns label { display: grid; gap: 6px; }
+.visual-plan-two-columns { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.visual-plan-two-columns label { display: grid; gap: 3px; }
 .visual-plan-presenter-settings { border: 1px solid #e2dafa; border-radius: 10px; background: #fcfaff; }
 .visual-plan-presenter-settings summary { align-items: center; cursor: pointer; display: flex; gap: 10px; justify-content: space-between; list-style: none; padding: 11px 13px; }
 .visual-plan-presenter-settings summary::-webkit-details-marker { display: none; }

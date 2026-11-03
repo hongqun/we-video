@@ -200,12 +200,9 @@ export const validateVisualPlan = (plan: VisualPlan, draft: Draft, narration: Na
   const runtimeScenes = deriveScenes(plan, draft, narration, resources, {allowIncompleteImage});
   plan.scenes.forEach((scene, index) => {
     const first = index === 0;
-    const last = index === plan.scenes.length - 1 && !first;
     const definition = templateById.get(scene.templateId);
     if (!definition || !definition.adapted || !isTemplateAvailableForProfile(definition, profile)) throw new Error(`镜头 ${scene.segmentId} 使用了不可用模板`);
-    if (last && scene.templateId !== "ip/closing-stage") throw new Error(`镜头 ${scene.segmentId} 必须使用总结 IP 模板`);
     if (first && scene.templateId === "ip/closing-stage") throw new Error(`镜头 ${scene.segmentId} 不能使用总结 IP 模板`);
-    if (last && (scene.presenter.rollType !== "a-roll" || scene.presenter.mode !== "hero" || scene.presenter.placement !== "hero")) throw new Error(`镜头 ${scene.segmentId} 必须使用首尾 IP 主讲舞台`);
     if (definition.rollRole === "a-roll" && (scene.presenter.rollType !== "a-roll" || scene.presenter.mode !== "hero" || scene.presenter.placement !== "hero")) throw new Error(`镜头 ${scene.segmentId} 的人物设置与主讲模板不兼容`);
     if (definition.rollRole === "b-roll" && (scene.presenter.rollType !== "b-roll" || scene.presenter.mode === "hero" || scene.presenter.placement === "hero")) throw new Error(`镜头 ${scene.segmentId} 必须使用 B-roll 模式`);
     if (definition.rollRole === "b-roll" && scene.presenter.mode === "companion" && !definition.companionPlacements.includes(scene.presenter.placement as Exclude<typeof scene.presenter.placement, "hero">)) throw new Error(`镜头 ${scene.segmentId} 的人物位置不在模板安全区`);

@@ -178,8 +178,6 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   const currentStatus = runtimeScene ? getTemplateStatus(runtimeScene) : {usable: false, reason: "缺少口播时间轴"};
   const planIssue = runtimeScenes.map((scene, index) => {
     if (!scene) return `第 ${index + 1} 个镜头缺少口播时间轴`;
-    const requiredTemplateId = index === runtimeScenes.length - 1 && runtimeScenes.length > 1 ? "ip/closing-stage" : null;
-    if (requiredTemplateId && scene.templateId !== requiredTemplateId) return `第 ${index + 1} 个镜头必须使用固定模板`;
     // 新增行未填写完整时给出明确提示，避免严格契约保存失败。
     if (scene.templateId === "ip/opening-stage" && scene.content.emphasisBindings?.some((binding) => !binding.text.trim() || !binding.cueText.trim())) return `第 ${index + 1} 个镜头：请填写重点词及其口播绑定，或删除空行`;
     const definition = templateById.get(scene.templateId);
@@ -191,9 +189,8 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     }
     return status.usable ? null : `第 ${index + 1} 个镜头：${status.reason}`;
   }).find((item): item is string => Boolean(item));
-  // 首场默认使用 IP 开场舞台，但允许用户改成任意可用的 B-roll 模板；尾场仍保持结论舞台。
-  const availableTemplates = current ? templateRegistry.filter((definition) => definition.id !== "ip/closing-stage" && (definition.rollRole === "b-roll" || (selected === 0 && definition.id === "ip/opening-stage"))) : [];
-  const fixedEdge = value.scenes.length > 1 && selected === value.scenes.length - 1;
+  // 首尾舞台分别只在对应边缘提供，所有镜头均可选择可用的 B-roll 模板。
+  const availableTemplates = current ? templateRegistry.filter((definition) => definition.rollRole === "b-roll" || (selected === 0 && definition.id === "ip/opening-stage") || (selected > 0 && selected === value.scenes.length - 1 && definition.id === "ip/closing-stage")) : [];
 
   const update = (patch: Partial<VisualPlanScene>) => setValue((previous) => ({...previous, scenes: previous.scenes.map((scene, index) => index === selected ? {...scene, ...patch} : scene)}));
   const updateContent = (patch: Partial<VisualPlanScene["content"]>) => current && update({content: {...current.content, ...patch}});
@@ -398,9 +395,11 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
         </label>)}</div>
         <p className="field-hint">卡片展示的是封面风格；正文镜头会自动降低色彩和装饰强度。不会加入进度、百分比、仪表盘等无业务含义的信息组件。</p>
       </fieldset>
-      <div className="visual-plan-cover-editor">
+      {/* 默认收起封面编辑，保留用户手动展开后的完整表单与预览。 */}
+      <details className="visual-plan-cover-disclosure">
+        <summary><span><span className="review-section-label">封面</span><strong>编辑开场封面</strong></span><span className="metadata">{dirty ? "有未保存修改" : "已保存"} <span aria-hidden="true" className="visual-plan-cover-chevron">▾</span></span></summary>
+        <div className="visual-plan-cover-editor">
         <div className="visual-plan-cover-form">
-          <div className="visual-plan-section-heading"><div><p className="review-section-label">封面</p><h3>编辑开场封面</h3></div><span className="metadata">{dirty ? "有未保存修改" : "已保存"}</span></div>
           {/* 封面标题支持手动换行，直接复用渲染端的显式换行处理。 */}
           <label>封面标题<textarea rows={2} value={cover.title} disabled={locked} maxLength={40} onChange={(event) => updateCover({title: event.target.value})} placeholder="可按 Enter 手动换行" /></label>
           {/* 副标题使用多行输入，保存时保留手动换行。 */}
@@ -416,9 +415,28 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           {coverPreview.imagePath ? <img className="visual-plan-cover-image-thumb" src={coverPreview.imagePath} alt="当前封面图片" /> : <p className="field-hint">可上传 1:1 透明背景小宠物插画，不使用边界框。</p>}
         </div>
         {runtimeScenes[0] ? <aside className="visual-plan-cover-preview"><div><p className="review-section-label">封面预览</p><strong>视频首帧封面</strong></div><CoverPreview brand={brand} presenter={previewPresenter} cover={coverPreview} visualStyle={value.visualStyle} /></aside> : null}
-      </div>
+        </div>
+      </details>
       <div className="visual-plan-scenes-heading"><p className="review-section-label">镜头规划</p><strong>跟着声音排镜头</strong></div>
       <div className="visual-plan-editor">
+        {/* 先选择模板，再编辑该镜头的内容和素材。 */}
+        <div className="template-field"><label>可用模板</label><div className="compatible-template-picker">{availableTemplates.map((definition) => {
+          const candidateResource = visualResourceForScene(visualResources, current.id, current.segmentId);
+          const candidateImagePath = candidateResource?.imagePath ? sceneImageUrl(jobId, candidateResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
+          const candidateModelPath = candidateResource?.modelPath ? sceneImageUrl(jobId, candidateResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
+          const candidateTemplateData = definition.id === "rve/visual-image" && candidateImagePath && candidateResource?.imageWidth && candidateResource.imageHeight
+            ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
+            : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
+            : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
+          const candidatePresenter = definition.rollRole === "a-roll"
+            ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
+            : {...current.presenter, rollType: "b-roll" as const, mode: "hidden" as const, placement: "right-lower" as const, framing: definition.companionFraming};
+          // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
+          const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
+          const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
+          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene";
+          return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingMedia)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingMedia ? "可先选择，待完成素材与编排" : status.reason}</small></span></button>;
+        })}</div></div>
         <div className="visual-plan-spoken"><span>当前口播 · 将光标放在文字中间后点击拆分</span><div className="visual-plan-spoken-editor"><textarea ref={spokenTextRef} value={runtimeScene?.spokenText ?? ""} readOnly rows={3} aria-label="当前镜头口播文字" /><button type="button" className="secondary icon-only" aria-label="按光标拆分镜头" title="按光标拆分镜头" data-tooltip="按光标拆分镜头" disabled={locked} onClick={splitAtSpokenTextCursor}><Icon name="flow" /></button></div></div>
         {/* 场景主标题与封面标题保持一致，支持手动换行并直接传给显式换行渲染。 */}
         <label>主标题<textarea rows={2} value={current.content.title} disabled={locked} onChange={(event) => updateContent({title: event.target.value})} placeholder="可按 Enter 手动换行" /></label>
@@ -447,23 +465,6 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           <label>人物位置<select value={current.presenter.placement} disabled={locked || current.presenter.rollType === "a-roll" || current.presenter.mode === "hidden"} onChange={(event) => { const placement = event.target.value as PresenterPlacement; update({presenter: {...current.presenter, placement, poseId: compatiblePoseForPlacement(current.presenter.poseId, placement, profile.presenter.poses)}}); }}>{current.presenter.rollType === "a-roll" ? <option value="hero">{presenterPlacementLabels.hero}</option> : ["left-mid", "right-mid", "left-lower", "right-lower"].map((id) => <option key={id} value={id}>{presenterPlacementLabels[id as PresenterPlacement]}</option>)}</select></label>
           <label>人物构图<select value={current.presenter.framing ?? "waist"} disabled={locked || current.presenter.rollType === "a-roll" || current.presenter.mode === "hidden"} onChange={(event) => update({presenter: {...current.presenter, framing: event.target.value as PresenterFraming}})}>{Object.entries(presenterFramingLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
         </div></details>
-        {fixedEdge ? <div className="visual-plan-structure"><span>固定模板</span><strong>{templateById.get(current.templateId)?.label}</strong><small>最后镜头固定为结论 IP 舞台</small></div> : <div className="template-field"><label>可用模板</label><div className="compatible-template-picker">{availableTemplates.map((definition) => {
-          const candidateResource = visualResourceForScene(visualResources, current.id, current.segmentId);
-          const candidateImagePath = candidateResource?.imagePath ? sceneImageUrl(jobId, candidateResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
-          const candidateModelPath = candidateResource?.modelPath ? sceneImageUrl(jobId, candidateResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
-          const candidateTemplateData = definition.id === "rve/visual-image" && candidateImagePath && candidateResource?.imageWidth && candidateResource.imageHeight
-            ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
-            : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
-            : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
-          const candidatePresenter = definition.rollRole === "a-roll"
-            ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
-            : {...current.presenter, rollType: "b-roll" as const, mode: "hidden" as const, placement: "right-lower" as const, framing: definition.companionFraming};
-          // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
-          const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
-          const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
-          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene";
-          return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingMedia)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingMedia ? "可先选择，待完成素材与编排" : status.reason}</small></span></button>;
-        })}</div></div>}
         {current.templateId === "rve/3d-model-scene" ? <section className="visual-plan-image-resources" aria-label="当前镜头 3D 模型">
           <div className="visual-plan-section-heading"><div><p className="review-section-label">3D 模型</p><h3>模型动作与标注</h3></div><span className="metadata">{currentModelPath ? "已上传" : "待上传"}</span></div>
           <div className="visual-plan-image-actions"><label className="secondary cover-image-upload-label" title="上传 50MB 以内的自包含 GLB（支持 Draco）；暂不支持外部资源、Meshopt、KTX2。替换后会重置相机轨道及部件锚点，保留标注文字待重新绑定。"><Icon name="upload" />{currentModelPath ? "替换 GLB" : "上传 GLB"}<input type="file" accept=".glb,model/gltf-binary" disabled={locked} onChange={(event) => { const file = event.target.files?.[0]; if (file) void onUploadModel(current.id, current.segmentId, file); event.currentTarget.value = ""; }} /></label>{currentModelPath ? <button type="button" className="secondary" disabled={locked} title="删除当前镜头的模型素材；继续使用 3D 场景前需要重新上传 GLB。" onClick={() => void onDeleteModel(current.id, current.segmentId)}>删除模型</button> : null}<GlbModelPrompt key={current.id} jobId={jobId} segmentId={current.segmentId} spokenText={runtimeScene?.spokenText ?? ""} disabled={locked} /></div>

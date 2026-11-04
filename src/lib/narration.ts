@@ -6,6 +6,7 @@ import {loadNarrationSystemPrompt, loadNarrationUserPrompt, loadScriptSystemProm
 import {prepareNarrationSource, type NarrationSourceRequest} from "./narration-source";
 import {readJobPlatformProfile, type PlatformProfile} from "./profile";
 import {readPipelineSettings} from "./pipeline-settings";
+import {splitExplicitScenes} from "./explicit-scenes";
 
 type Segment = {id: string; spokenText: string; ttsText?: string; pauseAfter: "none" | "short" | "medium" | "long"};
 export type NarrationDraft = {
@@ -118,7 +119,10 @@ const requestModel = async (profile: PlatformProfile, source: Record<string, unk
     ? await Promise.all([loadScriptSystemPrompt(profile), loadScriptUserPrompt(profile)])
     : await Promise.all([loadNarrationSystemPrompt(profile), loadNarrationUserPrompt(profile)]);
   const prompt = renderNarrationPrompt(userTemplate, source, previous, feedback || "请从原文生成完整口播稿。");
-  const response = await fetch(`${settings.deepseek.baseUrl}/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json", Authorization: `Bearer ${settings.deepseek.apiKey}`}, body: JSON.stringify({model, messages: [{role: "system", content: `${system}\n输出语言：${profile.outputLanguage}\n内容定位：${profile.seriesDescription}\n表达风格：${profile.expressionStyle ?? "清晰自然"}`}, {role: "user", content: prompt}], response_format: {type: "json_object"}, stream: true})});
+  // 场景规则在运行时追加，专栏覆盖提示词或已有任务快照也必须遵守原文边界。
+  const explicitScenes = splitExplicitScenes(String(source.originalText ?? ""));
+  const sceneRule = explicitScenes ? `\n原文已明确划分为 ${explicitScenes.length} 个场景，narrationSegments 必须逐场景一一对应，保持顺序，不得拆分、合并或新增场景。场景内的空行、对白、拟声词不是新场景；末尾总结归入最后一个场景，文首说明归入第一个场景。` : "";
+  const response = await fetch(`${settings.deepseek.baseUrl}/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json", Authorization: `Bearer ${settings.deepseek.apiKey}`}, body: JSON.stringify({model, messages: [{role: "system", content: `${system}${sceneRule}\n输出语言：${profile.outputLanguage}\n内容定位：${profile.seriesDescription}\n表达风格：${profile.expressionStyle ?? "清晰自然"}`}, {role: "user", content: prompt}], response_format: {type: "json_object"}, stream: true})});
   if (!response.ok || !response.body) throw new Error(`DeepSeek 文稿生成失败：HTTP ${response.status}`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -135,7 +139,16 @@ const requestModel = async (profile: PlatformProfile, source: Record<string, unk
     buffer = buffer.slice(buffer.lastIndexOf("\n") + 1);
   }
   if (!content) throw new Error("DeepSeek 未返回口播稿");
-  try { return JSON.parse(content) as Record<string, unknown>; } catch (error) { throw new Error(`DeepSeek 返回的内容不是有效 JSON：${String(error)}`); }
+  let raw: Record<string, unknown>;
+  try { raw = JSON.parse(content) as Record<string, unknown>; } catch (error) { throw new Error(`DeepSeek 返回的内容不是有效 JSON：${String(error)}`); }
+  if (explicitScenes && source.type === "script" && profile.kind !== "derived") {
+    // 原稿模式直接使用原文场景，不让模型的自由分段覆盖用户已指定的结构。
+    raw.narrationSegments = explicitScenes.map((spokenText, index) => ({id: `narration-${String(index + 1).padStart(2, "0")}`, spokenText, pauseAfter: "medium"}));
+  } else if (explicitScenes && (!Array.isArray(raw.narrationSegments) || raw.narrationSegments.length !== explicitScenes.length)) {
+    // 改写模式允许润色正文，但不能静默接受模型改动场景数量。
+    throw new Error(`原文已划分为 ${explicitScenes.length} 个场景，生成稿必须保持相同场景数量，请重新生成`);
+  }
+  return raw;
 };
 
 export const createNarration = async (jobId: string, request: NarrationSourceRequest, profile: PlatformProfile, model: string, initializeJob = true) => {

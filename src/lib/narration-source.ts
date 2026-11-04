@@ -1,6 +1,7 @@
 import {createHash} from "node:crypto";
 import dns from "node:dns/promises";
 import net from "node:net";
+import {splitExplicitScenes} from "./explicit-scenes";
 
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MIN_TEXT_LENGTH = 20;
@@ -76,6 +77,8 @@ const extractScriptTitle = (value: string) => {
   // Markdown 一级标题只取第一个；其余 # 号仍按用户原稿保留在正文中。
   const match = value.match(/^(?:\uFEFF)?[ \t]*#[ \t]+(.+?)[ \t]*(?:\r?\n|$)/m);
   if (!match) return {title: "", text: value};
+  // 一级标题本身是场景标题时也属于正文，不能被提取为视频标题而丢失边界。
+  if (splitExplicitScenes(match[1]!)) return {title: "", text: value};
   const headingStart = match.index ?? 0;
   const textAfterHeading = `${value.slice(0, headingStart)}${value.slice(headingStart + match[0].length)}`;
   // 标题后的空行只是 Markdown 分隔符，不属于需要配音的正文。
@@ -128,7 +131,12 @@ export const prepareNarrationSource = async (request: NarrationSourceRequest, us
   let originalText: string;
   let title = cleanText(request.title ?? "");
   let url: string | null = null;
-  if (request.type === "text") originalText = cleanTextPreservingCode(request.text ?? "");
+  if (request.type === "text") {
+    // 明确划分的场景单独清洗并保留换行，避免标题边界被空白归一化抹平。
+    const text = request.text ?? "";
+    const scenes = splitExplicitScenes(text);
+    originalText = scenes ? scenes.map(cleanTextPreservingCode).join("\n\n") : cleanTextPreservingCode(text);
+  }
   // 口播稿是用户已确认的配音文字，必须保存正文原始字符，不能复用正文清洗逻辑。
   else if (request.type === "script") {
     const parsed = extractScriptTitle(request.text ?? "");

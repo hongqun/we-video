@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type {ArtifactManifest, Caption, CaptionStyle, RenderManifest, VideoScene} from "@/remotion/schema";
 import { videoDownloadFilename } from "@/lib/filename";
+import type {DeliveryMetadata} from "@/lib/delivery-metadata";
 import { ReviewPreview } from "./ReviewPreview";
 import { AudioReview } from "./AudioReview";
 import { Icon, type IconName } from "./Icon";
@@ -122,6 +123,7 @@ type Snapshot = {
   translation?: TranslationReviewData | null;
   pendingDraft?: {draft: Draft; feedback: string; fromRevision: number; createdAt: string} | null;
   manifest: ArtifactManifest | null;
+  deliveryMetadata?: DeliveryMetadata | null;
   visualPlan?: VisualPlan | null;
   previewArtifactToken?: string;
   visualResources?: {revision?: number; resources: Array<{segmentId: string; sceneId?: string; imagePath?: string; imageWidth?: number; imageHeight?: number; modelPath?: string; polygons: Array<{text: string; points: Array<{x: number; y: number}>}>}>} | null;
@@ -306,6 +308,11 @@ export const Workspace: React.FC = () => {
   const [summaryCopyStatus, setSummaryCopyStatus] = useState<
     "idle" | "copied" | "failed"
   >("idle");
+  // 未保存的发布文案按任务隔离，轮询快照时保留用户输入。
+  const [deliveryEdit, setDeliveryEdit] = useState<{jobId: string; values: DeliveryMetadata} | null>(null);
+  const [deliverySaving, setDeliverySaving] = useState(false);
+  const [deliveryNotice, setDeliveryNotice] = useState<{jobId: string; text: string} | null>(null);
+  useEffect(() => { setDeliveryEdit(null); setDeliveryNotice(null); }, [jobId]);
   const generationOutputRef = useRef<HTMLPreElement | null>(null);
   const previewSeekTokenRef = useRef(0);
   const scriptDialogInputRef = useRef<HTMLInputElement | null>(null);
@@ -1183,7 +1190,35 @@ export const Workspace: React.FC = () => {
     if (snapshot?.job.state) setStep(failedAtRender ? 5 : stateStep);
   }, [snapshot?.job.jobId, snapshot?.job.state, stateStep, failedAtRender]);
   const visibleSteps = steps.map((label, index) => ({step: index + 1, label: index === 0 && snapshot?.translation ? "翻译对照" : label}));
-  const deliverySummary = previewManifest?.summary?.trim() ?? "";
+  const savedDelivery = snapshot?.deliveryMetadata ?? {title: previewManifest?.title ?? "", shortTitle: previewShortTitle ?? "", summary: previewManifest?.summary ?? ""};
+  const deliveryValues = deliveryEdit?.jobId === jobId ? deliveryEdit.values : savedDelivery;
+  const deliverySummary = deliveryValues.summary;
+  const deliveryChanged = deliveryValues.title !== savedDelivery.title || deliveryValues.shortTitle !== savedDelivery.shortTitle || deliveryValues.summary !== savedDelivery.summary;
+  const deliveryEnglish = previewManifest?.contentProfile?.outputLanguage === "en-US" || profile?.outputLanguage === "en-US";
+  const deliveryIssue = !deliveryValues.title.trim() ? "视频标题不能为空" : !deliveryEnglish && Array.from(deliveryValues.shortTitle.trim()).length > 16 ? "短标题不能超过 16 字" : "";
+  const updateDelivery = (field: keyof DeliveryMetadata, value: string) => {
+    if (!jobId) return;
+    setDeliveryEdit({jobId, values: {...deliveryValues, [field]: value}});
+    setDeliveryNotice(null);
+  };
+  const saveDelivery = async () => {
+    if (!jobId || deliverySaving || deliveryIssue) return;
+    setDeliverySaving(true);
+    setDeliveryNotice(null);
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/delivery`, {
+        method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(deliveryValues),
+      });
+      const result = await readApiJson<{deliveryMetadata?: DeliveryMetadata; error?: string}>(response);
+      if (!response.ok || !result.deliveryMetadata) throw new Error(result.error ?? "保存发布信息失败");
+      // 仅更新发布信息，预览清单和已完成的成片继续使用原渲染数据。
+      setSnapshot((current) => current?.job.jobId === jobId ? {...current, deliveryMetadata: result.deliveryMetadata} : current);
+      setDeliveryEdit((current) => current?.jobId === jobId ? null : current);
+      setDeliveryNotice({jobId, text: "发布信息已保存"});
+    } catch (cause) {
+      setDeliveryNotice({jobId, text: cause instanceof Error ? cause.message : "保存发布信息失败"});
+    } finally { setDeliverySaving(false); }
+  };
   const rawVisibleError = error ?? snapshot?.job.error ?? "";
   // 失败原因（含 worker 侧音频合成失败，只落在 job.error）必须始终展示在顶部横幅，避免静默失败。
   const visibleError = isLegacyNarrationDurationError(rawVisibleError) ? "" : rawVisibleError;
@@ -1240,7 +1275,7 @@ export const Workspace: React.FC = () => {
     setTitleCopyStatus("idle");
     setShortTitleCopyStatus("idle");
     setSummaryCopyStatus("idle");
-  }, [previewManifest?.revision, previewManifest?.title, previewShortTitle, previewManifest?.summary]);
+  }, [jobId, deliveryValues.title, deliveryValues.shortTitle, deliverySummary]);
   const copyText = async (value: string) => {
     // On mobile Safari/embedded browsers, a rejected clipboard promise can
     // consume the click's user activation before the legacy fallback runs.
@@ -1294,18 +1329,18 @@ export const Workspace: React.FC = () => {
     }
   };
   const copyTitle = async () => {
-    if (!previewManifest?.title) return;
+    if (!deliveryValues.title) return;
     try {
-      await copyText(previewManifest.title);
+      await copyText(deliveryValues.title);
       setTitleCopyStatus("copied");
     } catch {
       setTitleCopyStatus("failed");
     }
   };
   const copyShortTitle = async () => {
-    if (!previewShortTitle) return;
+    if (!deliveryValues.shortTitle) return;
     try {
-      await copyText(previewShortTitle);
+      await copyText(deliveryValues.shortTitle);
       setShortTitleCopyStatus("copied");
     } catch {
       setShortTitleCopyStatus("failed");
@@ -2048,8 +2083,9 @@ export const Workspace: React.FC = () => {
               </button>
             </div>
             <input
-              readOnly
-              value={previewManifest.title}
+              disabled={deliverySaving}
+              value={deliveryValues.title}
+              onChange={(event) => updateDelivery("title", event.target.value)}
               aria-label="视频标题"
             />
             {titleCopyStatus === "copied" ? (
@@ -2062,13 +2098,13 @@ export const Workspace: React.FC = () => {
               </span>
             ) : null}
           </section>
-          {previewManifest.contentMode === "narration" && previewManifest.shortTitle ? (
+          {previewManifest.contentMode === "narration" ? (
             <section className="summary-card delivery-title-card" aria-labelledby="video-delivery-short-title">
               <div className="summary-heading">
-                <div><h3 id="video-delivery-short-title">16 字短标题</h3><span>用于平台标题栏和封面文案 · 版本 {previewManifest.revision}</span></div>
-                <button className="secondary" type="button" onClick={() => void copyShortTitle()}><Icon name="copy" />复制短标题</button>
+                <div><h3 id="video-delivery-short-title">{deliveryEnglish ? "短标题" : "16 字短标题"}</h3><span>用于平台发布 · {deliveryEnglish ? "英文不限长度" : `${Array.from(deliveryValues.shortTitle).length}/16 字`} · 版本 {previewManifest.revision}</span></div>
+                <button className="secondary" type="button" disabled={!deliveryValues.shortTitle} onClick={() => void copyShortTitle()}><Icon name="copy" />复制短标题</button>
               </div>
-              <input readOnly value={previewManifest.shortTitle} aria-label="16 字短标题" />
+              <input disabled={deliverySaving} value={deliveryValues.shortTitle} onChange={(event) => updateDelivery("shortTitle", event.target.value)} aria-label={deliveryEnglish ? "短标题" : "16 字短标题"} />
               {shortTitleCopyStatus === "copied" ? <span className="copy-status success" role="status" aria-live="polite">短标题已复制</span> : shortTitleCopyStatus === "failed" ? <span className="copy-status failed" role="status" aria-live="polite">复制失败，请手动选择短标题文本</span> : null}
             </section>
           ) : null}
@@ -2092,9 +2128,10 @@ export const Workspace: React.FC = () => {
               </button>
             </div>
             <textarea
-              readOnly
+              disabled={deliverySaving}
               rows={5}
               value={deliverySummary}
+              onChange={(event) => updateDelivery("summary", event.target.value)}
               placeholder="当前版本暂无摘要"
               aria-label={"视频摘要"}
             />
@@ -2108,6 +2145,12 @@ export const Workspace: React.FC = () => {
               </span>
             ) : null}
           </section>
+          {/* 三项发布文案一次保存，空短标题和摘要也可用于清除历史内容。 */}
+          <div className="actions">
+            <button type="button" disabled={deliverySaving || !deliveryChanged || Boolean(deliveryIssue)} onClick={() => void saveDelivery()}><Icon name="save" />{deliverySaving ? "保存中…" : "保存发布信息"}</button>
+            <button type="button" className="secondary" disabled={deliverySaving || !deliveryChanged} onClick={() => {setDeliveryEdit(null); setDeliveryNotice(null);}}>撤销修改</button>
+            <span className="hint" role="status" aria-live="polite">{(deliveryNotice?.jobId === jobId ? deliveryNotice.text : "") || deliveryIssue || (deliveryChanged ? "有未保存的修改" : "修改发布信息后保存，无需重新生成成片。")}</span>
+          </div>
           <div className="actions">
             <button className="secondary" onClick={() => setStep(5)}>
               <Icon name="arrow-right" className="icon-flip" />返回预览
@@ -2116,7 +2159,7 @@ export const Workspace: React.FC = () => {
               <a
                 className="button-link"
                 href={`/api/jobs/${encodeURIComponent(snapshot.job.jobId)}/artifacts/output.mp4`}
-                download={videoDownloadFilename(previewManifest.title, profile?.downloadPrefix ?? "tech123-video")}
+                download={videoDownloadFilename(savedDelivery.title, profile?.downloadPrefix ?? "tech123-video")}
               >
                 <Icon name="download" />下载成片
               </a>

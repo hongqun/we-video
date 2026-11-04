@@ -2,7 +2,7 @@ import {createReadStream} from "node:fs";
 import {promises as fs} from "node:fs";
 import {Readable} from "node:stream";
 import {NextResponse} from "next/server";
-import {jobStateAllowsOutput, readJob, safeArtifactPath} from "@/lib/jobs";
+import {jobStateAllowsOutput, readDeliveryMetadata, readJob, safeArtifactPath} from "@/lib/jobs";
 import {verifyRenderArtifactToken} from "@/lib/render-access";
 import {videoDownloadAsciiFallback, videoDownloadFilename} from "@/lib/filename";
 import {requireAuth} from "@/lib/auth";
@@ -58,7 +58,9 @@ export async function GET(request: Request, context: {params: Promise<{id: strin
     if (range) headers["Content-Range"] = `bytes ${range.start}-${range.end}/${stat.size}`;
     if (isOutput) {
       const manifest = JSON.parse(await fs.readFile(safeArtifactPath(params.id, ["manifest.json"]), "utf8")) as {title?: unknown; brand?: {downloadPrefix?: string}};
-      const title = typeof manifest.title === "string" ? manifest.title : "";
+      // 响应头优先使用已保存的发布标题，保证浏览器下载名与交付页一致。
+      const deliveryMetadata = await readDeliveryMetadata(params.id);
+      const title = deliveryMetadata?.title ?? (typeof manifest.title === "string" ? manifest.title : "");
       const prefix = manifest.brand?.downloadPrefix ?? "tech123-video";
       const filename = videoDownloadFilename(title, prefix);
       // 兼容不识别 filename* 的浏览器，也不能再写死为 video.mp4。

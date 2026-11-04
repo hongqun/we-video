@@ -8,6 +8,7 @@ import type {ContentProfileContext} from "./profile";
 import {manifestNeedsMediaResolution, resolveManifestMedia} from "./manifest-media";
 import type {TranslationReview} from "./translation-review";
 import {repairFragmentedEnglishCaptions, repairEnglishSegmentCaptions} from "./tts";
+import {deliveryMetadataSchema} from "./delivery-metadata";
 
 // job ID 统一使用 UTC 时间戳。
 const JOB_ID_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/;
@@ -122,6 +123,12 @@ const optionalJson = async <T>(file: string): Promise<T | null> => {
   }
 };
 
+// 下载和交付页共用发布信息；没有独立文案的旧任务返回空值。
+export const readDeliveryMetadata = async (jobId: string) => {
+  const value = await optionalJson<unknown>(path.join(jobDir(jobId), "delivery.json"));
+  return value ? deliveryMetadataSchema.parse(value) : null;
+};
+
 export const assertTranslationReviewed = async (jobId: string) => {
   // 只有新流程有 translation.json；旧派生任务沿用原流程，不强制重新审核。
   const review = await optionalJson<TranslationReview>(path.join(jobDir(jobId), "translation.json"));
@@ -144,6 +151,8 @@ export const snapshot = async (jobId: string, origin?: string) => {
   const job = await readJob(jobId);
   const directory = jobDir(jobId);
   const translation = await optionalJson<TranslationReview>(path.join(directory, "translation.json"));
+  // 老任务没有独立发布信息时，前端继续用渲染清单中的原始文案。
+  const deliveryMetadata = await readDeliveryMetadata(jobId);
   const [source, storedDraft, rawManifest, rawVisualPlan, narration, visualResources] = await Promise.all([
     optionalJson<Record<string, unknown>>(path.join(directory, "source.json")),
     optionalJson<Record<string, unknown>>(path.join(directory, "draft.json")),
@@ -195,7 +204,7 @@ export const snapshot = async (jobId: string, origin?: string) => {
   const audioPreview = repairedNarration
     ? {src: `/api/jobs/${encodeURIComponent(jobId)}/artifacts/audio/narration.wav${previewArtifactToken ? `?renderToken=${encodeURIComponent(previewArtifactToken)}` : ""}`, narration: repairedNarration}
     : null;
-  return {job, source, draft, pendingDraft, translation, manifest, visualPlan, visualResources, ...(previewArtifactToken ? {previewArtifactToken} : {}), audioPreview, outputReady};
+  return {job, source, draft, pendingDraft, translation, manifest, deliveryMetadata, visualPlan, visualResources, ...(previewArtifactToken ? {previewArtifactToken} : {}), audioPreview, outputReady};
 };
 
 export const updateJobState = async (

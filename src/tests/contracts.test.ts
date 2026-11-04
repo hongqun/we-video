@@ -33,8 +33,8 @@ assert.equal(visualPlanChanged(planWithCover, {...planWithCover, cover: {...plan
 assert.equal(visualPlanChanged(planWithCover, {...planWithCover, visualStyle: "kinetic-lime"}), true);
 assert.equal(renderManifestSchema.safeParse({...manifest, scenes: [{...scene, visualKind: "hook"}]}).success, false);
 assert.equal(renderManifestSchema.safeParse({...manifest, scenes: [{...scene, visualTemplate: {id: "x", data: {}}}]}).success, false);
-// 关系图属于当前可选内容模板，白名单断言必须与实际注册表保持同步。
-assert.deepEqual(templateRegistry.map((item) => item.id), ["ip/opening-stage", "rve/text-reveal", "rve/visual-image", "rve/text-highlight", "rve/generic-content", "rve/relation-graph", "ip/closing-stage"]);
+// 手绘、三维和关系图均属于当前模板白名单，顺序与注册表保持一致。
+assert.deepEqual(templateRegistry.map((item) => item.id), ["ip/opening-stage", "rve/text-reveal", "rve/visual-image", "rve/handdraw-image", "rve/3d-model-scene", "rve/text-highlight", "rve/generic-content", "rve/relation-graph", "ip/closing-stage"]);
 // 契约文件在独立项目根目录，不再位于旧平台父目录。
 assert.doesNotThrow(() => JSON.parse(readFileSync(new URL("../../contracts/render-manifest-v1.schema.json", import.meta.url), "utf8")));
 assert.doesNotThrow(() => JSON.parse(readFileSync(new URL("../../contracts/draft-v1.schema.json", import.meta.url), "utf8")));

@@ -3,6 +3,7 @@ import {SceneFrame} from "../scenes/SceneFrame";
 import {getTemplateStatus} from "./registry";
 import {TextReveal} from "./TextReveal";
 import {VisualImage} from "./VisualImage";
+import {HanddrawImage} from "./HanddrawImage";
 import {TemplateHighlight} from "./TemplateAdapters";
 import {GenericContent} from "./GenericContent";
 import {RelationGraph} from "./RelationGraph";
@@ -46,6 +47,7 @@ export const TemplateSurface: React.FC<{scene: VideoScene; captions?: Caption[]}
     case "text-reveal": rendered = <TextReveal scene={scene} text={text} fontStyle={scene.templateData?.fontStyle} />; break;
     case "text-highlight": rendered = <TemplateHighlight scene={scene} captions={captions} text={text} items={items} />; break;
     case "visual-image": rendered = <VisualImage scene={scene} captions={captions} />; break;
+    case "handdraw-image": rendered = <HanddrawImage key={`${scene.id}-${scene.templateData?.cacheKey}`} scene={scene} />; break;
     case "generic-content": rendered = <GenericContent scene={scene} />; break;
     case "relation-graph": rendered = <RelationGraph scene={scene} captions={captions} />; break;
     case "3d-model-scene": rendered = <ModelScene scene={scene} captions={captions} />; break;

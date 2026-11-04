@@ -12,6 +12,9 @@ import {compatiblePoseForPlacement} from "@/lib/presenter-planning";
 import {presenterFramingLabels, presenterPlacementLabels, type PresenterFraming, type PresenterPlacement, type PresenterPoseId} from "@/remotion/presenter-config";
 import {Icon} from "./Icon";
 import {GlbModelPrompt} from "./GlbModelPrompt";
+import {HanddrawResources, type HanddrawResourcesSnapshot} from "./HanddrawResources";
+import {handdrawTemplateData} from "@/remotion/templates/handdraw-schema";
+import type {SceneVisualResource} from "@/lib/visual-resource-selection";
 import {CoverPreview} from "./CoverPreview";
 import {defaultCover} from "@/remotion/cover";
 import {buildRelationGraphFromKeywords, type RelationGraphData} from "@/remotion/templates/relation-graph";
@@ -30,7 +33,7 @@ const ModelSceneEditor = dynamic(() => import("./ModelSceneEditor").then(({Model
 type SpokenSegment = {id: string; spokenText: string};
 // 编辑器额外接收兼容姿态目录，正式渲染仍只使用已解析的 poses。
 type ProfileContext = {accountId: string; seriesId: string; outputLanguage?: string; presenter: NonNullable<RenderManifest["presenter"]> & {compatibilityPoses?: NonNullable<RenderManifest["presenter"]>["poses"]}};
-type Resource = {segmentId: string; sceneId?: string; imagePath?: string; imageWidth?: number; imageHeight?: number; modelPath?: string; polygons: Array<{text: string; points: Array<{x: number; y: number}>}>};
+type Resource = SceneVisualResource;
 type Polygon = Resource["polygons"][number];
 type PlaybackMode = "step" | "full";
 const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
@@ -47,7 +50,11 @@ const saveInput = (plan: VisualPlan, title: string): VisualPlanSaveInput => {
   return {schemaVersion: "1.0", revision: plan.revision, ...(plan.feedback ? {feedback: plan.feedback} : {}), ...(plan.visualStyle ? {visualStyle: plan.visualStyle} : {}), cover: {...cover, keywords: cover.keywords.map((keyword) => keyword.trim()).filter(Boolean).slice(0, 8)}, scenes: plan.scenes};
 };
 
-export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: VisualPlan; audioSrc: string; segments: TimedNarrationSegment[]; captions: Caption[]; visualResources: {revision?: number; resources: Resource[]}; previewArtifactToken?: string; spokenSegments: SpokenSegment[]; profile: ProfileContext; brand: RenderManifest["brand"]; busy: boolean; canFinalize: boolean; coverImageBusy: boolean; onUploadCoverImage: (file: File) => Promise<void>; onDeleteCoverImage: () => Promise<void>; onGenerateCoverImageRequirement: (title: string) => Promise<void>; onGenerateVisualRequirement: (segmentId: string, spokenText: string, transparentBackground: boolean) => Promise<string>; onUploadImage: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteImage: (sceneId: string, segmentId: string) => Promise<void>; onUploadModel: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteModel: (sceneId: string, segmentId: string) => Promise<void>; onSavePolygons: (sceneId: string, segmentId: string, polygons: Polygon[]) => Promise<void>; onSave: (plan: VisualPlanSaveInput) => Promise<VisualPlan>; onReplan: (feedback: string) => Promise<void>; onFinalize: (planVersion: number) => Promise<void>}> = ({jobId, title, plan, audioSrc, segments, captions, visualResources, previewArtifactToken, spokenSegments, profile, brand, busy, canFinalize, coverImageBusy, onUploadCoverImage, onDeleteCoverImage, onGenerateCoverImageRequirement, onGenerateVisualRequirement, onUploadImage, onDeleteImage, onUploadModel, onDeleteModel, onSavePolygons, onSave, onReplan, onFinalize}) => {
+export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: VisualPlan; audioSrc: string; segments: TimedNarrationSegment[]; captions: Caption[]; visualResources: {revision?: number; resources: Resource[]}; previewArtifactToken?: string; spokenSegments: SpokenSegment[]; profile: ProfileContext; brand: RenderManifest["brand"]; busy: boolean; canFinalize: boolean; coverImageBusy: boolean; onHanddrawChange: () => Promise<void>; onUploadCoverImage: (file: File) => Promise<void>; onDeleteCoverImage: () => Promise<void>; onGenerateCoverImageRequirement: (title: string) => Promise<void>; onGenerateVisualRequirement: (segmentId: string, spokenText: string, transparentBackground: boolean) => Promise<string>; onUploadImage: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteImage: (sceneId: string, segmentId: string) => Promise<void>; onUploadModel: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteModel: (sceneId: string, segmentId: string) => Promise<void>; onSavePolygons: (sceneId: string, segmentId: string, polygons: Polygon[]) => Promise<void>; onSave: (plan: VisualPlanSaveInput) => Promise<VisualPlan>; onReplan: (feedback: string) => Promise<void>; onFinalize: (planVersion: number) => Promise<void>}> = ({jobId, title, plan, audioSrc, segments, captions, visualResources: incomingResources, previewArtifactToken, spokenSegments, profile, brand, busy, canFinalize, coverImageBusy, onHanddrawChange, onUploadCoverImage, onDeleteCoverImage, onGenerateCoverImageRequirement, onGenerateVisualRequirement, onUploadImage, onDeleteImage, onUploadModel, onDeleteModel, onSavePolygons, onSave, onReplan, onFinalize}) => {
+  // 手绘处理独立于主任务轮询，按资源版本防止旧快照覆盖新结果。
+  const [handdrawSnapshot, setHanddrawSnapshot] = useState<HanddrawResourcesSnapshot | null>(null);
+  const [handdrawBusy, setHanddrawBusy] = useState(false);
+  const visualResources = handdrawSnapshot && (handdrawSnapshot.revision ?? 0) >= (incomingResources.revision ?? 0) ? handdrawSnapshot : incomingResources;
   const [value, setValue] = useState(plan);
   const [saved, setSaved] = useState(plan);
   const incomingPlan = useRef(JSON.stringify(plan));
@@ -127,7 +134,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   const retiredScenePose = profile.presenter.compatibilityPoses?.find((pose) => pose.id === current?.presenter.poseId);
   // 资源接口直接从任务目录读取，预览 URL 不再插入已废弃的 revision 层。
   const coverPreview = useMemo(() => cover.imagePath ? {...cover, imagePath: `/api/jobs/${encodeURIComponent(jobId)}/artifacts/${cover.imagePath}${previewArtifactToken ? `?renderToken=${encodeURIComponent(previewArtifactToken)}` : ""}`} : cover, [cover, jobId, previewArtifactToken]);
-  const locked = busy || operation !== "idle";
+  const locked = busy || handdrawBusy || operation !== "idle";
   const dirty = visualPlanChanged(value, saved);
   const playingIndex = visualPlanSceneIndexAtTime(value.scenes, time);
 
@@ -141,6 +148,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     const templateData = scene.templateId === "rve/visual-image" && imagePath && sceneResource?.imageWidth && sceneResource.imageHeight
       ? {imagePath, imageWidth: sceneResource.imageWidth, imageHeight: sceneResource.imageHeight, polygons: sceneResource.polygons}
       : scene.templateId === "rve/3d-model-scene" && modelPath && scene.modelScene ? {modelPath, ...scene.modelScene}
+      : scene.templateId === "rve/handdraw-image" ? handdrawTemplateData(sceneResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
       : scene.templateId === "rve/relation-graph" ? scene.visualData : undefined;
     const speechStartMs = Math.max(scene.startMs, sceneTiming.speechStartMs ?? sceneTiming.startMs);
     const speechEndMs = Math.min(scene.endMs, sceneTiming.speechEndMs ?? sceneTiming.endMs);
@@ -427,6 +435,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           const candidateTemplateData = definition.id === "rve/visual-image" && candidateImagePath && candidateResource?.imageWidth && candidateResource.imageHeight
             ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
             : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
+            : definition.id === "rve/handdraw-image" ? handdrawTemplateData(candidateResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
             : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
           const candidatePresenter = definition.rollRole === "a-roll"
             ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
@@ -434,7 +443,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
           const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
           const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
-          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene";
+          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image";
           return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingMedia)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingMedia ? "可先选择，待完成素材与编排" : status.reason}</small></span></button>;
         })}</div></div>
         <div className="visual-plan-spoken"><span>当前口播 · 将光标放在文字中间后点击拆分</span><div className="visual-plan-spoken-editor"><textarea ref={spokenTextRef} value={runtimeScene?.spokenText ?? ""} readOnly rows={3} aria-label="当前镜头口播文字" /><button type="button" className="secondary icon-only" aria-label="按光标拆分镜头" title="按光标拆分镜头" data-tooltip="按光标拆分镜头" disabled={locked} onClick={splitAtSpokenTextCursor}><Icon name="flow" /></button></div></div>
@@ -479,6 +488,10 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
             setValue(next); setSaved(next); setMessage("三维镜头修改已保存。");
           }} /> : null}
         </section> : null}
+        {current.templateId === "rve/handdraw-image" ? <HanddrawResources key={`${jobId}-${current.id}`} jobId={jobId} sceneId={current.id} scene={current} resource={currentResource?.handdraw} disabled={locked} url={(relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision)} onResources={(next) => setHanddrawSnapshot((old) => !old || (next.revision ?? 0) >= (old.revision ?? 0) ? next : old)} onInvalidate={onHanddrawChange} onBusyChange={setHanddrawBusy} beforeChange={async () => {
+          // 先持久化新镜头和时间边界，再以 sceneId 上传素材或生成提示词。
+          if (dirty) {const next = await save(); if (!next) throw new Error("请先保存镜头规划后重试");}
+        }} /> : null}
         {current.templateId === "rve/visual-image" ? <section className="visual-plan-image-resources" aria-label="当前镜头图片资源">
           <div className="visual-plan-section-heading"><div><p className="review-section-label">图片资源</p><h3>视觉要求图片</h3></div><span className="metadata">{currentImagePath ? "已上传" : "待上传"}</span></div>
           <div className="visual-plan-image-actions">

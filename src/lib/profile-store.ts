@@ -20,7 +20,8 @@ export const profileEditSchema = z.object({
   brand: z.object({title: z.string().max(100).default(""), subtitle: z.string().max(200).default(""), logo: z.string().optional(), presenterEnabled: z.boolean().default(false), outroEnabled: z.boolean().default(false)}).default({title: "", subtitle: "", presenterEnabled: false, outroEnabled: false}),
   prompts: z.record(z.string(), z.string().max(50000)).default({}),
 }).strict();
-export const PROMPT_FILES = ["narration-system.md", "narration-user.md", "script-system.md", "script-user.md", "visual-system.md", "visual-requirement-template.md", "visual-background-transparent.md", "visual-background-opaque.md", "cover-image-requirement-template.md", "translation-system.md", "translation-user.md", "translation-segmentation.md", "translation-visual.md", "glb-model-template.md"];
+// 手绘提示词也进入任务快照，外部生图时使用相同的专栏覆盖规则。
+export const PROMPT_FILES = ["narration-system.md", "narration-user.md", "script-system.md", "script-user.md", "visual-system.md", "visual-requirement-template.md", "visual-background-transparent.md", "visual-background-opaque.md", "cover-image-requirement-template.md", "translation-system.md", "translation-user.md", "translation-segmentation.md", "translation-visual.md", "glb-model-template.md", "handdraw-lineart-template.md", "handdraw-color-template.md"];
 const placeholders: Record<string, string[]> = {
   "narration-user.md": ["SOURCE_CONTEXT", "CURRENT_DRAFT", "USER_FEEDBACK"], "script-user.md": ["SOURCE_CONTEXT", "CURRENT_DRAFT", "USER_FEEDBACK"],
   "translation-user.md": ["TRANSLATION_CONTEXT"], "visual-requirement-template.md": ["BACKGROUND_REQUIREMENT", "SPOKEN_TEXT"], "cover-image-requirement-template.md": ["COVER_TITLE"],

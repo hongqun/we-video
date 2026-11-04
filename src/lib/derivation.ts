@@ -101,6 +101,8 @@ export const prepareEnglishTask = async (parentJobId: string, targetSeriesId: st
       atomicWriteJson(path.join(childDir, "translation-source.json"), {draft, visualPlan: plan, visualResources: resources}),
       atomicWriteJson(path.join(childDir, "visual-resources.json"), resources),
       fs.cp(path.join(parentDir, "uploaded-images"), path.join(childDir, "uploaded-images"), {recursive: true, force: false}).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }),
+      // 手绘输入与已发布缓存独立复制，派生任务不读取母任务文件。
+      fs.cp(path.join(parentDir, "handdraw"), path.join(childDir, "handdraw"), {recursive: true, force: false, filter: (source) => !path.basename(source).startsWith("work-")}).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }),
       fs.cp(path.join(parentDir, "uploaded-models"), path.join(childDir, "uploaded-models"), {recursive: true, force: false}).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }),
     ]);
     const job = await readJob(childJobId);

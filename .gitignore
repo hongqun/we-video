@@ -6,6 +6,9 @@ out/
 .remotion/
 .mcp-cache/
 *.tsbuildinfo
+# 本地手绘预处理环境与 Python 缓存不进入 Git。
+/.venv-handdraw/
+__pycache__/
 /skills/
 /.agents/skills/
 /DEPLOYMENT_UBUNTU.md

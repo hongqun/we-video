@@ -3,7 +3,8 @@ import {getTemplateStatus, isTemplateCompatible, templateById, templateRegistry}
 import {openingEmphasisCues, openingKeywordCues} from "../remotion/OpeningEmphasis";
 import {getOpeningStageMotion} from "../remotion/OpeningStage";
 
-assert.equal(templateRegistry.length, 7);
+// 新增手绘与三维镜头后，注册表与公开能力数量一致。
+assert.equal(templateRegistry.length, 9);
 for (const definition of templateRegistry) {
   assert.ok(definition.minDurationMs > 0);
   assert.equal(definition.adapted, true);

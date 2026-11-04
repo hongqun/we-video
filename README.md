@@ -24,6 +24,30 @@ https://github.com/user-attachments/assets/c35ecc91-e41a-4efd-b185-ddf2efff3b56
 4. **预览与渲染**：在We-Video中预览成片效果，用户确认后生成 MP4文件。
 
 ## 效果示例
+
+### 手绘插画镜头
+
+在第 4 步选择“手绘插画”，点击“查看生成提示词”：先在外部图像模型生成黑白线稿，再附上这张线稿进行上色编辑。分别上传线稿和上色图后，后台自动生成绘制计划，预览与导出均按真实线条描绘，再逐区涂色。两张图要求白底、同尺寸、构图一致；支持 10MB 以内的 PNG / JPEG / WebP，单张不超过 1600 万像素，推荐 PNG。
+
+手绘预处理额外需要 Python 3.10+、Pillow、NumPy 和 SciPy。仅在使用该镜头时需要准备，安装命令从本项目根目录执行：
+
+```bash
+python3 -m venv .venv-handdraw
+.venv-handdraw/bin/python -m pip install -r scripts/handdraw/requirements.txt
+```
+
+在根目录 `.env` 设置 `HANDDRAW_PYTHON` 为 `.venv-handdraw/bin/python` 的绝对路径；留空使用 `python3`。该设置由应用启动时读取，后台进程继承，不另建运行配置入口。
+
+画面先整图描线，再按浅到深上色；白纸与固定画笔，无需标注部位。绘制时间最多占镜头可用窗口的 70%，成图展示至少占 30% 且不少于 1 秒。上传后按实际路径自动分配描线和上色时间：优先缩短抬笔与停顿，再加速实际绘制，整体额外加速最多 10 倍；较长镜头自然画完后保持成图。超过上限时提示所需时长和简化方向。错位、重画、复杂度过高和环境缺失会给出错误提示；中断的处理可在超时后重试。
+
+生成提示词会按当前镜头时长给出主体、道具、独立笔画、主要颜色和色区数量的创作目标，短镜头优先只表现一个主体及必要道具。预算约束动态附加到提示词中，已有任务和专栏覆盖模板也会收到；模型出图后仍以实际路径检测为准。
+
+上传素材和产物保存在任务内 `handdraw/`，按内容哈希隔离。替换或删除图片会使旧计划与成片失效；拆分镜头复用不可变素材，并分别校验绘制预算。首版不绑定口播部位，不生成图片、手臂、起形、擦除动画或笔声。
+
+按需验证（不会随应用启动自动执行）：`npm run test:handdraw` 检查播放逻辑，`npm run test:handdraw:python` 检查预处理。实际画面和预览／导出一致性仍需在上传代表素材后人工检查。
+
+预处理参考 [sweety-handdraw-video](https://github.com/threerocks/sweety-handdraw-video) 的线稿配准与线条拓扑算法；裁剪代码及 MIT 版权说明保存在 [scripts/handdraw/vendor](scripts/handdraw/vendor/LICENSE)，运行时不依赖原项目。
+
 ### 3D 模型讲解
 
 

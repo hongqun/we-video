@@ -1,4 +1,5 @@
 // 纯数据选择逻辑，客户端可以安全复用；文件系统和 sharp 只留在服务端资源模块。
+import type {HanddrawResource} from "@/remotion/templates/handdraw-schema";
 export type SceneVisualResource = {
   segmentId: string;
   sceneId?: string;
@@ -6,6 +7,7 @@ export type SceneVisualResource = {
   imageWidth?: number;
   imageHeight?: number;
   modelPath?: string;
+  handdraw?: HanddrawResource;
   polygons: Array<{text: string; points: Array<{x: number; y: number}>}>;
 };
 
@@ -19,7 +21,7 @@ export const visualResourceForScene = (resources: SceneVisualResources, sceneId:
   let parentId = sceneId;
   while (parentId.endsWith("-split")) {
     parentId = parentId.slice(0, -6);
-    const parent = resources.resources.find((item) => item.sceneId === parentId && item.segmentId === segmentId && item.modelPath);
+    const parent = resources.resources.find((item) => item.sceneId === parentId && item.segmentId === segmentId && (item.modelPath || item.handdraw));
     if (parent) return {...parent, imagePath: undefined, imageWidth: undefined, imageHeight: undefined, polygons: []};
   }
   if (resources.resources.some((item) => item.sceneId && item.segmentId === segmentId)) return undefined;

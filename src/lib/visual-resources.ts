@@ -8,6 +8,7 @@ import {resetModelPlan} from "@/remotion/templates/model-scene-editing";
 import type {VisualPlan} from "./visual-plan";
 import {visualResourceForScene} from "./visual-resource-selection";
 import {visualImagePolygonSchema} from "@/remotion/templates/visual-image-schema";
+import {handdrawResourceSchema} from "@/remotion/templates/handdraw-schema";
 
 // 第四步视觉资源是独立事实源；新资源按 sceneId 隔离，segmentId 只保留父口播段兼容关系。
 export const visualResourceSchema = z.object({
@@ -17,6 +18,7 @@ export const visualResourceSchema = z.object({
   imageWidth: z.number().int().positive().optional(),
   imageHeight: z.number().int().positive().optional(),
   modelPath: z.string().trim().min(1).optional(),
+  handdraw: handdrawResourceSchema.optional(),
   polygons: z.array(visualImagePolygonSchema).default([]),
 }).strict().superRefine((resource, context) => {
   const imageFields = [resource.imagePath, resource.imageWidth, resource.imageHeight].filter((value) => value !== undefined).length;
@@ -27,6 +29,34 @@ export type VisualResource = z.infer<typeof visualResourceSchema>;
 export type VisualResources = z.infer<typeof visualResourcesSchema>;
 
 export const visualResourcesPath = (jobId: string) => path.join(jobDir(jobId), "visual-resources.json");
+// 上传请求与后台预处理共用文件锁，比较版本和写入必须属于同一个临界区。
+export const mutateVisualResources = async (jobId: string, change: (value: VisualResources) => VisualResources | Promise<VisualResources>): Promise<VisualResources> => {
+  const lock = path.join(jobDir(jobId), ".visual-resources.lock");
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { handle = await fs.open(lock, "wx"); await handle.writeFile(String(process.pid)); break; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const stat = await fs.stat(lock).catch(() => null);
+      if (stat && Date.now() - stat.mtimeMs > 30000) {
+        const pid = Number(await fs.readFile(lock, "utf8").catch(() => "0"));
+        if (!pid) await fs.unlink(lock).catch(() => undefined);
+        try { if (pid > 0) process.kill(pid, 0); }
+        catch (cause) { if ((cause as NodeJS.ErrnoException).code === "ESRCH") await fs.unlink(lock).catch(() => undefined); }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  if (!handle) throw new Error("视觉资源正在保存，请稍后重试");
+  try {
+    const current = await readVisualResources(jobId);
+    const next = await change(current);
+    if (next === current) return current;
+    const parsed = visualResourcesSchema.parse({...next, revision: current.revision + 1});
+    await atomicWriteJson(visualResourcesPath(jobId), parsed);
+    return parsed;
+  } finally { await handle.close(); await fs.unlink(lock).catch(() => undefined); }
+};
 export const readVisualResources = async (jobId: string, revision?: number): Promise<VisualResources> => {
   void revision;
   try { return visualResourcesSchema.parse(await readJson<unknown>(visualResourcesPath(jobId))); }
@@ -37,17 +67,17 @@ export const readVisualResources = async (jobId: string, revision?: number): Pro
 };
 
 export const saveVisualResource = async (jobId: string, segmentId: string, patch: Partial<Omit<VisualResource, "segmentId" | "sceneId">>, sceneId?: string) => {
-  const resources = await readVisualResources(jobId);
   const draft = await readJson<{narrationSegments?: Array<{id: string}>}>(path.join(jobDir(jobId), "draft.json"));
   if (!draft.narrationSegments?.some((segment) => segment.id === segmentId)) throw new Error("未找到目标口播段落");
-  const current = (sceneId ? resources.resources.find((item) => item.sceneId === sceneId) : undefined)
-    ?? resources.resources.find((item) => !item.sceneId && item.segmentId === segmentId)
-    ?? {segmentId, ...(sceneId ? {sceneId} : {}), polygons: []};
-  const next = visualResourceSchema.parse({...current, ...patch, segmentId, ...(sceneId ? {sceneId} : {})});
-  const value = {...resources, revision: resources.revision + 1, resources: [...resources.resources.filter((item) => sceneId ? item.sceneId !== sceneId : !(item.segmentId === segmentId && !item.sceneId)), next]};
-  await atomicWriteJson(visualResourcesPath(jobId), visualResourcesSchema.parse(value));
-  // 规划页直接读取 visual-resources.json；资源修改不再隐式生成 manifest。
-  return value;
+  return mutateVisualResources(jobId, (resources) => {
+    const current = (sceneId ? resources.resources.find((item) => item.sceneId === sceneId) : undefined)
+      ?? resources.resources.find((item) => !item.sceneId && item.segmentId === segmentId)
+      ?? {segmentId, ...(sceneId ? {sceneId} : {}), polygons: []};
+    const next = visualResourceSchema.parse({...current, ...patch, segmentId, ...(sceneId ? {sceneId} : {})});
+    const value = {...resources, revision: resources.revision + 1, resources: [...resources.resources.filter((item) => sceneId ? item.sceneId !== sceneId : !(item.segmentId === segmentId && !item.sceneId)), next]};
+    // 规划页直接读取 visual-resources.json；资源修改不再隐式生成 manifest。
+    return value;
+  });
 };
 
 export const saveVisualResourceImage = async (jobId: string, segmentId: string, file: File, sceneId?: string) => {
@@ -65,20 +95,23 @@ export const saveVisualResourceImage = async (jobId: string, segmentId: string, 
 };
 
 export const deleteVisualResourceImage = async (jobId: string, segmentId: string, sceneId?: string) => {
-  const resources = await readVisualResources(jobId);
-  const current = sceneId
-    ? resources.resources.find((item) => item.sceneId === sceneId)
-    : resources.resources.find((item) => !item.sceneId && item.segmentId === segmentId);
-  const isSharedImage = current?.imagePath && resources.resources.some((item) => item !== current && item.imagePath === current.imagePath);
-  if (current?.imagePath && !isSharedImage) await fs.unlink(path.join(jobDir(jobId), current.imagePath)).catch((error: NodeJS.ErrnoException) => {
-    if (error.code !== "ENOENT") throw error;
+  return mutateVisualResources(jobId, async (resources) => {
+    const current = sceneId
+      ? resources.resources.find((item) => item.sceneId === sceneId)
+      : resources.resources.find((item) => !item.sceneId && item.segmentId === segmentId);
+    const isSharedImage = current?.imagePath && resources.resources.some((item) => item !== current && item.imagePath === current.imagePath);
+    if (current?.imagePath && !isSharedImage) await fs.unlink(path.join(jobDir(jobId), current.imagePath)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+    // 删除普通图片仅清理对应字段，保留同一镜头已经上传的手绘和三维素材。
+    const cleared = (item: VisualResource) => ({...item, imagePath: undefined, imageWidth: undefined, imageHeight: undefined, polygons: []});
+    const next = sceneId
+      ? resources.resources.some((item) => item.sceneId === sceneId)
+        ? resources.resources.map((item) => item.sceneId === sceneId ? cleared(item) : item)
+        : [...resources.resources, {segmentId, sceneId, polygons: []}]
+      : resources.resources.map((item) => !item.sceneId && item.segmentId === segmentId ? cleared(item) : item);
+    return {...resources, resources: next};
   });
-  const next = sceneId
-    ? resources.resources.some((item) => item.sceneId === sceneId)
-      ? resources.resources.map((item) => item.sceneId === sceneId ? {segmentId, sceneId, ...(item.modelPath ? {modelPath: item.modelPath} : {}), polygons: []} : item)
-      : [...resources.resources, {segmentId, sceneId, polygons: []}]
-    : resources.resources.map((item) => !item.sceneId && item.segmentId === segmentId ? {segmentId, polygons: []} : item);
-  await atomicWriteJson(visualResourcesPath(jobId), visualResourcesSchema.parse({...resources, revision: resources.revision + 1, resources: next}));
 };
 
 // GLB 必须把几何、纹理等资源包在单个文件内，避免渲染器访问任意外部地址。
@@ -152,6 +185,12 @@ const invalidateModelRender = async (jobId: string, state: string) => {
 export const copySplitModelResources = async (jobId: string, scenes: Array<{id: string; segmentId: string; templateId: string}>, resources: VisualResources): Promise<VisualResources> => {
   let next = resources;
   for (const scene of scenes) {
+    if (scene.templateId === "rve/handdraw-image" && !next.resources.some((item) => item.sceneId === scene.id) && scene.id.endsWith("-split")) {
+      const source = visualResourceForScene(next, scene.id, scene.segmentId)?.handdraw;
+      // 拆分资源条目独立保存，已完成的内容寻址缓存可安全共享。
+      if (source) next = {...next, resources: [...next.resources, {sceneId: scene.id, segmentId: scene.segmentId, polygons: [], handdraw: source.status === "ready" ? source : {...source, status: "waiting", requestId: undefined, startedAt: undefined, data: undefined}}]};
+      continue;
+    }
     if (scene.templateId !== "rve/3d-model-scene" || next.resources.some((r) => r.sceneId === scene.id)) continue;
     const source = visualResourceForScene(next, scene.id, scene.segmentId);
     if (!source?.modelPath || !scene.id.endsWith("-split")) continue;
@@ -161,6 +200,9 @@ export const copySplitModelResources = async (jobId: string, scenes: Array<{id: 
     await fs.copyFile(path.join(jobDir(jobId), source.modelPath), path.join(jobDir(jobId), modelPath));
     next = {...next, revision: next.revision + 1, resources: [...next.resources, {sceneId: scene.id, segmentId: scene.segmentId, modelPath, polygons: []}]};
   }
-  if (next !== resources) await atomicWriteJson(visualResourcesPath(jobId), next);
+  if (next !== resources) {
+    const additions = next.resources.filter((item) => !resources.resources.some((previous) => previous.sceneId === item.sceneId));
+    next = await mutateVisualResources(jobId, (latest) => ({...latest, resources: [...latest.resources, ...additions.filter((item) => !latest.resources.some((previous) => previous.sceneId === item.sceneId))]}));
+  }
   return next;
 };

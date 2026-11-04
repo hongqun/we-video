@@ -1838,6 +1838,7 @@ export const Workspace: React.FC = () => {
       ) : null}
       {step === 4 && snapshot && !isHistoricalRevision && !["planning_visuals", "finalizing_visuals", "awaiting_visual_resources"].includes(snapshot.job.state) && snapshot.visualPlan && snapshot.audioPreview && draft && profile && jobId ? (
         <VisualPlanWorkspace
+          key={jobId}
           jobId={jobId}
           title={draft.title}
           plan={snapshot.visualPlan}
@@ -1852,6 +1853,7 @@ export const Workspace: React.FC = () => {
           busy={busy}
           canFinalize={snapshot.job.state === "awaiting_visual_review"}
           coverImageBusy={coverImageBusy}
+          onHanddrawChange={refresh}
           onUploadCoverImage={uploadCoverImage}
           onDeleteCoverImage={deleteCoverImage}
           onGenerateCoverImageRequirement={generateCoverImageRequirement}

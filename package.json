@@ -9,7 +9,7 @@
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1 --port 3100",
     "lint": "eslint src && tsc --noEmit",
-    "test": "set -a; . ./.env; set +a; node --import tsx src/tests/contracts.test.ts && node --import tsx src/tests/filename.test.ts && node --import tsx src/tests/render-integrity.test.ts && node --import tsx src/tests/tts.test.ts && node --import tsx src/tests/narration.test.ts && node --import tsx src/tests/template-contracts.test.ts && npm run test:translation && npm run test:relation-graph && npm run test:captions && npm run test:visual-image && npm run test:visual-plan && npm run test:visual-plan-integration && npm run test:model-scene",
+    "test": "set -a; . ./.env; set +a; node --import tsx src/tests/contracts.test.ts && node --import tsx src/tests/filename.test.ts && node --import tsx src/tests/render-integrity.test.ts && node --import tsx src/tests/tts.test.ts && node --import tsx src/tests/narration.test.ts && node --import tsx src/tests/template-contracts.test.ts && npm run test:translation && npm run test:relation-graph && npm run test:captions && npm run test:visual-image && npm run test:visual-plan && npm run test:visual-plan-integration && npm run test:model-scene && npm run test:handdraw",
     "test:translation": "node --import tsx src/tests/translation.test.ts",
     "test:captions": "node --import tsx src/tests/captions.test.ts",
     "test:visual-image": "node --import tsx src/tests/visual-image.test.ts",
@@ -20,7 +20,10 @@
     "render:job": "tsx src/server/render-job.ts",
     "talk:approve": "tsx src/server/talk-worker.ts",
     "test:model-scene": "esbuild src/tests/model-scene.test.ts --bundle --format=esm --platform=node --packages=external --outfile=node_modules/.cache/talk-video/model-scene.test.mjs --log-level=error && node node_modules/.cache/talk-video/model-scene.test.mjs",
-    "test:profiles": "node --import tsx src/tests/profile.test.ts"
+    "test:profiles": "node --import tsx src/tests/profile.test.ts",
+    "test:handdraw": "node --import tsx src/tests/handdraw.test.ts && npm run test:handdraw:resources",
+    "test:handdraw:python": "set -a; . ./.env; set +a; \"${HANDDRAW_PYTHON:-python3}\" scripts/handdraw/test_prepare.py",
+    "test:handdraw:resources": "esbuild src/tests/handdraw-resources.test.ts --bundle --format=esm --platform=node --packages=external --outfile=node_modules/.cache/talk-video/handdraw-resources.test.mjs --log-level=error && node node_modules/.cache/talk-video/handdraw-resources.test.mjs"
   },
   "dependencies": {
     "@iconify-json/logos": "^1.2.14",

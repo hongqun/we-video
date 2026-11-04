@@ -17,6 +17,7 @@ import {relationGraphNodeCue, relationGraphNodeDisplayName} from "@/remotion/tem
 import {modelScenePlanSchema} from "@/remotion/templates/model-scene-schema";
 import {ensureCameraBoundaries} from "@/remotion/templates/model-scene-editing";
 import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
+import {handdrawTemplateData, handdrawTiming, handdrawDataSchema} from "@/remotion/templates/handdraw-schema";
 
 const presenterPlanSchema = z.object({rollType: rollTypeSchema, mode: presenterModeSchema, poseId: presenterPoseIdSchema, placement: presenterPlacementSchema, framing: presenterFramingSchema.optional()}).strict();
 
@@ -115,6 +116,11 @@ export const readVisualPlan = async (jobId: string, revision?: number) => {
 
 const templateDataForManifest = (scene: VisualPlanScene, resources: VisualResources, allowIncompleteImage = false): Record<string, unknown> | undefined => {
   if (scene.templateId === "rve/relation-graph") return scene.visualData ? relationGraphDataSchema.parse(scene.visualData) : undefined;
+  if (scene.templateId === "rve/handdraw-image") {
+    const data = handdrawTemplateData(visualResourceForScene(resources, scene.id, scene.segmentId)?.handdraw, (relative) => `artifact://${relative}`);
+    if (!data && !allowIncompleteImage) throw new Error(`镜头 ${scene.id} 的手绘素材尚未处理完成`);
+    return data;
+  }
   if (scene.templateId === "rve/3d-model-scene") {
     const resource = visualResourceForScene(resources, scene.id, scene.segmentId);
     if (!scene.modelScene || !resource?.modelPath) {
@@ -211,6 +217,8 @@ export const validateVisualPlan = (plan: VisualPlan, draft: Draft, narration: Na
     if (scene.presenter.mode !== "hidden" && ![...profile.presenter.poses, ...(profile.presenter.compatibilityPoses ?? [])].some((pose) => pose.id === scene.presenter.poseId)) throw new Error(`镜头 ${scene.segmentId} 使用了未登记的人物姿态`);
     if (runtimeScenes[index]!.endMs - runtimeScenes[index]!.startMs < definition.minDurationMs) throw new Error(`镜头 ${scene.segmentId} 时长不足 ${(definition.minDurationMs / 1000).toFixed(1)} 秒`);
     if (scene.templateId === "rve/visual-image" && runtimeScenes[index]!.templateData) buildVisualImageSchedule({scene: runtimeScenes[index]!, captions: narration.captions, data: runtimeScenes[index]!.templateData});
+    // 草稿允许保留尚待简化的手绘镜头；确认和渲染必须满足真实绘制预算。
+    if (scene.templateId === "rve/handdraw-image" && !allowIncompleteImage) handdrawTiming(runtimeScenes[index]!, handdrawDataSchema.parse(runtimeScenes[index]!.templateData));
     if (scene.templateId === "rve/relation-graph") {
       const graph = relationGraphDataSchema.parse(scene.visualData);
       graph.nodes.forEach((node) => {
@@ -231,6 +239,12 @@ export const saveVisualPlan = async (jobId: string, input: VisualPlanSaveInput, 
   await fs.rm(path.join(jobDir(jobId), "visual-plans"), {recursive: true, force: true});
   await copySplitModelResources(jobId, plan.scenes, resources);
   await atomicWriteJson(currentPlanPath(jobId), plan);
+  // 未完成的拆分手绘镜头拥有自己的请求，不能依赖父镜头 worker 回写。
+  const splitResources = await readVisualResources(jobId);
+  for (const scene of plan.scenes) {
+    const drawing = splitResources.resources.find((item) => item.sceneId === scene.id)?.handdraw;
+    if (scene.templateId === "rve/handdraw-image" && drawing?.status === "waiting" && drawing.lineart && drawing.color) await (await import("./handdraw")).startHanddraw(jobId, scene.id);
+  }
   // 镜头结构变化后，旧 Manifest 与成片不再代表当前任务。
   await Promise.all([
     fs.rm(path.join(jobDir(jobId), "manifest.json"), {force: true}),
@@ -264,6 +278,9 @@ export const retimeCopiedVisualPlan = async (jobId: string) => {
 export const writeVisualPreviewManifest = async (jobId: string, profile: PlatformProfile): Promise<RenderManifest> => {
   const [plan, draft, narration, resources] = await Promise.all([readVisualPlan(jobId), readDraft(jobId), readNarration(jobId), readVisualResources(jobId)]);
   validateVisualPlan(plan, draft, narration, profile, resources);
+  for (const scene of deriveScenes(plan, draft, narration, resources)) {
+    if (scene.templateId === "rve/handdraw-image") await (await import("./handdraw")).verifyHanddrawArtifacts(jobId, scene.templateData);
+  }
   // 仅当旧任务确实引用退役姿态时才把它加入新 Manifest，不扩张新任务的人物目录。
   const usedPoseIds = new Set([plan.cover?.presenterPoseId, ...plan.scenes.map((scene) => scene.presenter.poseId)]);
   const presenter = {poses: [...profile.presenter.poses, ...(profile.presenter.compatibilityPoses ?? []).filter((pose) => usedPoseIds.has(pose.id))]};

@@ -82,7 +82,7 @@
         <mxCell id="template5" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="关系图" vertex="1">
           <mxGeometry height="44" width="110" x="130" y="157" as="geometry" />
         </mxCell>
-        <mxCell id="template6" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="视觉要求图片" vertex="1">
+        <mxCell id="template6" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="图片逐步揭示" vertex="1">
           <mxGeometry height="44" width="110" x="10" y="213" as="geometry" />
         </mxCell>
         <mxCell id="template7" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="3D Model Scene" vertex="1">

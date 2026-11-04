@@ -33,11 +33,11 @@ export type TemplateDefinition = {
 
 const bRollDefaults = {adapted: true, rollRole: "b-roll" as const, companionPlacements: ["right-lower", "left-lower", "right-mid", "left-mid"] as Exclude<PresenterPlacement, "hero">[], companionFraming: "waist" as const};
 
-// 注册表只保留当前产品允许选择的模板；模板能力不再绑定场景分类。
+// 注册表只保留当前产品允许选择的模板；显示名称与模板目录契约保持一致。
 export const templateRegistry: TemplateDefinition[] = [
   {id: "ip/opening-stage", label: "IP 动态开场舞台", description: "默认首镜头，可按需替换。", category: "presenter", requiresMedia: false, renderer: "opening-stage", minDurationMs: 1800, fields: [], adapted: true, presentationMode: "immersive", supportingTextPlacement: "hidden", titleMotion: "reveal", rollRole: "a-roll", companionPlacements: [], companionFraming: "full"},
   {id: "rve/text-reveal", label: "揭示文字", description: "逐步揭示核心文字。", category: "text", requiresMedia: false, renderer: "text-reveal", minDurationMs: 1800, fields: [], presentationMode: "immersive", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
-  {id: "rve/visual-image", label: "视觉要求图片", description: "按口播时间揭示人工审核配图。", category: "media", requiresMedia: true, resourceType: "image", renderer: "visual-image", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
+  {id: "rve/visual-image", label: "图片逐步揭示", description: "按口播时间揭示人工审核配图。", category: "media", requiresMedia: true, resourceType: "image", renderer: "visual-image", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   // 手绘与图片扫掠独立注册，避免旧图片任务的契约和动画发生变化。
   {id: "rve/handdraw-image", label: "手绘插画", description: "上传线稿与上色图，逐笔描线并上色。", category: "media", requiresMedia: true, resourceType: "handdraw", renderer: "handdraw-image", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/3d-model-scene", label: "3D Model Scene", description: "按口播编排 GLB 模型环绕、特写与标注。", category: "media", requiresMedia: true, resourceType: "model", renderer: "3d-model-scene", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},

@@ -50,13 +50,14 @@ const buildRevealSegments = (intervals: Array<Interval & {y: number; height: num
 };
 
 const normalizeTimedText = (value: string) => [...value.normalize("NFKC")].filter((character) => !/\s/u.test(character)).join("");
-const visualImageError = (scene: Pick<VideoScene, "id">, message: string): never => { throw new Error(`镜头 ${scene.id} 的视觉要求图片：${message}`); };
+// 报错沿用镜头的显示名称，便于定位素材问题。
+const visualImageError = (scene: Pick<VideoScene, "id">, message: string): never => { throw new Error(`镜头 ${scene.id} 的图片逐步揭示：${message}`); };
 
 export const parseVisualImageData = (scene: Pick<VideoScene, "id">, value: unknown): VisualImageData => {
   const parsed = visualImageDataSchema.safeParse(value);
   if (!parsed.success) {
     const issue = parsed.error.issues[0]; const location = issue?.path.length ? `（${issue.path.join(".")}）` : "";
-    throw new Error(`镜头 ${scene.id} 的视觉要求图片：图片尺寸或多边形无效${location}${issue?.message ? `：${issue.message}` : ""}`);
+    throw new Error(`镜头 ${scene.id} 的图片逐步揭示：图片尺寸或多边形无效${location}${issue?.message ? `：${issue.message}` : ""}`);
   }
   return parsed.data;
 };

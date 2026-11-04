@@ -506,7 +506,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           if (dirty) {const next = await save(); if (!next) throw new Error("请先保存镜头规划后重试");}
         }} /> : null}
         {current.templateId === "rve/visual-image" ? <section className="visual-plan-image-resources" aria-label="当前镜头图片资源">
-          <div className="visual-plan-section-heading"><div><p className="review-section-label">图片资源</p><h3>视觉要求图片</h3></div><span className="metadata">{currentImagePath ? "已上传" : "待上传"}</span></div>
+          <div className="visual-plan-section-heading"><div><p className="review-section-label">图片资源</p><h3>图片逐步揭示</h3></div><span className="metadata">{currentImagePath ? "已上传" : "待上传"}</span></div>
           <div className="visual-plan-image-actions">
             <label className="secondary cover-image-upload-label"><Icon name="upload" />上传图片<input type="file" accept="image/png,image/jpeg,image/webp" disabled={locked} onChange={(event) => { const file = event.target.files?.[0]; if (file && current) void onUploadImage(current.id, current.segmentId, file); event.currentTarget.value = ""; }} /></label>
             {currentImagePath ? <><button type="button" className={imageMode === "original" ? "" : "secondary"} disabled={locked} onClick={() => setImageMode("original")}>原图</button><button type="button" className={imageMode === "boxes" ? "" : "secondary"} disabled={locked} onClick={() => setImageMode("boxes")}>边界框</button><button type="button" className="secondary" disabled={locked} onClick={() => { if (current) void onDeleteImage(current.id, current.segmentId); }}>删除图片</button></> : null}

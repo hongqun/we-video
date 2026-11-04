@@ -1,6 +1,7 @@
 import type {CSSProperties} from "react";
 import {AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig} from "remotion";
 import {VIDEO_COLORS, VIDEO_RADIUS, VIDEO_SHADOW, useVisualTheme} from "./theme";
+import {FairytaleDecor} from "./FairytaleDecor";
 
 const signalDots = Array.from({length: 72}, (_, index) => {
   const lane = index % 4;
@@ -17,6 +18,8 @@ export const ComicBackdrop = ({settled = false, role = "scene"}: {settled?: bool
   const theme = useVisualTheme();
   const enter = settled ? 1 : interpolate(frame, [0, 22], [0, 1], {easing: Easing.bezier(.16, 1, .3, 1), extrapolateLeft: "clamp", extrapolateRight: "clamp"});
   if (theme.id === "legacy-comic") return <AbsoluteFill aria-hidden="true" style={{backgroundColor: theme.colors.canvas, pointerEvents: "none"}} />;
+  // 童话封面展示完整彩虹配饰，正文只保留边缘的淡色星云。
+  if (theme.id === "dopamine-fairytale") return <AbsoluteFill aria-hidden="true" style={{backgroundColor: theme.colors.canvas, overflow: "hidden", pointerEvents: "none"}}><FairytaleDecor quiet={role === "scene"} opacity={enter} /></AbsoluteFill>;
   // 科技简报正文只保留两个极淡环境光域，封面网格和结构图形不进入业务场景。
   if (role === "scene") return <AbsoluteFill aria-hidden="true" style={{background: theme.id === "kinetic-lime" ? `radial-gradient(circle at 94% 8%, ${theme.colors.softInfo}, transparent 18%), radial-gradient(circle at 7% 93%, ${theme.colors.softAccent}, transparent 22%), ${theme.colors.canvas}` : theme.colors.canvas, pointerEvents: "none"}} />;
   if (theme.id === "kinetic-lime") return <AbsoluteFill aria-hidden="true" style={{backgroundColor: theme.colors.canvas, overflow: "hidden", pointerEvents: "none"}}>

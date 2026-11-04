@@ -11,7 +11,7 @@
     "revision": {"type": "integer", "minimum": 1},
     "contentProfile": {"type":"object"},
     "title": {"type": "string", "minLength": 1},
-    "visualStyle": {"enum": ["kinetic-lime", "layered-mint", "deep-signal"]},
+    "visualStyle": {"enum": ["kinetic-lime", "layered-mint", "deep-signal", "dopamine-fairytale"]},
     "shortTitle": {"type": "string"},
     "cover": {"type":"object","additionalProperties":false,"required":["title","subtitle","keywords","presenterPoseId"],"properties":{"title":{"type":"string","minLength":1,"maxLength":40},"subtitle":{"type":"string","maxLength":120},"keywords":{"type":"array","maxItems":8,"items":{"type":"string","minLength":1,"maxLength":24}},"presenterPoseId":{"type":"string","pattern":"^(?:|[a-z0-9][a-z0-9-]{1,63})$"},"imagePath":{"type":"string","minLength":1},"imageWidth":{"type":"integer","minimum":1},"imageHeight":{"type":"integer","minimum":1}},"anyOf":[{"not":{"anyOf":[{"required":["imagePath"]},{"required":["imageWidth"]},{"required":["imageHeight"]}]}},{"required":["imagePath","imageWidth","imageHeight"]}]},
     "summary": {"type": "string"},

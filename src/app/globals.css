@@ -3212,7 +3212,8 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-style-picker legend { display: grid; gap: 3px; padding: 0 4px; }
 .visual-style-picker legend strong { color: #30433b; font-size: 16px; }
 .visual-style-legacy-note { background: #fff8e9; border: 1px solid #ecd39a; border-radius: 8px; color: #75520b; margin: 0; padding: 9px 11px; }
-.visual-style-options { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* 四种风格均匀排列，窄容器自动换行。 */
+.visual-style-options { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
 .visual-style-option { background: #fff; border: 2px solid #d8e7e1; border-radius: 12px; cursor: pointer; display: grid; gap: 10px; min-width: 0; padding: 10px; }
 .visual-style-option:hover { border-color: #91bda9; }
 .visual-style-option:focus-within { outline: 3px solid rgb(32 211 79 / 24%); outline-offset: 2px; }
@@ -3233,6 +3234,11 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-style-option-deep-signal .visual-style-swatch i:nth-child(1) { border: 1px solid #62ed35; border-radius: 50%; bottom: -78%; height: 140%; right: -8%; width: 70%; }
 .visual-style-option-deep-signal .visual-style-swatch i:nth-child(2) { border-top: 2px dotted #62ed35; height: 40%; right: -3%; rotate: -17deg; top: 48%; width: 76%; }
 .visual-style-option-deep-signal .visual-style-swatch i:nth-child(3) { background: radial-gradient(circle, rgb(98 237 53 / 58%), transparent 68%); filter: blur(5px); height: 65%; right: 2%; top: 40%; width: 58%; }
+/* 童话卡以糖果彩虹、白云与星星预告全片的多巴胺配饰。 */
+.visual-style-option-dopamine-fairytale .visual-style-swatch { background: #fff0f7; }
+.visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(1) { background: radial-gradient(ellipse at 50% 100%, transparent 35%, #ae78e7 36% 44%, #33c9ed 45% 53%, #ffdc45 54% 62%, #ff69a7 63% 71%, transparent 72%); height: 95%; right: -6%; top: -15%; width: 85%; }
+.visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(2) { background: #fff; border-radius: 50px; box-shadow: 12px -9px 0 1px #fff, 25px 0 0 #fff; height: 18%; right: 26%; top: 57%; width: 21%; }
+.visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(3) { background: #ffdc45; clip-path: polygon(50% 0, 62% 33%, 98% 36%, 70% 59%, 79% 96%, 50% 76%, 21% 96%, 30% 59%, 2% 36%, 38% 33%); height: 30%; left: 12%; top: 25%; width: 18%; }
 .visual-style-copy { display: grid; gap: 4px; }
 .visual-style-copy strong { color: #253d32; font-size: 14px; }
 .visual-style-copy small { color: #66786f; line-height: 1.45; }
@@ -3245,6 +3251,10 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-plan-cover-image-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
 .cover-image-upload-label { align-items: center; cursor: pointer; display: inline-flex; gap: 6px; }
 .cover-image-upload-label input { display: none; }
+/* 手绘素材操作收为方形图标按钮，与标题同行。 */
+.handdraw-resource-heading { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.handdraw-resource-heading h4 { margin: 0 auto 0 0; }
+.handdraw-resource-heading .handdraw-resource-action { align-items: center; display: inline-flex; flex: 0 0 36px; height: 36px; justify-content: center; min-width: 36px; padding: 0; width: 36px; }
 .visual-plan-cover-image-thumb { background: #eaf1ed; border: 1px solid var(--line); border-radius: 8px; height: 110px; object-fit: contain; width: 110px; }
 .visual-plan-scenes-heading { border-top: 1px solid #e8e1f3; display: grid; gap: 3px; grid-column: 1 / -1; padding-top: 16px; }
 .visual-plan-scenes-heading p { margin: 0; }

@@ -3,6 +3,7 @@
 import {useEffect, useRef, useState} from "react";
 import {handdrawTiming, type HanddrawResource, type HanddrawSceneWindow} from "@/remotion/templates/handdraw-schema";
 import type {SceneVisualResource} from "@/lib/visual-resource-selection";
+import {Icon} from "./Icon";
 
 export type HanddrawResourcesSnapshot = {revision?: number; resources: SceneVisualResource[]};
 type Props = {jobId: string; sceneId: string; scene: HanddrawSceneWindow; resource?: HanddrawResource; disabled: boolean; url: (path: string) => string; beforeChange: () => Promise<void>; onResources: (resources: HanddrawResourcesSnapshot) => void; onInvalidate: () => Promise<void>; onBusyChange: (busy: boolean) => void};
@@ -15,6 +16,8 @@ export const HanddrawResources = ({jobId, sceneId, scene, resource, disabled, ur
   const [notice, setNotice] = useState("");
   const [prompts, setPrompts] = useState<{lineart: string; color: string} | null>(null);
   const [promptOpen, setPromptOpen] = useState(false);
+  // 用真实按钮触发文件选择，保留键盘操作与禁用状态。
+  const uploadInputs = useRef<Partial<Record<"lineart" | "color", HTMLInputElement | null>>>({});
   const hasResource = Boolean(resource);
   // 上传或保存尚未完成时锁住规划确认，避免沿用替换前的绘制计划。
   useEffect(() => {onBusyChange(busy); return () => onBusyChange(false);}, [busy, onBusyChange]);
@@ -82,9 +85,14 @@ export const HanddrawResources = ({jobId, sceneId, scene, resource, disabled, ur
     </div>
     <div style={{display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16}}>
       {(["lineart", "color"] as const).map((kind) => <div key={kind}>
-        <h4>{kind === "lineart" ? "黑白线稿" : "上色图"}</h4>
-        <label className="secondary cover-image-upload-label">{resource?.[kind] ? "替换图片" : "上传图片"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={locked} onChange={(event) => {const file = event.currentTarget.files?.[0]; if (file) void change(kind, file); event.currentTarget.value = "";}} /></label>
-        {resource?.[kind] ? <><button type="button" className="secondary" disabled={locked} onClick={() => void change(kind, undefined, true)}>删除</button><img src={url(resource[kind]!.path)} alt={kind === "lineart" ? "手绘黑白线稿" : "手绘上色图"} style={{display: "block", width: "100%", marginTop: 12, background: "white"}} /></> : null}
+        {/* 标题旁集中放置图标操作，提示中明确图片类型与上传或替换状态。 */}
+        <div className="handdraw-resource-heading">
+          <h4>{kind === "lineart" ? "黑白线稿" : "上色图"}</h4>
+          <button type="button" className="secondary handdraw-resource-action" title={`${resource?.[kind] ? "替换" : "上传"}${kind === "lineart" ? "黑白线稿" : "上色图"}`} aria-label={`${resource?.[kind] ? "替换" : "上传"}${kind === "lineart" ? "黑白线稿" : "上色图"}`} disabled={locked} onClick={() => uploadInputs.current[kind]?.click()}><Icon name="upload" size={18} /></button>
+          {resource?.[kind] ? <button type="button" className="secondary handdraw-resource-action" title={`删除${kind === "lineart" ? "黑白线稿" : "上色图"}`} aria-label={`删除${kind === "lineart" ? "黑白线稿" : "上色图"}`} disabled={locked} onClick={() => void change(kind, undefined, true)}><Icon name="trash" size={18} /></button> : null}
+        </div>
+        <input ref={(element) => {uploadInputs.current[kind] = element;}} hidden type="file" accept="image/png,image/jpeg,image/webp" disabled={locked} onChange={(event) => {const file = event.currentTarget.files?.[0]; if (file) void change(kind, file); event.currentTarget.value = "";}} />
+        {resource?.[kind] ? <img src={url(resource[kind]!.path)} alt={kind === "lineart" ? "手绘黑白线稿" : "手绘上色图"} style={{display: "block", width: "100%", marginTop: 12, background: "white"}} /> : null}
       </div>)}
     </div>
     {resource?.status === "ready" && resource.data ? <div><p>参考绘制时间：{(resource.data.minimumDrawMs / 1000).toFixed(1)} 秒。</p>{timingStatus ? <p className={timingStatus.error ? "error-text" : "field-hint"} role={timingStatus.error ? "alert" : "status"}>{timingStatus.text}</p> : null}<img src={url(resource.data.completePath)} alt="配准后的手绘完成图" style={{maxWidth: "100%", maxHeight: 400, objectFit: "contain"}} /></div> : null}

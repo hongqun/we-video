@@ -25,7 +25,10 @@ export const OpeningEditorialBackdrop = ({hasVisual}: {hasVisual: boolean}) => {
         ? cover
           ? {display: "none"}
           : {background: `linear-gradient(90deg, ${theme.colors.softAccent}, transparent 82%)`, borderLeft: `5px solid ${theme.colors.ink}`}
-        : {backgroundColor: "#EAF3E8"};
+        // 童话人物区采用柔和彩色光域，不遮住背景彩虹。
+        : theme.id === "dopamine-fairytale"
+          ? {background: `radial-gradient(ellipse, ${theme.colors.softInfo}, ${theme.colors.softAccent} 55%, transparent 72%)`, borderRadius: "48% 52% 42% 58%"}
+          : {backgroundColor: "#EAF3E8"};
   return <div aria-hidden="true" style={{position: "absolute", left: 660, top: 132, width: 356, height: 900, ...panelStyle}} />;
 };
 

@@ -1,5 +1,5 @@
-// 三套新风格是任务级选择；legacy-comic 只用于兼容未保存 visualStyle 的历史任务。
-export const VISUAL_STYLE_IDS = ["kinetic-lime", "layered-mint", "deep-signal"] as const;
+// 全片风格是任务级选择；legacy-comic 只用于兼容未保存 visualStyle 的历史任务。
+export const VISUAL_STYLE_IDS = ["kinetic-lime", "layered-mint", "deep-signal", "dopamine-fairytale"] as const;
 export type VisualStyleId = (typeof VISUAL_STYLE_IDS)[number];
 export type ResolvedVisualStyleId = VisualStyleId | "legacy-comic";
 
@@ -44,6 +44,18 @@ const legacyColors = {
 };
 
 export const VIDEO_THEMES: Record<ResolvedVisualStyleId, VideoTheme> = {
+  // 童话正文采用奶油纸面和彩色配饰，深紫文字保证多巴胺配色下的可读性。
+  "dopamine-fairytale": {
+    id: "dopamine-fairytale", scope: "scene", label: "多巴胺童话", description: "糖果粉、明黄、天蓝与梦幻紫，搭配彩虹、云朵和星星；正文柔和清晰。",
+    colors: {
+      canvas: "#FFF8EF", ink: "#392454", accent: "#E83B89", surface: "#FFFFFF", line: "#D4B7ED",
+      highlight: "#FFE05A", info: "#28B9E8", mutedInk: "rgba(57,36,84,.70)", faintInk: "rgba(57,36,84,.07)",
+      softAccent: "rgba(255,95,162,.12)", softInfo: "rgba(40,185,232,.12)", surfaceStrong: "rgba(255,255,255,.96)",
+      surfaceGlass: "rgba(255,255,255,.84)", inkStrong: "rgba(57,36,84,.94)", onDarkMuted: "rgba(255,248,239,.74)",
+      onDarkLine: "rgba(255,248,239,.24)", onDarkSoft: "rgba(255,248,239,.16)", onDarkFaint: "rgba(255,248,239,.08)",
+    },
+    radius: {small: 18, card: 30, feature: 46}, shadow: {card: "0 8px 0 rgba(174,120,231,.16)", feature: "0 12px 0 rgba(232,59,137,.14), 0 22px 46px rgba(109,66,153,.10)", active: "0 0 0 4px rgba(232,59,137,.18)"},
+  },
   "legacy-comic": {
     id: "legacy-comic", scope: "scene", label: "旧版漫画", description: "仅兼容历史任务。", colors: legacyColors,
     radius: {small: 8, card: 14, feature: 22}, shadow: {card: "5px 6px 0 #182820", feature: "8px 9px 0 #182820", active: "5px 6px 0 #20D34F"},
@@ -85,6 +97,7 @@ export const VIDEO_THEMES: Record<ResolvedVisualStyleId, VideoTheme> = {
 
 export const resolveVisualStyle = (style?: VisualStyleId): ResolvedVisualStyleId => style ?? "legacy-comic";
 const COVER_THEME_OVERRIDES: Partial<Record<VisualStyleId, {colors: Partial<VideoTheme["colors"]>; radius?: VideoTheme["radius"]; shadow?: VideoTheme["shadow"]}>> = {
+  "dopamine-fairytale": {colors: {canvas: "#FFF0F7", accent: "#E83B89", highlight: "#FFDC45", info: "#21BDED", softAccent: "rgba(255,95,162,.22)", softInfo: "rgba(40,185,232,.18)"}},
   "kinetic-lime": {colors: {canvas: "#F4F8F1", ink: "#10231B", surface: "#FFFFFF", line: "#DCE6DF", highlight: "#B9FA79", mutedInk: "rgba(16,35,27,.68)", faintInk: "rgba(16,35,27,.08)", surfaceStrong: "rgba(255,255,255,.94)", surfaceGlass: "rgba(255,255,255,.82)"}},
   "layered-mint": {colors: {canvas: "#DFFFD1", ink: "#10291B", surface: "#F6FFF0", line: "#87B68B", highlight: "#A9EF76", info: "#19783A", softAccent: "rgba(66,213,29,.18)"}},
   "deep-signal": {colors: {canvas: "#073B1B", ink: "#F2FFE8", accent: "#62ED35", surface: "#104C29", line: "#73A87C", highlight: "#A5FF70", info: "#8ED6B0", mutedInk: "rgba(238,255,230,.68)", faintInk: "rgba(238,255,230,.10)", softAccent: "rgba(98,237,53,.15)", softInfo: "rgba(142,214,176,.12)", surfaceStrong: "rgba(12,74,37,.94)", surfaceGlass: "rgba(12,74,37,.78)"}, shadow: {card: "0 12px 34px rgba(0,0,0,.24)", feature: "0 22px 64px rgba(0,0,0,.30)", active: "0 0 30px rgba(98,237,53,.28)"}},

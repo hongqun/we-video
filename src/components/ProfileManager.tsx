@@ -3,6 +3,8 @@
 import {useEffect, useState} from "react";
 import Link from "next/link";
 import type {profileEditorData} from "@/lib/profile-store";
+// 专栏与任务复用风格目录，保持童话等新增选项同步。
+import {VISUAL_STYLE_OPTIONS} from "@/remotion/visual-style";
 
 type Editor = Awaited<ReturnType<typeof profileEditorData>>;
 type Form = Pick<Editor, "accountId" | "seriesId" | "version" | "accountVersion" | "title" | "description" | "expressionStyle" | "outputLanguage" | "defaultTextModel" | "defaultVoiceId" | "tts" | "visualStyle" | "archived" | "brand"> & {prompts: Record<string, string>; copyFromSeriesId?: string};
@@ -75,7 +77,7 @@ export function ProfileManager() {
       <label>默认模型<select value={form.defaultTextModel || ""} disabled={busy || overridden("TALK_VIDEO_DEFAULT_TEXT_MODEL")} onChange={(e) => patch({defaultTextModel: e.target.value as Form["defaultTextModel"]})}><option value="">使用系统默认</option><option value="deepseek-v4-flash">DeepSeek V4 Flash</option><option value="deepseek-v4-pro">DeepSeek V4 Pro</option></select></label>
       <label>默认音色<select value={form.defaultVoiceId || ""} disabled={busy} onChange={(e) => patch({defaultVoiceId: e.target.value})}><option value="">使用系统默认</option>{form.defaultVoiceId && !voices.some((v) => v.id === form.defaultVoiceId) ? <option value={form.defaultVoiceId}>{form.defaultVoiceId}（当前配置）</option> : null}{voices.map((voice) => <option value={voice.id} key={voice.id}>{voice.name}</option>)}</select></label>
       <label>语速<input type="number" min={0.5} max={1.5} step={0.05} placeholder="使用系统默认" value={form.tts?.rate ?? ""} disabled={busy} onChange={(e) => patch({tts: {...form.tts, rate: e.target.value ? Number(e.target.value) : undefined}})} /></label>
-      <label>视觉风格<select value={form.visualStyle || "kinetic-lime"} disabled={busy} onChange={(e) => patch({visualStyle: e.target.value as Form["visualStyle"]})}><option value="kinetic-lime">科技简报</option><option value="layered-mint">薄荷层次</option><option value="deep-signal">深绿信号</option></select></label></div>
+      <label>视觉风格<select value={form.visualStyle || "kinetic-lime"} disabled={busy} onChange={(e) => patch({visualStyle: e.target.value as Form["visualStyle"]})}>{VISUAL_STYLE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label></div>
       {settingsWarning ? <p className="hint">声音配置暂不可读取：{settingsWarning}。请在本地部署配置中修复服务连接。</p> : null}
       <fieldset disabled={busy}><legend>品牌与人物（可选）</legend><p className="hint">品牌文字与显示开关属于本专栏。人物素材由同账号专栏共享；上传只增加素材，已有任务使用自己的副本。</p>
         <label>品牌名称<input value={form.brand.title} disabled={overridden("TALK_VIDEO_BRAND_TITLE")} onChange={(e) => patch({brand: {...form.brand, title: e.target.value}})} /></label>

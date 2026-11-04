@@ -1,6 +1,7 @@
 import {promises as fs, existsSync} from "node:fs";
 import path from "node:path";
 import {z} from "zod";
+import {VISUAL_STYLE_IDS} from "../remotion/visual-style";
 import {REPO_ROOT} from "./paths";
 import {PRESENTER_GESTURE_DIRECTIONS, PRESENTER_SAFE_SIDES, type PresenterGestureDirection, type PresenterPoseId, type PresenterSafeSide} from "../remotion/presenter-config";
 
@@ -66,7 +67,8 @@ export const seriesSchema = z.object({
   description: z.string().default(""),
   displayLabel: z.string().default(""),
   expressionStyle: z.string().default(""),
-  visualStyle: z.enum(["layered-mint", "kinetic-lime", "deep-signal"]).optional(),
+  // 专栏默认风格与工作台共用枚举，新增童话风格可直接保存。
+  visualStyle: z.enum(VISUAL_STYLE_IDS).optional(),
   archived: z.boolean().default(false),
   promptOverrides: z.record(z.string(), z.string()).optional(),
   brand: z.object({title: z.string().default(""), subtitle: z.string().default(""), logo: z.string().default(""), presenterEnabled: z.boolean().default(true), outroEnabled: z.boolean().default(false)}).optional(),

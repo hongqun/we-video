@@ -57,7 +57,7 @@ export async function POST(request: Request, context: {params: Promise<{id: stri
       const plan = await readVisualPlan(id);
       assertVisualPlanBaseVersion(plan, requestBody.basePlanVersion);
       // 最终确认前按最新规划、资源和音频时间轴重建唯一 manifest。
-      const profile = await readJobPlatformProfile(job.contentProfile);
+      const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
       await writeVisualPreviewManifest(id, profile);
       renderManifestSchema.parse(await readJson<unknown>(`${directory}/manifest.json`));
       await recordJobApproval(id, "visual");
@@ -68,7 +68,7 @@ export async function POST(request: Request, context: {params: Promise<{id: stri
       throw new Error(`当前状态 ${job.state} 不能生成音频`);
     }
     const {voiceId, rate} = requestBody;
-    const settings = await readPipelineSettings(await readJobPlatformProfile(job.contentProfile));
+    const settings = await readPipelineSettings(await readJobPlatformProfile(job.contentProfile, job.jobId));
     // 明确拒绝不兼容音色，避免实际生成参数与用户选择不一致。
     if (voiceId && !settings.voices.some((voice) => voice.id === voiceId)) throw new Error("所选音色当前不可用，请重新选择");
     const resolvedVoiceId = voiceId ?? settings.defaultVoiceId;

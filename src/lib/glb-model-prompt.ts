@@ -19,6 +19,7 @@ export const DEFAULT_GLB_MODEL_TEMPLATE = `根据上传的参考图片，还原�
 {{NARRATION_CONTEXT}}`;
 
 export const loadGlbModelTemplate = async (profile: PlatformProfile): Promise<{template: string; templateSource: GlbPromptSource}> => {
+  if (profile.resolvedPrompts?.["glb-model-template.md"]) return {template: profile.resolvedPrompts["glb-model-template.md"], templateSource: "当前专题"};
   const sourceRoot = profile.sourceSeriesId ? path.resolve(profile.promptRoot, "..", profile.sourceSeriesId) : null;
   for (const root of promptRoots(profile)) {
     try {
@@ -49,7 +50,7 @@ export const generateGlbModelPrompt = async (jobId: string, segmentId: string, s
   const draft = await readJson<{narrationSegments?: Array<{id: string}>}>(path.join(revisionDir(jobId, job.currentRevision), "draft.json"));
   if (!draft.narrationSegments?.some((segment) => segment.id === segmentId)) throw new Error("未找到目标口播段落");
   if (includeNarration && !spokenText.trim()) throw new Error("当前镜头口播为空，请关闭附带口播或补齐口播内容");
-  const profile = await readJobPlatformProfile(job.contentProfile);
+  const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
   const {template, templateSource} = await loadGlbModelTemplate(profile);
   return {prompt: renderGlbModelPrompt(template, spokenText, includeNarration), templateSource};
 };

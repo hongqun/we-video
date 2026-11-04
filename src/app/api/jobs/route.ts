@@ -7,6 +7,7 @@ import {JOBS_ROOT} from "@/lib/paths";
 import {initializeNarrationJob, jobDir, readJob, readJson} from "@/lib/jobs";
 import {requireAuth} from "@/lib/auth";
 import {profileContext, readPlatformProfile} from "@/lib/profile";
+import {freezeProfile} from "@/lib/profile-snapshot";
 import {newJobId} from "@/lib/job-id";
 
 export const runtime = "nodejs";
@@ -23,7 +24,7 @@ export async function GET() {
   const unauthorized = await requireAuth();
   if (unauthorized) return unauthorized;
   try {
-    const entries = await fs.readdir(JOBS_ROOT, {withFileTypes: true});
+    const entries = await fs.readdir(JOBS_ROOT, {withFileTypes: true}).catch((error: NodeJS.ErrnoException) => {if (error.code === "ENOENT") return []; throw error;});
     const jobs = await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {
       try {
         const job = await readJob(entry.name);
@@ -56,10 +57,12 @@ export async function POST(request: Request) {
     const body = requestSchema.parse(await request.json());
     const profile = await readPlatformProfile(body.accountId, body.seriesId);
     if (profile.kind !== "source") throw new Error("派生专栏不能直接输入素材，请先完成中文母稿视频");
-    const settings = await readPipelineSettings(profile);
+    if (profile.archived) throw new Error("专栏已归档，请选择其他专栏");
+    const settings = await readPipelineSettings(profile, {requireCredentials: "text"});
     if (!settings.textModels.includes(body.textModel)) throw new Error("不支持的 DeepSeek 文稿模型");
     inputFile = await writeRequestFile(jobId, body);
     // 在返回 jobId 前写好任务记录，避免前端轮询早于后台 worker 初始化。
+    await freezeProfile(jobId, profile);
     await initializeNarrationJob(jobId, profileContext(profile), {textModel: body.textModel});
     await startTypeScriptNarration("create", jobId, inputFile, {textModel: body.textModel, accountId: profile.accountId, seriesId: profile.seriesId});
     inputFile = null;

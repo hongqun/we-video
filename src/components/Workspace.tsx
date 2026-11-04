@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import Link from "next/link";
 import type {ArtifactManifest, Caption, CaptionStyle, RenderManifest, VideoScene} from "@/remotion/schema";
 import { videoDownloadFilename } from "@/lib/filename";
 import { ReviewPreview } from "./ReviewPreview";
@@ -14,10 +14,6 @@ import {
   type TemplateCategory,
 } from "@/remotion/templates/registry";
 
-const VideoPlayer = dynamic(
-  () => import("./VideoPlayer").then(({VideoPlayer: Component}) => Component),
-  {ssr: false},
-);
 import {audioDraftSignature, narrationWorkflowStep, reviewAudioStatus, type ReviewAudioStatus} from "@/lib/review";
 import {TranslationReview} from "./TranslationReview";
 import type {TranslationReview as TranslationReviewData, TranslationText} from "@/lib/translation-review";
@@ -67,77 +63,16 @@ const normalizeDraftForReview = (draft: Draft | null): Draft | null => {
       segmentId: segment.id,
       spokenText: segment.spokenText,
       content: {title: `口播段落 ${index + 1}`, subtitle: "", text: "", keywords: [segment.spokenText.slice(0, 8)]},
-      templateId: index === 0 ? "ip/opening-stage" : index === segments.length - 1 ? "ip/closing-stage" : "rve/generic-content",
-      rollType: index === 0 || index === segments.length - 1 ? "a-roll" : "b-roll",
-      presenterMode: index === 0 || index === segments.length - 1 ? "hero" : "hidden",
-      presenterPoseId: "neutral",
-      presenterPlacement: index === 0 || index === segments.length - 1 ? "hero" : "right-lower",
-      presenterFraming: index === 0 || index === segments.length - 1 ? "full" : "waist",
+      // 审稿占位镜头只显示内容，人物由正式镜头规划决定。
+      templateId: "rve/generic-content",
+      rollType: "b-roll",
+      presenterMode: "hidden",
+      presenterPoseId: "",
+      presenterPlacement: "right-lower",
+      presenterFraming: "waist",
     })),
   };
 };
-
-type DraftMetadataEditorProps = {
-  draft: Draft;
-  busy: boolean;
-  disabled: boolean;
-  draftChanged: boolean;
-  saveStatus: "idle" | "saving" | "saved" | "failed";
-  onChange: (patch: Pick<Draft, "title" | "shortTitle" | "summary">) => void;
-  onSave: () => void;
-};
-
-const DraftMetadataEditor: React.FC<DraftMetadataEditorProps> = ({
-  draft,
-  busy,
-  disabled,
-  draftChanged,
-  saveStatus,
-  onChange,
-  onSave,
-}) => (
-  <section className="panel review-metadata-editor" aria-labelledby="draft-metadata-title">
-    <div className="panel-heading">
-      <div>
-        <h2 id="draft-metadata-title" className="icon-label"><Icon name="edit" />标题与摘要</h2>
-      </div>
-      <span className="metadata">{draftChanged ? "有未保存修改" : "已保存"}</span>
-    </div>
-    <label>
-      标题
-      <input
-        value={draft.title}
-        disabled={busy || disabled}
-        onChange={(event) => onChange({title: event.target.value, shortTitle: draft.shortTitle, summary: draft.summary})}
-      />
-    </label>
-    <label>
-      16 字短标题
-      <input value={draft.shortTitle ?? ""} maxLength={16} disabled={busy || disabled} onChange={(event) => onChange({title: draft.title, shortTitle: event.target.value, summary: draft.summary})} placeholder="用于短视频平台标题栏和封面文案" />
-      <span className="field-hint">{Array.from(draft.shortTitle ?? "").length}/16 字</span>
-    </label>
-    <label>
-      摘要
-      <textarea
-        rows={4}
-        value={draft.summary ?? ""}
-        disabled={busy || disabled}
-        onChange={(event) => onChange({title: draft.title, shortTitle: draft.shortTitle, summary: event.target.value})}
-        placeholder="面向观众的视频简介，结尾附 3~5 个 #话题标签（半角逗号分隔）。"
-      />
-    </label>
-    <div className="actions review-metadata-actions">
-      <div>
-        {saveStatus === "saving" ? <span className="save-status is-saving">保存中…</span> : null}
-        {saveStatus === "saved" && !draftChanged ? <span className="save-status is-saved">已保存</span> : null}
-        {saveStatus === "failed" ? <span className="save-status is-failed">保存失败</span> : null}
-      </div>
-      <button type="button" disabled={busy || disabled || !draftChanged || !draft.title.trim()} onClick={onSave}>
-        <Icon name="save" />保存标题、短标题和摘要
-      </button>
-    </div>
-  </section>
-);
 
 type Settings = {
   textModels: Array<"deepseek-v4-flash" | "deepseek-v4-pro">;
@@ -197,7 +132,7 @@ type VisualResourcesPayload = NonNullable<Snapshot["visualResources"]>;
 type RevisionView = Pick<Snapshot, "source" | "draft" | "manifest" | "outputReady"> & {
   revision: number;
 };
-type PlatformProfile = {accountId: string; seriesId: string; accountVersion: string; seriesVersion: string; outputLanguage?: "zh-CN" | "en-US"; title: string; subtitle: string; logoSrc: string; displayLabel: string; workspaceName: string; downloadPrefix: string; presenter: NonNullable<RenderManifest["presenter"]>};
+type PlatformProfile = {profileMigrationRequired?: boolean; derivedTargets?: Array<{seriesId: string; title: string}>; accountId: string; seriesId: string; accountVersion: string; seriesVersion: string; outputLanguage?: "zh-CN" | "en-US"; title: string; subtitle: string; logoSrc: string; displayLabel: string; workspaceName: string; downloadPrefix: string; presenter: NonNullable<RenderManifest["presenter"]>};
 type SourceProfile = Pick<PlatformProfile, "accountId" | "seriesId" | "displayLabel">;
 
 const revisionViewFromSnapshot = (value: Snapshot): RevisionView => ({
@@ -323,7 +258,8 @@ export const Workspace: React.FC = () => {
   const [input, setInput] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loadedSettingsKey, setLoadedSettingsKey] = useState("");
-  const selectedSourceAccountId = sourceProfiles.find((item) => item.seriesId === sourceSeriesId)?.accountId;
+  const selectedSource = sourceProfiles.find((item) => `${item.accountId}/${item.seriesId}` === sourceSeriesId);
+  const selectedSourceAccountId = selectedSource?.accountId;
   const [textModel, setTextModel] =
     useState<Settings["defaultTextModel"]>("deepseek-v4-flash");
   const [voiceId, setVoiceId] = useState("");
@@ -387,19 +323,19 @@ export const Workspace: React.FC = () => {
     setRecentJobs(value.jobs ?? []);
   }, []);
 
+  const profileJobId = snapshot?.job.jobId;
   useEffect(() => {
     const controller = new AbortController();
-    const contentProfile = snapshot?.job.contentProfile;
-    const query = contentProfile
-      ? `?accountId=${encodeURIComponent(contentProfile.accountId)}&seriesId=${encodeURIComponent(contentProfile.seriesId)}`
-      : "";
+    const query = profileJobId
+      ? `?jobId=${encodeURIComponent(profileJobId)}`
+      : `?accountId=${encodeURIComponent(selectedSourceAccountId || "builtin")}&seriesId=${encodeURIComponent(selectedSource?.seriesId || "general")}`;
     // 打开任务后按任务所属专题加载 profile，避免英文派生任务沿用中文默认标签。
     void fetch(`/api/profile${query}`, {cache: "no-store", signal: controller.signal})
       .then(readApiJson<PlatformProfile & {error?: string}>)
-      .then((value) => { if (!value.error) setProfile(value); })
-      .catch((cause: unknown) => { if (!(cause instanceof DOMException && cause.name === "AbortError")) return; });
+      .then((value) => { if (value.error) throw new Error(value.error); setProfile(value); })
+      .catch((cause: unknown) => { if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(cause instanceof Error ? cause.message : "读取专栏失败"); });
     return () => controller.abort();
-  }, [snapshot?.job.contentProfile?.accountId, snapshot?.job.contentProfile?.seriesId]);
+  }, [profileJobId, selectedSourceAccountId, selectedSource?.seriesId]);
 
   useEffect(() => {
     void fetch("/api/version", {cache: "no-store"})
@@ -415,7 +351,7 @@ export const Workspace: React.FC = () => {
     const controller = new AbortController();
     const query = new URLSearchParams(jobId ? {jobId} : {
       ...(selectedSourceAccountId ? {accountId: selectedSourceAccountId} : {}),
-      ...(sourceSeriesId ? {seriesId: sourceSeriesId} : {}),
+      ...(selectedSource?.seriesId ? {seriesId: selectedSource.seriesId} : {}),
     });
     void fetch(`/api/settings?${query}`, {cache: "no-store", signal: controller.signal})
       .then(readApiJson<Settings & {error?: string}>)
@@ -434,7 +370,7 @@ export const Workspace: React.FC = () => {
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "读取设置失败");
       });
     return () => controller.abort();
-  }, [jobId, selectedSourceAccountId, sourceSeriesId, settingsKey]);
+  }, [jobId, selectedSourceAccountId, selectedSource?.seriesId, settingsKey]);
 
   useEffect(() => {
     void fetch("/api/profiles", {cache: "no-store"})
@@ -443,7 +379,7 @@ export const Workspace: React.FC = () => {
         if (value.error) throw new Error(value.error);
         const profiles = value.profiles ?? [];
         setSourceProfiles(profiles);
-        setSourceSeriesId((current) => current || profiles[0]?.seriesId || "");
+        setSourceSeriesId((current) => current || (profiles[0] ? `${profiles[0].accountId}/${profiles[0].seriesId}` : ""));
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : "读取专栏失败"));
   }, []);
@@ -479,7 +415,7 @@ export const Workspace: React.FC = () => {
       setDraft(normalizeDraftForReview(value.draft));
       setPendingDraft(normalizeDraftForReview(value.pendingDraft?.draft ?? null));
     }
-  }, [jobId, snapshot?.job.currentRevision]);
+  }, [jobId]);
 
   const jobState = snapshot?.job.state;
   useEffect(() => {
@@ -501,10 +437,10 @@ export const Workspace: React.FC = () => {
     setScriptNotice(null);
     try {
       const body = sourceType === "url"
-          ? { type: "url", url: input, accountId: sourceProfiles.find((item) => item.seriesId === sourceSeriesId)?.accountId, seriesId: sourceSeriesId, sourceLanguage, textModel }
+          ? { type: "url", url: input, accountId: selectedSourceAccountId, seriesId: selectedSource?.seriesId, sourceLanguage, textModel }
           : sourceType === "script"
-            ? { type: "script", text: input, accountId: sourceProfiles.find((item) => item.seriesId === sourceSeriesId)?.accountId, seriesId: sourceSeriesId, sourceLanguage, textModel }
-            : { type: "text", text: input, accountId: sourceProfiles.find((item) => item.seriesId === sourceSeriesId)?.accountId, seriesId: sourceSeriesId, sourceLanguage, textModel };
+            ? { type: "script", text: input, accountId: selectedSourceAccountId, seriesId: selectedSource?.seriesId, sourceLanguage, textModel }
+            : { type: "text", text: input, accountId: selectedSourceAccountId, seriesId: selectedSource?.seriesId, sourceLanguage, textModel };
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -927,11 +863,11 @@ export const Workspace: React.FC = () => {
     if (!response.ok) throw new Error(result.error ?? "确认镜头规划失败");
     await refresh();
   };
-  const deriveEnglishVideo = async () => {
+  const deriveEnglishVideo = async (targetSeriesId: string) => {
     if (!jobId) return;
     setBusy(true); setError(null);
     try {
-      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/derive`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({seriesId: "tech-minute-en"})});
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/derive`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({seriesId: targetSeriesId})});
       const result = await readApiJson<{jobId?: string; error?: string}>(response);
       if (!response.ok || !result.jobId) throw new Error(result.error ?? "派生英文视频失败");
       // 先读取子任务快照，再切换界面，避免翻译页加载期间闪现普通素材输入表单。
@@ -1025,7 +961,7 @@ export const Workspace: React.FC = () => {
       templateId: index === 0 ? "ip/opening-stage" : index === narrationSegments.length - 1 ? "ip/closing-stage" : "rve/generic-content",
       rollType: index === 0 || index === narrationSegments.length - 1 ? "a-roll" : "b-roll",
       presenterMode: index === 0 || index === narrationSegments.length - 1 ? "hero" : "hidden",
-      presenterPoseId: "neutral", presenterPlacement: index === 0 || index === narrationSegments.length - 1 ? "hero" : "right-lower", presenterFraming: index === 0 || index === narrationSegments.length - 1 ? "full" : "waist",
+      presenterPoseId: "", presenterPlacement: index === 0 || index === narrationSegments.length - 1 ? "hero" : "right-lower", presenterFraming: index === 0 || index === narrationSegments.length - 1 ? "full" : "waist",
     }))});
   };
   const splitDraftSegment = (index: number, textarea: HTMLTextAreaElement) => {
@@ -1424,9 +1360,10 @@ export const Workspace: React.FC = () => {
   const isEnglishProfile = profile?.outputLanguage === "en-US";
   return (
     <main className="workspace">
+      {profile?.profileMigrationRequired && jobId ? <section className="panel"><p>此旧任务没有配置快照。继续生成将采用当前专栏配置并固定，历史配置无法还原。已生成的成片仍可下载。</p><button disabled={busy} onClick={() => {setBusy(true); void fetch("/api/profile", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({jobId, confirm: true})}).then(readApiJson<{error?: string}>).then((result) => {if (result.error) throw new Error(result.error); window.location.reload();}).catch((e) => setError(e.message)).finally(() => setBusy(false));}}>采用当前配置并继续</button></section> : null}
       <section className="hero">
         <div>
-          <p className="eyebrow section-kicker">{profile?.workspaceName ?? "TECH123 / VIDEO STUDIO"}</p>
+          <p className="eyebrow section-kicker">{profile?.workspaceName ?? "WE-VIDEO"}</p>
           <h1 className="hero-title">视频<span className="accent">创作</span>平台</h1>
           <p>从素材到成片，按步骤完成。</p>
           <p className="build-info" title={buildInfo.commit || undefined}>
@@ -1436,6 +1373,7 @@ export const Workspace: React.FC = () => {
           </p>
         </div>
         <div className="hero-actions">
+          <Link className="secondary" href="/profiles">管理专栏</Link>
           <div className="settings-menu" ref={settingsMenuRef}>
             <button
               className="secondary icon-label settings-menu-trigger"
@@ -1758,9 +1696,9 @@ export const Workspace: React.FC = () => {
               <p className="input-panel-settings-title">生成设置</p>
               <>
                 <label>
-                  母稿专栏
+                  专栏（可选）
                   <select value={sourceSeriesId} onChange={(event) => setSourceSeriesId(event.target.value)} disabled={busy || !sourceProfiles.length}>
-                    {sourceProfiles.map((item) => <option key={item.seriesId} value={item.seriesId}>{item.displayLabel}</option>)}
+                    {sourceProfiles.map((item) => <option key={`${item.accountId}/${item.seriesId}`} value={`${item.accountId}/${item.seriesId}`}>{item.displayLabel}</option>)}
                   </select>
                 </label>
                 <label>
@@ -2182,7 +2120,7 @@ export const Workspace: React.FC = () => {
               </a>
             ) : <span className="metadata">{snapshot.job.state === "rendering" ? "请稍候，渲染完成后即可下载" : "当前暂无可下载成片"}</span>}
           </div>
-          {snapshot.job.state === "completed" && snapshot.job.contentProfile.seriesId === "tech-minute" ? <div className="actions"><button disabled={busy} onClick={() => void deriveEnglishVideo()}><Icon name="arrow-right" />派生英文视频</button></div> : null}
+          {snapshot.job.state === "completed" && profile?.derivedTargets?.length ? <div className="actions">{profile.derivedTargets.map((target) => <button key={target.seriesId} disabled={busy || profile.profileMigrationRequired} onClick={() => void deriveEnglishVideo(target.seriesId)}><Icon name="arrow-right" />派生：{target.title}</button>)}</div> : null}
         </section>
       ) : null}
       {visualRequirementDialog ? (

@@ -46,7 +46,7 @@ export const templateRegistry: TemplateDefinition[] = [
 export const SUPPORTED_TEMPLATE_IDS = new Set(templateRegistry.map((item) => item.id));
 export const templateById = new Map(templateRegistry.map((item) => [item.id, item]));
 
-export const isTemplateAvailableForProfile = (definition: TemplateDefinition, profile?: {accountId?: string; seriesId?: string}) => !definition.availableProfiles?.length || definition.availableProfiles.some((item) => item.accountId === profile?.accountId && item.seriesId === profile?.seriesId);
+export const isTemplateAvailableForProfile = (definition: TemplateDefinition, profile?: {accountId?: string; seriesId?: string; presenter?: {poses: unknown[]}}) => !(definition.category === "presenter" && profile?.presenter && !profile.presenter.poses.length) && (!definition.availableProfiles?.length || definition.availableProfiles.some((item) => item.accountId === profile?.accountId && item.seriesId === profile?.seriesId));
 export const isTemplateCompatible = (scene: Pick<VideoScene, "rollType" | "content">, definition: TemplateDefinition) => definition.rollRole === (scene.rollType ?? "b-roll") && (definition.id !== "rve/text-highlight" || scene.content.keywords.length >= 2);
 
 export const getTemplateStatus = (scene: VideoScene) => {

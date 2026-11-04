@@ -13,7 +13,7 @@ export const generateVisualRequirement = async (jobId: string, segmentId: string
   const segments = Array.isArray(draft.narrationSegments) ? draft.narrationSegments as Segment[] : [];
   const index = segments.findIndex((segment) => segment.id === segmentId);
   if (index < 0) throw new Error("未找到目标口播段落");
-  const profile = await readJobPlatformProfile(job.contentProfile);
+  const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
   // 拆分镜头时优先注入当前视觉镜头的裁剪口播；旧入口不传时才使用完整段落。
   const template = await loadVisualRequirementTemplate(profile, transparentBackground);
   const spokenText = sceneSpokenText?.trim() || segments[index]!.spokenText;
@@ -28,7 +28,7 @@ export const generateCoverImageRequirement = async (jobId: string) => {
   const plan = await readJson<{cover?: {title?: string}}>(path.join(directory, "visual-plan.json"));
   const title = typeof plan.cover?.title === "string" ? plan.cover.title.trim() : "";
   if (!title) throw new Error("封面标题为空，无法生成封面图片要求");
-  const profile = await readJobPlatformProfile(job.contentProfile);
+  const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
   const template = await loadCoverImageRequirementTemplate(profile);
   const visualRequirement = template.replaceAll("{{COVER_TITLE}}", title).trim();
   if (!visualRequirement) throw new Error("封面图片要求模板为空");

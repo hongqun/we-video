@@ -47,7 +47,7 @@ export type PipelineSettings = {
   };
 };
 
-export const readPipelineSettings = async (profile?: PlatformProfile): Promise<PipelineSettings> => {
+export const readPipelineSettings = async (profile?: PlatformProfile, options: {requireCredentials?: boolean | "text" | "tts"} = {}): Promise<PipelineSettings> => {
   // 配置文件提供默认值，环境变量可覆盖模型和密钥，但不把密钥写入任务文件。
   const selectedProfile = profile ?? await readPlatformProfile();
   const configuredFile = process.env.TALK_VIDEO_PIPELINE_CONFIG?.trim();
@@ -56,7 +56,7 @@ export const readPipelineSettings = async (profile?: PlatformProfile): Promise<P
     : path.join(REPO_ROOT, "pipeline.config.json");
   const raw = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, Record<string, unknown>>;
   const textModels = process.env.TALK_VIDEO_TEXT_MODELS?.trim();
-  const defaultTextModel = process.env.TALK_VIDEO_DEFAULT_TEXT_MODEL?.trim() || selectedProfile.defaultTextModel;
+  const defaultTextModel = selectedProfile.snapshot ? selectedProfile.defaultTextModel : process.env.TALK_VIDEO_DEFAULT_TEXT_MODEL?.trim() || selectedProfile.defaultTextModel;
   const defaultVoice = selectedProfile.defaultVoiceId || process.env.TALK_VIDEO_DEFAULT_VOICE?.trim();
   const config = settingsSchema.parse({
     ...raw,
@@ -77,17 +77,18 @@ export const readPipelineSettings = async (profile?: PlatformProfile): Promise<P
   const workspaceId = String(process.env.TALK_VIDEO_BAILIAN_WORKSPACE_ID ?? bailian.workspace_id ?? "").trim();
   const apiKeyEnv = String(bailian.api_key_env ?? "DASHSCOPE_API_KEY");
   const apiKey = String(process.env[apiKeyEnv] ?? "").trim();
+  if (options.requireCredentials === "text" && !deepseekApiKey) throw new Error(`环境变量 ${deepseekApiKeyEnv} 未设置`);
   const websocketTemplate = String(
     process.env.TALK_VIDEO_BAILIAN_WS_API_URL ??
       process.env.TALK_VIDEO_BAILIAN_WEBSOCKET_URL ??
       bailian.base_websocket_api_url ??
       "",
   ).trim();
-  if (!apiKey) throw new Error(`环境变量 ${apiKeyEnv} 未设置`);
-  if (!workspaceId || workspaceId === "YOUR_WORKSPACE_ID") throw new Error("百炼配置缺少真实 workspace_id");
-  if (!websocketTemplate) throw new Error("百炼配置缺少 base_websocket_api_url");
+  if ((options.requireCredentials === undefined || options.requireCredentials === true || options.requireCredentials === "tts") && !apiKey) throw new Error(`环境变量 ${apiKeyEnv} 未设置`);
+  if ((options.requireCredentials === undefined || options.requireCredentials === true || options.requireCredentials === "tts") && (!workspaceId || workspaceId === "YOUR_WORKSPACE_ID")) throw new Error("百炼配置缺少真实 workspace_id");
+  if ((options.requireCredentials === undefined || options.requireCredentials === true || options.requireCredentials === "tts") && !websocketTemplate) throw new Error("百炼配置缺少 base_websocket_api_url");
   const websocketUrl = websocketTemplate.replaceAll("{workspace_id}", workspaceId);
-  if (!websocketUrl.startsWith("wss://")) throw new Error("百炼 WebSocket 地址必须使用 WSS");
+  if ((options.requireCredentials === undefined || options.requireCredentials === true || options.requireCredentials === "tts") && !websocketUrl.startsWith("wss://")) throw new Error("百炼 WebSocket 地址必须使用 WSS");
   const numericSetting = (envName: string, configName: string, fallback: number) => {
     const value = Number(process.env[envName] ?? bailian[configName] ?? fallback);
     if (!Number.isFinite(value)) throw new Error(`百炼配置 ${configName} 必须是数字`);

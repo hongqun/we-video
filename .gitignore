@@ -9,18 +9,8 @@ out/
 /skills/
 /.agents/skills/
 /DEPLOYMENT_UBUNTU.md
-jobs/
-!/src/app/api/jobs/
-/src/app/api/jobs/**
-!/src/app/api/jobs/route.ts
-# 配音确认接口随流程变更一起纳入版本管理。
-!/src/app/api/jobs/[[]id]/
-/src/app/api/jobs/[[]id]/**
-!/src/app/api/jobs/[[]id]/approve/
-!/src/app/api/jobs/[[]id]/approve/route.ts
-# 附件鉴权参与渲染链路，纳入版本管理及开发监听。
-!/src/app/api/jobs/[[]id]/artifacts/
-!/src/app/api/jobs/[[]id]/artifacts/**
+# 仅忽略运行数据，API 源码必须参与版本管理与开发监听。
+/jobs/
 draft/
 data/
 public/ai_agent.wav

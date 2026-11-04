@@ -1,6 +1,6 @@
 import {promises as fs} from "node:fs";
 import {acceptNarration, createNarration, discardNarration, reviseNarration} from "@/lib/narration";
-import {readPlatformProfile, readJobPlatformProfile} from "@/lib/profile";
+import {readJobPlatformProfile} from "@/lib/profile";
 import {readJob} from "@/lib/jobs";
 
 const argument = (name: string) => { const index = process.argv.indexOf(name); return index >= 0 ? process.argv[index + 1] : undefined; };
@@ -12,13 +12,14 @@ const main = async () => {
   const jobId = required("--job-id");
   if (command === "create") {
     const input = JSON.parse(await fs.readFile(required("--input"), "utf8")) as Parameters<typeof createNarration>[1];
-    const profile = await readPlatformProfile(argument("--account-id"), argument("--series-id"));
+    const job = await readJob(jobId);
+    const profile = await readJobPlatformProfile(job.contentProfile, jobId);
     // API 已同步初始化任务；worker 直接生成来源和草稿，避免重复初始化。
     await createNarration(jobId, input, profile, argument("--text-model") ?? profile.defaultTextModel ?? "deepseek-v4-flash", false);
   } else if (command === "revise") {
     const input = JSON.parse(await fs.readFile(required("--input"), "utf8")) as {draft: Record<string, unknown>; feedback: string};
     const job = await readJob(jobId);
-    const profile = await readJobPlatformProfile(job.contentProfile);
+    const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
     await reviseNarration(jobId, input.draft, input.feedback, profile, job.generation?.textModel ?? profile.defaultTextModel ?? "deepseek-v4-flash");
   } else if (command === "accept") await acceptNarration(jobId);
   else if (command === "discard") await discardNarration(jobId);

@@ -1,3 +1,4 @@
+/* eslint-disable @remotion/non-pure-animation -- 此模块生成转场数据，动画由渲染端时间轴驱动。 */
 import path from "node:path";
 import sharp from "sharp";
 import {jobDir, readJob, readJson, updateGenerationProgress, updateJobState} from "./jobs";
@@ -68,7 +69,7 @@ export const validateVisualRequirementAssets = async (directory: string, segment
   return segment;
 }));
 
-export const runContractPlanning = async ({modelCall, segments, presenterPoses, currentPlan, feedback}: {modelCall: ModelCall; segments: SegmentInfo[]; presenterPoses: Parameters<typeof attachPresenterPlan>[2]; currentPlan?: VisualPlan | null; feedback?: string}) => {
+export const runContractPlanning = async ({modelCall, segments, presenterPoses, defaultPresenterPoseId, currentPlan, feedback}: {modelCall: ModelCall; segments: SegmentInfo[]; presenterPoses: Parameters<typeof attachPresenterPlan>[2]; defaultPresenterPoseId?: string; currentPlan?: VisualPlan | null; feedback?: string}) => {
   const response = await modelCall({narrationSegments: segments.map(({id, spokenText}) => ({id, spokenText})), ...(feedback ? {feedback} : {}), ...(currentPlan ? {currentPlan: currentPlan.scenes.map((scene) => ({segmentId: scene.segmentId, content: scene.content}))} : {})}, {maxTokens: 7000});
   const parsed = visualPlanModelOutputSchema.parse(jsonObject(response.raw));
   const byId = new Map(parsed.scenes.map((scene) => [scene.segmentId, scene]));
@@ -82,14 +83,14 @@ export const runContractPlanning = async ({modelCall, segments, presenterPoses, 
     const previousScene = currentPlan?.scenes.find((scene) => scene.segmentId === segment.id);
     return {id: previousScene?.id ?? `plan-${String(index + 1).padStart(2, "0")}`, segmentId: segment.id, startMs: segment.startMs, endMs: segment.endMs, transition: {kind: selectSceneTransition({templateId: middleDefault}, index, segments.length), durationMs: 315}, content: extracted.content, templateId: middleDefault, ...(middleDefault === "rve/3d-model-scene" && previousScene?.modelScene ? {modelScene: previousScene.modelScene} : {})};
   });
-  return {scenes: attachPresenterPlan(base, base.map(() => "neutral"), presenterPoses, base.map(() => "hidden")), diagnostics: [{phase: "content-extraction", status: "success", contentLength: response.contentLength, finishReason: response.finishReason}]};
+  return {scenes: attachPresenterPlan(base, base.map(() => "neutral"), presenterPoses, base.map(() => "hidden"), defaultPresenterPoseId), diagnostics: [{phase: "content-extraction", status: "success", contentLength: response.contentLength, finishReason: response.finishReason}]};
 };
 
 const generate = async (jobId: string, feedback?: string) => {
   await updateGenerationProgress(jobId, "正在读取口播、时间轴和视觉资源…");
   const job = await readJob(jobId);
-  const profile = await readJobPlatformProfile(job.contentProfile);
-  const settings = await readPipelineSettings(profile);
+  const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
+  const settings = await readPipelineSettings(profile, {requireCredentials: "text"});
   const directory = jobDir(jobId);
   const [draft, narration, resources, system] = await Promise.all([readJson<{narrationSegments?: Array<{id: string; spokenText: string}>}>(path.join(directory, "draft.json")), readJson<{segments?: Array<{id: string; startMs: number; endMs: number}>}>(path.join(directory, "audio", "narration.json")), readVisualResources(jobId), loadVisualSystemPrompt(profile)]);
   if (!settings.deepseek.apiKey) throw new Error("环境变量 DEEPSEEK_API_KEY 未设置");
@@ -105,9 +106,9 @@ const generate = async (jobId: string, feedback?: string) => {
   const currentPlan = feedback ? await readVisualPlan(jobId).catch(() => null) : null;
   await updateGenerationProgress(jobId, `正在提取 ${segments.length} 个镜头的通用文字…`);
   const modelCall: ModelCall = (input, options) => callWithRetry({endpoint: `${settings.deepseek.baseUrl}/chat/completions`, apiKey: settings.deepseek.apiKey, model: job.generation?.textModel ?? profile.defaultTextModel ?? "deepseek-v4-flash", system, input, maxTokens: options?.maxTokens});
-  const planning = await runContractPlanning({modelCall, segments, presenterPoses: profile.presenter.poses, currentPlan, feedback});
+  const planning = await runContractPlanning({modelCall, segments, presenterPoses: profile.presenter.poses, defaultPresenterPoseId: profile.defaultPresenterPoseId, currentPlan, feedback});
   // 新任务默认使用科技简报；兼容 ID 仍为 kinetic-lime，重新提取不改变用户已保存的全片风格。
-  const visualStyle = visualStyleForPlanning(currentPlan, feedback);
+  const visualStyle = currentPlan || feedback ? visualStyleForPlanning(currentPlan, feedback) : profile.visualStyle ?? "kinetic-lime";
   const plan = await saveVisualPlan(jobId, {schemaVersion: "1.0", revision: 1, ...(feedback ? {feedback} : {}), ...(visualStyle ? {visualStyle} : {}), ...(currentPlan?.cover ? {cover: currentPlan.cover} : {}), scenes: planning.scenes}, profile);
   await updateGenerationProgress(jobId, `镜头规划完成：${plan.scenes.length} 个镜头。`);
   return plan;

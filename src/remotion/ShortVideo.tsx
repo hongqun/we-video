@@ -61,13 +61,13 @@ export const ShortVideo: React.FC<RenderManifest> = (props) => {
       </Sequence>
       {/* 首帧保持完整封面，字幕不移动时间轴。 */}
       {frame > 0 ? <Captions captions={props.captions} narrationDurationMs={props.narration.durationMs} scenes={props.scenes} style={props.captionStyle ?? "narration"} /> : null}
-      <Sequence from={narrationFrames} durationInFrames={outroFrames} name="品牌片尾">
+      {outroFrames > 0 ? <Sequence from={narrationFrames} durationInFrames={outroFrames} name="品牌片尾">
         {/* 原提示音对齐 Logo 落定点，不占用口播尾音。 */}
         <Sequence from={Math.round(OUTRO_LOGO_LAND_SECONDS * fps)} layout="none">
           <Audio src={staticFile("sfx/outro-ding.wav")} volume={0.42} />
         </Sequence>
         <Outro brand={props.brand} durationInFrames={outroFrames} />
-      </Sequence>
+      </Sequence> : null}
     </AbsoluteFill>
     </VisualThemeProvider>
     </BrandProvider>

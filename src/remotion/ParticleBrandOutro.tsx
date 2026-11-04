@@ -47,9 +47,9 @@ export const ParticleBrandOutro: React.FC<ParticleBrandOutroProps> = ({brand, ca
       {dark ? <path d={`M 360 ${centerY + 210} C 470 ${centerY + 80}, 660 ${centerY + 45}, 820 ${centerY - 110}`} fill="none" stroke={theme.colors.accent} strokeWidth={2} opacity={.34 * effectsOut} /> : null}
     </svg>
     {/* Logo 始终使用原始透明背景，片尾不再添加底板或边框。 */}
-    <div style={{position: "absolute", left: 350, top: centerY - 205, width: 380, height: 410, alignItems: "center", display: "flex", justifyContent: "center", opacity: progress(.25, .45), scale: String(logoScale)}}><Img src={staticFile(brand.logoSrc)} style={{width: 330, height: 360, objectFit: "contain", filter: dark ? "drop-shadow(0 0 12px rgba(98,237,53,.28))" : undefined}} /></div>
-    <div style={{position: "absolute", left: 72, top: centerY + 250, width: 936, fontSize: 62, fontWeight: 850, textAlign: "center", opacity: progress(.7, 1), translate: `0 ${(1 - progress(.7, 1)) * 12}px`}}>{outroTitle}</div>
-    <div style={{position: "absolute", left: 72, top: centerY + 342, width: 936, color: muted, fontSize: 28, letterSpacing: 4, textAlign: "center", opacity: progress(.95, 1.3)}}>{outroSubtitle}</div>
-    {showPrompt ? <div style={{position: "absolute", left: 72, top: centerY + 452, width: 936, fontSize: 25, color: dark ? muted : VIDEO_COLORS.mutedInk, textAlign: "center", opacity: progress(1.3, 1.6)}}>{outroPrompt}</div> : null}
+    {brand.logoSrc ? <div style={{position: "absolute", left: 350, top: centerY - 205, width: 380, height: 410, alignItems: "center", display: "flex", justifyContent: "center", opacity: progress(.25, .45), scale: String(logoScale)}}><Img src={/^(?:https?:\/\/|data:|\/)/u.test(brand.logoSrc) ? brand.logoSrc : staticFile(brand.logoSrc)} style={{width: 330, height: 360, objectFit: "contain", filter: dark ? "drop-shadow(0 0 12px rgba(98,237,53,.28))" : undefined}} /></div> : null}
+    <div style={{position: "absolute", left: 72, top: centerY + (brand.logoSrc ? 250 : -20), width: 936, fontSize: 62, fontWeight: 850, textAlign: "center", opacity: progress(.7, 1), translate: `0 ${(1 - progress(.7, 1)) * 12}px`}}>{outroTitle}</div>
+    <div style={{position: "absolute", left: 72, top: centerY + (brand.logoSrc ? 342 : 72), width: 936, color: muted, fontSize: 28, letterSpacing: 4, textAlign: "center", opacity: progress(.95, 1.3)}}>{outroSubtitle}</div>
+    {showPrompt ? <div style={{position: "absolute", left: 72, top: centerY + (brand.logoSrc ? 452 : 182), width: 936, fontSize: 25, color: dark ? muted : VIDEO_COLORS.mutedInk, textAlign: "center", opacity: progress(1.3, 1.6)}}>{outroPrompt}</div> : null}
   </AbsoluteFill>;
 };

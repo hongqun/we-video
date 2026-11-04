@@ -7,8 +7,6 @@ DATA_ROOT="/opt/talk-video/data"
 set -a
 source "$APP_ROOT/.env"
 set +a
-: "${TALK_VIDEO_ACCOUNT:?TALK_VIDEO_ACCOUNT must be set in .env}"
-: "${TALK_VIDEO_SERIES:?TALK_VIDEO_SERIES must be set in .env}"
 
 cd "$APP_ROOT"
 mkdir -p "$DATA_ROOT/jobs" "$DATA_ROOT/draft"
@@ -24,7 +22,6 @@ EOF
   exit 1
 fi
 npm ci
-npm run profile:sync
 if [ -e .next ] && [ ! -w .next ]; then
   cat >&2 <<'EOF'
 Cannot clean .next: it is not writable by the deploy user.

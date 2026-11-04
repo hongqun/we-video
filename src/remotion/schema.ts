@@ -23,7 +23,7 @@ export const captionStyleSchema = z.enum(["narration", "clean", "impact"]);
 export const visualStyleSchema = z.enum(VISUAL_STYLE_IDS);
 export const rollTypeSchema = z.enum(["a-roll", "b-roll"]);
 export const presenterModeSchema = z.enum(["hero", "companion", "hidden"]);
-export const presenterPoseIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{1,63}$/);
+export const presenterPoseIdSchema = z.union([z.literal(""), z.string().regex(/^[a-z0-9][a-z0-9-]{1,63}$/)]);
 export const presenterPlacementSchema = z.enum(PRESENTER_PLACEMENTS);
 export const presenterFramingSchema = z.enum(PRESENTER_FRAMINGS);
 // 封面只保存可编辑文案和人物姿势，布局仍由 CoverOpening 统一控制。
@@ -115,7 +115,7 @@ export const renderManifestSchema = z.object({
     width: z.literal(1080),
     height: z.literal(1260),
     fps: z.literal(30),
-    outroDurationMs: z.literal(3000),
+    outroDurationMs: z.union([z.literal(0), z.literal(3000)]),
   }),
   narration: z.object({
     text: z.string().min(1),
@@ -128,9 +128,9 @@ export const renderManifestSchema = z.object({
   captions: z.array(captionSchema).min(1),
   scenes: z.array(sceneSchema).min(1),
   brand: z.object({
-    logoSrc: z.string().min(1),
-    title: z.string().min(1),
-    subtitle: z.string().min(1),
+    logoSrc: z.string(),
+    title: z.string(),
+    subtitle: z.string(),
     // 固定品牌片尾的可选文案；历史 Manifest 缺失时由片尾组件回退到旧中文文案。
     outro: z.object({title: z.string().min(1), subtitle: z.string().min(1), prompt: z.string().min(1)}).strict().optional(),
     label: z.string().min(1).optional(),
@@ -145,7 +145,7 @@ export const renderManifestSchema = z.object({
       semanticTags: z.array(z.string().trim().min(1)).min(1),
       gestureDirection: z.enum(PRESENTER_GESTURE_DIRECTIONS),
       safeSide: z.enum(PRESENTER_SAFE_SIDES),
-    }).strict()).min(1),
+    }).strict()),
   }).strict().optional(),
   media: z.object({logos: z.array(logoAssetSchema).default([]), maps: z.array(mapAssetSchema).default([])}).optional(),
 }).superRefine((manifest, context) => {

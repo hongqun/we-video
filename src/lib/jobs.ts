@@ -55,6 +55,8 @@ export const normalizeArtifactManifest = (value: unknown): unknown => {
 };
 
 export type JobRecord = {
+  // 旧任务明确采用当前配置的时间，区别于创建时即固定的新任务。
+  profileAdoptedAt?: string;
   jobId: string;
   /** @deprecated 单数据任务恒为 1，仅供尚未迁移的客户端比较请求新旧。 */
   currentRevision: number;
@@ -126,25 +128,17 @@ export const assertTranslationReviewed = async (jobId: string) => {
   if (review && !review.confirmedAt) throw new Error("请先在翻译对照页确认全文并完成分段");
 };
 
-export const resolveManifestAssets = (
-  manifest: ArtifactManifest,
-  origin: string,
-  renderToken?: string,
-): ArtifactManifest => {
-  const prefix = `artifact://`;
-  const audioSrc = manifest.narration.audioSrc.startsWith(prefix)
-    ? `${origin}/api/jobs/${encodeURIComponent(manifest.jobId)}/artifacts/${manifest.narration.audioSrc.slice(prefix.length)}${renderToken ? `?renderToken=${encodeURIComponent(renderToken)}` : ""}`
-    : manifest.narration.audioSrc;
-  const rewrite = (value: unknown): unknown => {
-    if (typeof value === "string" && value.startsWith(prefix)) {
-      return `${origin}/api/jobs/${encodeURIComponent(manifest.jobId)}/artifacts/${value.slice(prefix.length)}${renderToken ? `?renderToken=${encodeURIComponent(renderToken)}` : ""}`;
-    }
-    if (Array.isArray(value)) return value.map(rewrite);
-    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rewrite(item)]));
-    return value;
+// 所有任务资源复用同一解析器，品牌、人物、音频与模板图片采用一致的访问令牌。
+export const resolveArtifactValues = <T>(value: T, jobId: string, origin: string, renderToken?: string): T => {
+  const rewrite = (item: unknown): unknown => {
+    if (typeof item === "string" && item.startsWith("artifact://")) return `${origin}/api/jobs/${encodeURIComponent(jobId)}/artifacts/${item.slice("artifact://".length)}${renderToken ? `?renderToken=${encodeURIComponent(renderToken)}` : ""}`;
+    if (Array.isArray(item)) return item.map(rewrite);
+    if (item && typeof item === "object") return Object.fromEntries(Object.entries(item).map(([key, entry]) => [key, rewrite(entry)]));
+    return item;
   };
-  return rewrite({...manifest, narration: {...manifest.narration, audioSrc}}) as ArtifactManifest;
+  return rewrite(value) as T;
 };
+export const resolveManifestAssets = (manifest: ArtifactManifest, origin: string, renderToken?: string): ArtifactManifest => resolveArtifactValues(manifest, manifest.jobId, origin, renderToken);
 
 export const snapshot = async (jobId: string, origin?: string) => {
   const job = await readJob(jobId);
@@ -168,6 +162,11 @@ export const snapshot = async (jobId: string, origin?: string) => {
   const sourceManifest = rawManifest;
   const normalizedManifest = sourceManifest ? normalizeArtifactManifest(sourceManifest) : null;
   let parsed = normalizedManifest ? artifactManifestSchema.parse(normalizedManifest) : null;
+  if (parsed) {
+    const migrated = await (await import("./legacy-brand-assets")).freezeLegacyBrandAssets(parsed, directory);
+    if (JSON.stringify(migrated) !== JSON.stringify(parsed)) await atomicWriteJson(path.join(directory, "manifest.json"), migrated);
+    parsed = migrated;
+  }
   // The first review read freezes Logo assets so the reviewer sees their real
   // status before pressing render. Rendering only reuses this frozen manifest.
   if (parsed?.contentMode === "narration" && manifestNeedsMediaResolution(parsed)) {

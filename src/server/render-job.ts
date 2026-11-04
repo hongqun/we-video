@@ -96,6 +96,8 @@ const main = async () => {
   const rawManifest = await readJson<unknown>(resolvedManifestPath);
   const normalizedManifest = normalizeArtifactManifest(rawManifest);
   let manifest = artifactManifestSchema.parse(normalizedManifest);
+  // 历史图片也固定到任务内，取消启动同步后仍可直接重渲染。
+  manifest = await (await import("../lib/legacy-brand-assets")).freezeLegacyBrandAssets(manifest, jobDir(manifest.jobId));
   // 口播清单统一解析素材并执行渲染前校验。
   manifest = await resolveManifestMedia(manifest, jobDir(manifest.jobId));
   await assertRenderPreflight(manifest);

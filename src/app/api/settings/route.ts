@@ -13,9 +13,9 @@ export async function GET(request: Request) {
     // 页面与 worker 读取同一任务专题；已保存的人工音色和语速单独返回。
     const query = new URL(request.url).searchParams;
     const job = query.get("jobId") ? await readJob(query.get("jobId")!) : undefined;
-    const profile = job ? await readJobPlatformProfile(job.contentProfile)
+    const profile = job ? await readJobPlatformProfile(job.contentProfile, job.jobId)
       : await readPlatformProfile(query.get("accountId") || undefined, query.get("seriesId") || undefined);
-    const settings = await readPipelineSettings(profile);
+    const settings = await readPipelineSettings(profile, {requireCredentials: false});
     return NextResponse.json({
       textModels: settings.textModels,
       defaultTextModel: settings.defaultTextModel,

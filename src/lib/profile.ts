@@ -1,4 +1,4 @@
-import {promises as fs} from "node:fs";
+import {promises as fs, existsSync} from "node:fs";
 import path from "node:path";
 import {z} from "zod";
 import {REPO_ROOT} from "./paths";
@@ -14,25 +14,26 @@ const poseConfigSchema = z.object({
   gestureDirection: z.enum(PRESENTER_GESTURE_DIRECTIONS),
   safeSide: z.enum(PRESENTER_SAFE_SIDES),
 }).strict();
-const accountSchema = z.object({
+export const accountSchema = z.object({
   schemaVersion: z.string().min(1),
   configVersion: z.string().min(1),
   id: idSchema,
-  title: z.string().min(1),
-  subtitle: z.string().min(1),
+  title: z.string().default(""),
+  subtitle: z.string().default(""),
   workspaceName: z.string().min(1),
   workspaceTitle: z.string().min(1),
   workspaceDescription: z.string().min(1),
   downloadPrefix: z.string().min(1),
   userAgentSuffix: z.string().min(1),
-  logo: z.string().min(1).refine((value) => path.basename(value) === value, "logo 必须是品牌目录内的文件名"),
+  logo: z.string().refine((value) => !value || path.basename(value) === value, "logo 必须是品牌目录内的文件名").default(""),
   ip: z.object({
     directory: z.string().min(1).refine((value) => path.basename(value) === value, "IP 目录必须位于账号根目录"),
     // 退役姿态不进入新任务选择，但旧 Manifest 的素材 URL 仍要能由同步脚本恢复。
     compatibilityArchive: z.string().regex(/^backup\/[a-z0-9-]+$/, "兼容素材目录必须位于 IP backup 下").optional(),
-    poses: z.array(poseConfigSchema).min(1),
+    poses: z.array(poseConfigSchema).default([]),
+    defaultPoseId: idSchema.optional(),
     compatibilityPoses: z.array(poseConfigSchema).optional(),
-  }).strict(),
+  }).strict().default({directory: "ip", poses: []}),
 });
 // 英文派生专题可配置固定片尾文案；未配置时渲染端沿用中文默认片尾。
 const brandOutroSchema = z.object({
@@ -57,13 +58,18 @@ export const profileTtsSchema = z.object({
   }).strict().optional(),
 }).strict();
 
-const seriesSchema = z.object({
+export const seriesSchema = z.object({
   schemaVersion: z.string().min(1),
   configVersion: z.string().min(1),
   id: idSchema,
   title: z.string().min(1),
-  description: z.string().min(1),
-  displayLabel: z.string().min(1),
+  description: z.string().default(""),
+  displayLabel: z.string().default(""),
+  expressionStyle: z.string().default(""),
+  visualStyle: z.enum(["layered-mint", "kinetic-lime", "deep-signal"]).optional(),
+  archived: z.boolean().default(false),
+  promptOverrides: z.record(z.string(), z.string()).optional(),
+  brand: z.object({title: z.string().default(""), subtitle: z.string().default(""), logo: z.string().default(""), presenterEnabled: z.boolean().default(true), outroEnabled: z.boolean().default(false)}).optional(),
   defaultTextModel: z.enum(["deepseek-v4-flash", "deepseek-v4-pro"]).optional(),
   defaultVoiceId: z.string().min(1).optional(),
   tts: profileTtsSchema.optional(),
@@ -105,6 +111,13 @@ export type PlatformProfile = {
   displayLabel: string;
   seriesTitle: string;
   seriesDescription: string;
+  defaultPresenterPoseId?: string;
+  expressionStyle?: string;
+  visualStyle?: import("../remotion/schema").RenderManifest["visualStyle"];
+  archived?: boolean;
+  outroEnabled?: boolean;
+  resolvedPrompts?: Record<string, string>;
+  snapshot?: boolean;
   defaultTextModel?: "deepseek-v4-flash" | "deepseek-v4-pro";
   defaultVoiceId?: string;
   tts?: z.infer<typeof profileTtsSchema>;
@@ -130,12 +143,6 @@ export type PlatformProfile = {
 
 export type PublicPlatformProfile = Omit<PlatformProfile, "promptRoot" | "userAgentSuffix">;
 
-const requiredEnv = (name: string) => {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`环境变量 ${name} 未设置`);
-  return value;
-};
-
 const override = (name: string, fallback: string) => process.env[name]?.trim() || fallback;
 
 const logoFilename = (fallback: string) => {
@@ -144,13 +151,17 @@ const logoFilename = (fallback: string) => {
   return logo;
 };
 
-export const profilesRoot = () => path.resolve(
-  REPO_ROOT,
-  process.env.TALK_VIDEO_PROFILES_DIR?.trim() || "content",
-);
+export const profilesRoot = () => {
+  const explicit = process.env.TALK_VIDEO_PROFILES_DIR?.trim();
+  if (explicit) return path.resolve(REPO_ROOT, explicit);
+  // 老部署曾默认使用 content/；保留已配置账号的路径，新用户使用本地数据目录。
+  const account = process.env.TALK_VIDEO_ACCOUNT?.trim();
+  if (account && /^[a-z0-9][a-z0-9-]{1,63}$/.test(account) && existsSync(path.join(REPO_ROOT, "content", account, "account.json"))) return path.join(REPO_ROOT, "content");
+  return path.join(REPO_ROOT, "data/local/content");
+};
 
-export const defaultAccountId = () => requiredEnv("TALK_VIDEO_ACCOUNT");
-export const configuredSeriesId = () => requiredEnv("TALK_VIDEO_SERIES");
+export const defaultAccountId = () => process.env.TALK_VIDEO_ACCOUNT?.trim() || "builtin";
+export const configuredSeriesId = () => process.env.TALK_VIDEO_SERIES?.trim() || "general";
 
 export const readPlatformProfile = async (
   requestedAccountId?: string,
@@ -158,38 +169,46 @@ export const readPlatformProfile = async (
 ): Promise<PlatformProfile> => {
   // 账号和专题共同决定提示词目录、默认模型及文稿时长等生成约束。
   const accountId = idSchema.parse(requestedAccountId || defaultAccountId());
+  const seriesId = idSchema.parse(requestedSeriesId || configuredSeriesId());
+  // 通用创作是内置能力，不依赖本地账号或品牌目录。
+  if (accountId === "builtin" && seriesId === "general") return builtinProfile();
   const accountRoot = path.join(profilesRoot(), accountId);
   const account = accountSchema.parse(JSON.parse(await fs.readFile(path.join(accountRoot, "account.json"), "utf8")));
   if (account.id !== accountId) throw new Error("账号目录名与 account.json 的 id 不一致");
-  const seriesId = idSchema.parse(requestedSeriesId || configuredSeriesId());
   const seriesRoot = path.join(accountRoot, "series", seriesId);
   const series = seriesSchema.parse(JSON.parse(await fs.readFile(path.join(seriesRoot, "series.json"), "utf8")));
   if (series.id !== seriesId) throw new Error("专题目录名与 series.json 的 id 不一致");
-  const logo = logoFilename(account.logo);
+  const logo = logoFilename(series.brand?.logo ?? account.logo);
+  const activePoses = series.brand?.presenterEnabled === false ? [] : account.ip.poses;
   const promptRoot = seriesRoot;
   await Promise.all([
-    fs.access(path.join(accountRoot, "brand", logo)),
+    ...(logo ? [fs.access(path.join(accountRoot, "brand", logo))] : []),
     fs.access(promptRoot),
-    ...account.ip.poses.map((pose) => fs.access(path.join(accountRoot, account.ip.directory, pose.file))),
-    ...(account.ip.compatibilityArchive ? (account.ip.compatibilityPoses ?? []).map((pose) => fs.access(path.join(accountRoot, account.ip.directory, account.ip.compatibilityArchive!, pose.file))) : []),
+    ...activePoses.map((pose) => fs.access(path.join(accountRoot, account.ip.directory, pose.file))),
+    ...(series.brand?.presenterEnabled !== false && account.ip.compatibilityArchive ? (account.ip.compatibilityPoses ?? []).map((pose) => fs.access(path.join(accountRoot, account.ip.directory, account.ip.compatibilityArchive!, pose.file))) : []),
   ]);
   if ((account.ip.compatibilityPoses?.length ?? 0) && !account.ip.compatibilityArchive) throw new Error("兼容 IP 姿态必须指定归档目录");
   const allPoseIds = [...account.ip.poses, ...(account.ip.compatibilityPoses ?? [])].map((pose) => pose.id);
   const poseIds = new Set(allPoseIds);
   if (poseIds.size !== allPoseIds.length) throw new Error("账号 IP 姿态 id 必须唯一");
-  // neutral 是无效选择和安全区冲突时的账号级兜底，不允许省略。
-  if (!account.ip.poses.some((pose) => pose.id === "neutral")) throw new Error("账号正式 IP 姿态必须包含 neutral");
+  // 默认姿态可为任意上传图片，不再强制 neutral。
   return {
     id: account.id,
     accountId,
     seriesId,
     accountVersion: account.configVersion,
     seriesVersion: series.configVersion,
-    title: override("TALK_VIDEO_BRAND_TITLE", account.title),
-    subtitle: override("TALK_VIDEO_BRAND_SUBTITLE", account.subtitle),
-    displayLabel: override("TALK_VIDEO_DISPLAY_LABEL", series.displayLabel),
+    title: override("TALK_VIDEO_BRAND_TITLE", series.brand?.title ?? account.title),
+    subtitle: override("TALK_VIDEO_BRAND_SUBTITLE", series.brand?.subtitle ?? account.subtitle),
+    displayLabel: override("TALK_VIDEO_DISPLAY_LABEL", series.displayLabel || series.title),
     seriesTitle: override("TALK_VIDEO_SERIES_TITLE", series.title),
     seriesDescription: override("TALK_VIDEO_SERIES_DESCRIPTION", series.description),
+    defaultPresenterPoseId: account.ip.defaultPoseId,
+    resolvedPrompts: series.promptOverrides,
+    expressionStyle: series.expressionStyle,
+    visualStyle: series.visualStyle,
+    archived: series.archived,
+    outroEnabled: series.brand?.outroEnabled ?? Boolean(account.title),
     defaultTextModel: series.defaultTextModel,
     defaultVoiceId: series.defaultVoiceId,
     tts: series.tts,
@@ -205,21 +224,21 @@ export const readPlatformProfile = async (
     downloadPrefix: override("TALK_VIDEO_DOWNLOAD_PREFIX", series.downloadPrefix ?? account.downloadPrefix),
     userAgentSuffix: override("TALK_VIDEO_USER_AGENT_SUFFIX", account.userAgentSuffix),
     logo,
-    logoSrc: `profile-assets/${accountId}/${logo}`,
+    logoSrc: logo ? `/api/profile-assets/${accountId}/brand/${logo}` : "",
     presenter: {
-      poses: account.ip.poses.map((pose) => ({
+      poses: activePoses.map((pose) => ({
         id: pose.id,
         label: pose.label,
-        src: `profile-assets/${accountId}/ip/${pose.file}`,
+        src: `/api/profile-assets/${accountId}/${account.ip.directory}/${pose.file}`,
         semanticTags: pose.semanticTags,
         gestureDirection: pose.gestureDirection,
         safeSide: pose.safeSide,
       })),
       // 旧规划按原 URL 识别退役姿态；新规划和下拉框仍只看 poses。
-      compatibilityPoses: (account.ip.compatibilityPoses ?? []).map((pose) => ({
+      compatibilityPoses: (series.brand?.presenterEnabled === false ? [] : account.ip.compatibilityPoses ?? []).map((pose) => ({
         id: pose.id,
         label: pose.label,
-        src: `profile-assets/${accountId}/ip/${pose.file}`,
+        src: `/api/profile-assets/${accountId}/${account.ip.directory}/${account.ip.compatibilityArchive}/${pose.file}`,
         semanticTags: pose.semanticTags,
         gestureDirection: pose.gestureDirection,
         safeSide: pose.safeSide,
@@ -249,6 +268,11 @@ export const publicPlatformProfile = (profile: PlatformProfile): PublicPlatformP
     displayLabel: profile.displayLabel,
     seriesTitle: profile.seriesTitle,
     seriesDescription: profile.seriesDescription,
+    expressionStyle: profile.expressionStyle,
+    visualStyle: profile.visualStyle,
+    archived: profile.archived,
+    outroEnabled: profile.outroEnabled,
+    brandOutro: profile.brandOutro,
     narration: profile.narration,
     defaultTextModel: profile.defaultTextModel,
     defaultVoiceId: profile.defaultVoiceId,
@@ -267,17 +291,18 @@ export const publicPlatformProfile = (profile: PlatformProfile): PublicPlatformP
   };
 };
 
+// 列表逐项容错，坏配置由管理页报告，不阻断通用创作。
 export const listSourceProfiles = async (requestedAccountId?: string) => {
-  const accountId = idSchema.parse(requestedAccountId || defaultAccountId());
-  const directory = path.join(profilesRoot(), accountId, "series");
-  const entries = await fs.readdir(directory, {withFileTypes: true});
-  const profiles = await Promise.all(entries.filter((entry) => entry.isDirectory()).map((entry) => readPlatformProfile(accountId, entry.name)));
-  return profiles.filter((profile) => profile.kind === "source").map(publicPlatformProfile);
+  const {scanProfiles} = await import("./profile-store");
+  const entries = await scanProfiles(requestedAccountId);
+  return [publicPlatformProfile(builtinProfile()), ...entries.flatMap((item) => item.profile && item.profile.kind === "source" && !item.profile.archived ? [publicPlatformProfile(item.profile)] : [])];
 };
 
-export const readJobPlatformProfile = async (content?: Partial<ContentProfileContext>) => {
-  if (!content || !content.accountId || !content.seriesId || !content.accountVersion || !content.seriesVersion) {
-    throw new Error("任务的账号/专题上下文无效");
+export const readJobPlatformProfile = async (content?: Partial<ContentProfileContext>, jobId?: string): Promise<PlatformProfile> => {
+  if (!content?.accountId || !content.seriesId || !content.accountVersion || !content.seriesVersion) throw new Error("任务的账号/专题上下文无效");
+  if (jobId) {
+    const {readProfileSnapshot} = await import("./profile-snapshot");
+    return readProfileSnapshot(jobId, content as ContentProfileContext);
   }
   return readPlatformProfile(content.accountId, content.seriesId);
 };
@@ -290,3 +315,14 @@ export const promptRoots = (profile: PlatformProfile) => {
   // 当前专题的提示词优先；派生专题缺失的固定模板再回退到母专题。
   return Array.from(new Set([override ? path.resolve(REPO_ROOT, override) : profile.promptRoot, profile.promptRoot, ...(sourcePromptRoot ? [sourcePromptRoot] : [])]));
 };
+
+// 内置配置提供运行所需默认值，公开品牌与人物均可为空。
+export const builtinProfile = (): PlatformProfile => ({
+  id: "builtin", accountId: "builtin", seriesId: "general", accountVersion: "1", seriesVersion: "1",
+  title: "", subtitle: "", displayLabel: "通用创作", seriesTitle: "通用创作", seriesDescription: "", expressionStyle: "",
+  kind: "source", sourceLanguage: "zh", outputLanguage: "zh-CN", visualStyle: "kinetic-lime", outroEnabled: false,
+  narration: {minSeconds: 60, targetSeconds: 75, maxSeconds: 90, hardMaxSeconds: 100, minScenes: 7, maxScenes: 12, hardMaxScenes: 14, cjkCharactersPerSecond: 5.3},
+  workspaceName: "WE-VIDEO", workspaceTitle: "We-Video 视频创作", workspaceDescription: "AI 视频创作工作台",
+  downloadPrefix: "we-video", userAgentSuffix: "We-Video", logo: "", logoSrc: "", presenter: {poses: []},
+  promptRoot: path.join(REPO_ROOT, "content", "defaults"),
+});

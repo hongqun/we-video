@@ -27,7 +27,7 @@ export const preserveVisualPlanStructure = (source: Plan, translated: Plan): Pla
 };
 
 const requestTranslationModel = async (profile: PlatformProfile, model: string | undefined, system: string, prompt: string): Promise<unknown> => {
-  const settings = await readPipelineSettings(profile);
+  const settings = await readPipelineSettings(profile, {requireCredentials: "text"});
   if (!settings.deepseek.apiKey) throw new Error("环境变量 DEEPSEEK_API_KEY 未设置");
   const response = await fetch(`${settings.deepseek.baseUrl}/chat/completions`, {
     method: "POST", signal: AbortSignal.timeout(600_000),
@@ -75,7 +75,7 @@ export const submitTranslation = async (jobId: string, action: "save" | "generat
 export const prepareEnglishTask = async (parentJobId: string, targetSeriesId: string, childJobId: string) => {
   const parent = await readJob(parentJobId);
   if (parent.state !== "completed") throw new Error("仅已完成的中文视频可以派生英文视频");
-  const parentProfile = await readJobPlatformProfile(parent.contentProfile);
+  const parentProfile = await readJobPlatformProfile(parent.contentProfile, parent.jobId);
   const target = await readPlatformProfile(parentProfile.accountId, targetSeriesId);
   if (target.kind !== "derived" || target.sourceSeriesId !== parentProfile.seriesId || target.outputLanguage !== "en-US") throw new Error("目标专栏不是该中文视频可用的英文派生专栏");
   const parentDir = jobDir(parentJobId);
@@ -84,6 +84,8 @@ export const prepareEnglishTask = async (parentJobId: string, targetSeriesId: st
     readJson<Plan>(path.join(parentDir, "visual-plan.json")), readJson<unknown>(path.join(parentDir, "visual-resources.json")),
   ]);
   if (!draft.narrationSegments?.length) throw new Error("母任务缺少确认口播稿");
+  if (target.archived) throw new Error("派生专栏已归档");
+  await (await import("./profile-snapshot")).freezeProfile(childJobId, target);
   await initializeNarrationJob(childJobId, profileContext(target), {textModel: target.defaultTextModel});
   const childDir = jobDir(childJobId);
   try {
@@ -214,7 +216,7 @@ export const runTranslation = async (jobId: string, action: "generate" | "confir
   const directory = jobDir(jobId);
   let failureStage: "segmentation" | "visual" = "segmentation";
   try {
-    const profile = await readJobPlatformProfile(job.contentProfile);
+    const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
     const review = await readTranslationReview(jobId);
     const request = (system: string, prompt: string) => requestTranslationModel(profile, job.generation?.textModel, system, prompt);
     if (action === "generate") {

@@ -111,14 +111,14 @@ const invalidateNarrationArtifacts = async (jobId: string) => {
 
 const requestModel = async (profile: PlatformProfile, source: Record<string, unknown>, previous: Record<string, unknown> | null, feedback: string, model: string, onProgress: (text: string) => Promise<void>) => {
   // 文稿生成使用 JSON 模式和流式响应；流内容仅用于进度展示，最终仍需完整 JSON 解析。
-  const settings = await readPipelineSettings(profile);
+  const settings = await readPipelineSettings(profile, {requireCredentials: "text"});
   if (!settings.deepseek.apiKey) throw new Error("环境变量 DEEPSEEK_API_KEY 未设置");
   // 中文原稿模式独立分段；英文派生后续修订仍使用英文专题，不能回退到中文原稿提示词。
-  const [system, userTemplate] = source.type === "script" && profile.outputLanguage !== "en-US"
+  const [system, userTemplate] = source.type === "script" && profile.kind !== "derived"
     ? await Promise.all([loadScriptSystemPrompt(profile), loadScriptUserPrompt(profile)])
     : await Promise.all([loadNarrationSystemPrompt(profile), loadNarrationUserPrompt(profile)]);
   const prompt = renderNarrationPrompt(userTemplate, source, previous, feedback || "请从原文生成完整口播稿。");
-  const response = await fetch(`${settings.deepseek.baseUrl}/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json", Authorization: `Bearer ${settings.deepseek.apiKey}`}, body: JSON.stringify({model, messages: [{role: "system", content: system}, {role: "user", content: prompt}], response_format: {type: "json_object"}, stream: true})});
+  const response = await fetch(`${settings.deepseek.baseUrl}/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json", Authorization: `Bearer ${settings.deepseek.apiKey}`}, body: JSON.stringify({model, messages: [{role: "system", content: `${system}\n输出语言：${profile.outputLanguage}\n内容定位：${profile.seriesDescription}\n表达风格：${profile.expressionStyle ?? "清晰自然"}`}, {role: "user", content: prompt}], response_format: {type: "json_object"}, stream: true})});
   if (!response.ok || !response.body) throw new Error(`DeepSeek 文稿生成失败：HTTP ${response.status}`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -143,6 +143,7 @@ export const createNarration = async (jobId: string, request: NarrationSourceReq
   if (initializeJob) {
     await initializeNarrationJob(jobId, {accountId: profile.accountId, seriesId: profile.seriesId, accountVersion: profile.accountVersion, seriesVersion: profile.seriesVersion}, {textModel: model});
   }
+  profile = await (await import("./profile-snapshot")).freezeProfile(jobId, profile);
   try {
     const source = await prepareNarrationSource(request, profile.userAgentSuffix);
     await atomicWriteJson(path.join(jobDir(jobId), "source.json"), source);
@@ -178,7 +179,7 @@ export const acceptNarration = async (jobId: string, draftOverride?: Record<stri
   const pending = await readJson<{draft: NarrationDraft; feedback?: string}>(path.join(jobDir(jobId), "pending-draft.json"));
   const source = await readJson<Record<string, unknown>>(path.join(jobDir(jobId), "source.json"));
   // 确认时重新归一化用户编辑的候选稿，保证段落 ID、停顿和事实校验仍符合契约。
-  const profile = await readJobPlatformProfile(job.contentProfile);
+  const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
   const draft = normalizeNarrationDraft(draftOverride ?? pending.draft, source, profile, pending.draft);
   validateNarrationDraft(draft, source);
   // AI 候选稿确认直接覆盖当前稿件，并清理基于旧稿的下游产物。
@@ -196,7 +197,7 @@ export const saveNarrationDraft = async (jobId: string, draftInput: Record<strin
   const job = await readJob(jobId);
   if (await fs.access(path.join(jobDir(jobId), "pending-draft.json")).then(() => true).catch(() => false)) throw new Error("请先处理待确认的 AI 候选稿");
   const source = await readJson<Record<string, unknown>>(path.join(jobDir(jobId), "source.json"));
-  const profile = await readJobPlatformProfile(job.contentProfile);
+  const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
   const draft = normalizeNarrationDraft(draftInput, source, profile, draftInput);
   validateNarrationDraft(draft, source);
   const directory = jobDir(jobId);

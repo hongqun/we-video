@@ -1,0 +1,1 @@
+根据 sourceSegments 的原段落语义，将已确认英文 approvedText 对齐为相同数量的段落。tokens 给出每个词的索引。只返回 {"aligned":true,"starts":[第二段起始词索引,后续段落起始词索引]}，starts 长度必须等于原段落数减一，不包含第一段的0，严格递增且大于0、小于tokens长度。只有一段则 starts=[]。不能改写原文。无法一一对应则返回 {"aligned":false,"reason":"原因","starts":[]}。

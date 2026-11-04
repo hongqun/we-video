@@ -42,6 +42,8 @@ export async function GET(request: Request, context: {params: Promise<{id: strin
   const unauthorized = renderAccess(request, params.id) ? null : await requireAuth();
   if (unauthorized) return unauthorized;
   try {
+    // 私有配置快照包含提示词与本地路径，不作为可下载附件公开。
+    if (params.path[0] === "profile-snapshot.json" || params.path.some((part) => part.startsWith("."))) throw new Error("文件不存在");
     const isOutput = params.path.length === 1 && params.path[0] === "output.mp4";
     if (isOutput && !jobStateAllowsOutput(await readJob(params.id))) return NextResponse.json({error: "成片尚未发布完成"}, {status: 409});
     const file = safeArtifactPath(params.id, params.path);

@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "set -a; . ./.env; set +a; next dev --hostname 0.0.0.0 --port 3100",
     "profile:sync": "node scripts/sync-profile-assets.mjs",
-    "predev": "npm run profile:sync",
-    "prebuild": "npm run profile:sync",
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1 --port 3100",
     "lint": "eslint src && tsc --noEmit",
@@ -21,7 +19,8 @@
     "studio": "remotion studio src/remotion/index.ts",
     "render:job": "tsx src/server/render-job.ts",
     "talk:approve": "tsx src/server/talk-worker.ts",
-    "test:model-scene": "esbuild src/tests/model-scene.test.ts --bundle --format=esm --platform=node --packages=external --outfile=node_modules/.cache/talk-video/model-scene.test.mjs --log-level=error && node node_modules/.cache/talk-video/model-scene.test.mjs"
+    "test:model-scene": "esbuild src/tests/model-scene.test.ts --bundle --format=esm --platform=node --packages=external --outfile=node_modules/.cache/talk-video/model-scene.test.mjs --log-level=error && node node_modules/.cache/talk-video/model-scene.test.mjs",
+    "test:profiles": "node --import tsx src/tests/profile.test.ts"
   },
   "dependencies": {
     "@iconify-json/logos": "^1.2.14",

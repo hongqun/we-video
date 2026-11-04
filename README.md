@@ -41,7 +41,9 @@ cp config_examples/.env.example .env
 cp config_examples/pipeline.config.example.json pipeline.config.json
 ```
 
-编辑 `.env`，至少填写模型 API Key、`TALK_VIDEO_ACCOUNT` 和 `TALK_VIDEO_SERIES`。账号和专题目录需按[账号配置说明](./content/README.md)放在本地配置目录中。
+编辑 `.env`，填写登录用的 `APP_PASSWORD`、`SESSION_SECRET`；创作前再配置模型 API Key，并在 `pipeline.config.json` 中填写真实的百炼工作空间与服务连接。
+
+默认使用内置“通用创作”，无需账号目录、专栏、Logo 或人物素材。进入工作台后点击“管理专栏”（`/profiles`），只填写名称即可保存专栏；内容定位、表达风格、声音和品牌素材均为可选。缺少模型密钥不影响进入配置界面。
 
 启动开发服务：
 
@@ -53,7 +55,8 @@ npm run dev
 
 ## 本地配置与数据
 
-- `.env` 填写 API Key、账号和专题；`pipeline.config.json` 设置模型与音色。
+- `.env` 管理认证、API Key 和部署覆盖；`pipeline.config.json` 管理模型、音色和服务连接。
+- 专栏与可选品牌素材在“管理专栏”页面维护；已有账号和专题目录继续兼容。
 - 账号素材放在 `data/local/content/<accountId>/`。
 - 本地配置与数据不会提交到 We-Video 仓库，请勿提交 API Key。
 - 账号与专题配置参见[账号配置说明](./content/README.md)；`.env` 格式参见[配置示例](./config_examples/.env.example)。

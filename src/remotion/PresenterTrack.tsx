@@ -105,8 +105,8 @@ export const PresenterTrack: React.FC<{scenes: VideoScene[]; presenter?: Present
   const poseById = new Map(presenter.poses.map((pose) => [pose.id, pose]));
   const fromPoseId = (before.presenterPoseId ?? current.presenterPoseId ?? "neutral") as PresenterPoseId;
   const toPoseId = (after.presenterPoseId ?? current.presenterPoseId ?? "neutral") as PresenterPoseId;
-  const fromPose = poseById.get(fromPoseId) ?? poseById.get("neutral");
-  const toPose = poseById.get(toPoseId) ?? poseById.get("neutral");
+  const fromPose = poseById.get(fromPoseId) ?? poseById.get("neutral") ?? presenter.poses[0];
+  const toPose = poseById.get(toPoseId) ?? poseById.get("neutral") ?? presenter.poses[0];
   if (!fromPose || !toPose) return null;
   const poseChanged = boundaryIndex > 0 && fromPose.id !== toPose.id;
   // 姿态与裁切直接跟随后者场景淡入，旧姿态随前者淡出，叠影被场景切换同时遮盖。
@@ -124,7 +124,7 @@ export const PresenterTrack: React.FC<{scenes: VideoScene[]; presenter?: Present
     if (!isVisible(scene) || !pose || opacity <= 0) return null;
     const opening = scene.templateId === "ip/opening-stage" && placement === "hero";
     return <div key={key} style={{overflow: opening ? "hidden" : undefined, height: targetBox.height, left: targetBox.left, opacity: opacity * (1 - finalSettle), pointerEvents: "none", position: "absolute", top: targetBox.top, transformOrigin: "bottom center", width: targetBox.width}}>
-      <Img cropBottom={opening ? 0 : cropBottomFor[framing]} src={staticFile(pose.src)} style={opening ? openingPresenterImageStyle(pose.id) : imageStyle} />
+      <Img cropBottom={opening ? 0 : cropBottomFor[framing]} src={(/^(?:https?:\/\/|data:|\/)/u.test(pose.src) ? pose.src : staticFile(pose.src))} style={opening ? openingPresenterImageStyle(pose.id) : imageStyle} />
     </div>;
   };
   if (boundaryIndex > 0 && (changesSide || openingBefore !== openingAfter || isVisible(before) !== isVisible(after))) {
@@ -137,7 +137,7 @@ export const PresenterTrack: React.FC<{scenes: VideoScene[]; presenter?: Present
   // 半身裁切只作用于开场，换入中间镜头时交叉到其原有视窗。
   const settledImageStyle = openingAfter ? openingPresenterImageStyle(fromPose.id) : imageStyle;
   return <div style={{overflow: openingAfter ? "hidden" : undefined, height: box.height, left: box.left, opacity: 1 - finalSettle, pointerEvents: "none", position: "absolute", top: box.top, transformOrigin: "bottom center", width: box.width}}>
-    <Img cropBottom={openingAfter ? 0 : cropBottom} src={staticFile(fromPose.src)} style={{...settledImageStyle, opacity: poseChanged ? 1 - poseProgress : 1}} />
-    {poseChanged ? <Img cropBottom={openingAfter ? 0 : cropBottom} src={staticFile(toPose.src)} style={{...(openingAfter ? openingPresenterImageStyle(toPose.id) : imageStyle), opacity: poseProgress}} /> : null}
+    <Img cropBottom={openingAfter ? 0 : cropBottom} src={(/^(?:https?:\/\/|data:|\/)/u.test(fromPose.src) ? fromPose.src : staticFile(fromPose.src))} style={{...settledImageStyle, opacity: poseChanged ? 1 - poseProgress : 1}} />
+    {poseChanged ? <Img cropBottom={openingAfter ? 0 : cropBottom} src={(/^(?:https?:\/\/|data:|\/)/u.test(toPose.src) ? toPose.src : staticFile(toPose.src))} style={{...(openingAfter ? openingPresenterImageStyle(toPose.id) : imageStyle), opacity: poseProgress}} /> : null}
   </div>;
 };

@@ -13,10 +13,10 @@
     "title": {"type": "string", "minLength": 1},
     "visualStyle": {"enum": ["kinetic-lime", "layered-mint", "deep-signal"]},
     "shortTitle": {"type": "string"},
-    "cover": {"type":"object","additionalProperties":false,"required":["title","subtitle","keywords","presenterPoseId"],"properties":{"title":{"type":"string","minLength":1,"maxLength":40},"subtitle":{"type":"string","maxLength":120},"keywords":{"type":"array","maxItems":8,"items":{"type":"string","minLength":1,"maxLength":24}},"presenterPoseId":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,63}$"},"imagePath":{"type":"string","minLength":1},"imageWidth":{"type":"integer","minimum":1},"imageHeight":{"type":"integer","minimum":1}},"anyOf":[{"not":{"anyOf":[{"required":["imagePath"]},{"required":["imageWidth"]},{"required":["imageHeight"]}]}},{"required":["imagePath","imageWidth","imageHeight"]}]},
+    "cover": {"type":"object","additionalProperties":false,"required":["title","subtitle","keywords","presenterPoseId"],"properties":{"title":{"type":"string","minLength":1,"maxLength":40},"subtitle":{"type":"string","maxLength":120},"keywords":{"type":"array","maxItems":8,"items":{"type":"string","minLength":1,"maxLength":24}},"presenterPoseId":{"type":"string","pattern":"^(?:|[a-z0-9][a-z0-9-]{1,63})$"},"imagePath":{"type":"string","minLength":1},"imageWidth":{"type":"integer","minimum":1},"imageHeight":{"type":"integer","minimum":1}},"anyOf":[{"not":{"anyOf":[{"required":["imagePath"]},{"required":["imageWidth"]},{"required":["imageHeight"]}]}},{"required":["imagePath","imageWidth","imageHeight"]}]},
     "summary": {"type": "string"},
     "captionStyle": {"enum": ["narration", "clean", "impact"]},
-    "video": {"type":"object","required":["width","height","fps","outroDurationMs"],"properties":{"width":{"const":1080},"height":{"const":1260},"fps":{"const":30},"outroDurationMs":{"const":3000}}},
+    "video": {"type":"object","required":["width","height","fps","outroDurationMs"],"properties":{"width":{"const":1080},"height":{"const":1260},"fps":{"const":30},"outroDurationMs":{"enum":[0,3000]}}},
     "narration": {"type":"object","required":["text","audioSrc","durationMs","model","voice"],"properties":{"text":{"type":"string"},"audioSrc":{"type":"string"},"spokenDurationMs":{"type":"integer"},"durationMs":{"type":"integer","minimum":1},"model":{"type":"string"},"voice":{"type":"string"}}},
     "captions": {"type":"array","items":{"type":"object"}},
     "scenes": {

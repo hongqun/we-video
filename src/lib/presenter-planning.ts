@@ -14,7 +14,7 @@ export const companionPlacementForTemplate = (templateId: string, pose: Presente
 export const compatiblePoseForPlacement = (poseId: PresenterPoseId, placement: PresenterPlacement, poses: PresenterPoseDefinition[]): PresenterPoseId => {
   const fallback = poses.find((pose) => pose.id === "neutral") ?? poses[0];
   const pose = poses.find((candidate) => candidate.id === poseId) ?? fallback;
-  if (!pose) return "neutral";
+  if (!pose) return "";
   if (placement === "hero" || pose.safeSide === "both" || placement.startsWith(pose.safeSide)) return pose.id;
   return fallback?.id ?? "neutral";
 };
@@ -27,11 +27,14 @@ export const attachPresenterPlan = (
   selectedPoses: PresenterPoseId[],
   poses: PresenterPoseDefinition[],
   selectedModes: Array<"companion" | "hidden"> = [],
+  defaultPoseId?: PresenterPoseId,
 ): VisualPlanScene[] => scenes.map((scene, index): VisualPlanScene => {
+  // 没有人物时保留内容模板，不强制首尾主讲，也不伪造姿态。
+  if (!poses.length) return {...scene, templateId: scene.templateId.startsWith("ip/") ? "rve/generic-content" : scene.templateId, presenter: {rollType: "b-roll", mode: "hidden", poseId: "", placement: "right-lower", framing: "waist"}};
   const first = index === 0;
   const last = index === scenes.length - 1 && !first;
   if (first || last) {
-    const preferred = first ? "greeting-wave" : "neutral";
+    const preferred = defaultPoseId ?? (first ? "greeting-wave" : "neutral");
     const poseId = poses.some((pose) => pose.id === preferred) ? preferred : poses[0]?.id ?? "neutral";
     return {...scene, templateId: first ? "ip/opening-stage" : "ip/closing-stage", presenter: {rollType: "a-roll", mode: "hero", poseId, placement: "hero", framing: "full"}};
   }

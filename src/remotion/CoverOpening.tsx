@@ -23,7 +23,7 @@ export const CoverOpening: React.FC<{brand: RenderManifest["brand"]; presenter?:
     <OpeningEditorialTitle title={content.title} preferredSize={72} />
     {/* 人物和主题配图共享右侧编辑分栏；有人物时配图缩为左侧编辑插图。 */}
     {/* 人物只渲染原始透明 PNG；不再叠加染色修正、外框或底部渐隐。 */}
-    {pose ? <div style={{position: "absolute", ...OPENING_PRESENTER_BOX, overflow: "hidden"}}><Img src={staticFile(pose.src)} style={{...openingPresenterImageStyle(pose.id), filter: theme.id === "layered-mint" ? "drop-shadow(0 18px 22px rgba(30,77,46,.12))" : undefined}} /></div> : null}
+    {pose ? <div style={{position: "absolute", ...OPENING_PRESENTER_BOX, overflow: "hidden"}}><Img src={coverImageSource(pose.src)} style={{...openingPresenterImageStyle(pose.id), filter: theme.id === "layered-mint" ? "drop-shadow(0 18px 22px rgba(30,77,46,.12))" : undefined}} /></div> : null}
     {content.subtitle ? <OpeningEditorialSummary text={openingBodyText(content.subtitle)} hasVisual={hasVisual} /> : null}
     {cover.imagePath ? <OpeningEditorialImage src={coverImageSource(cover.imagePath)} prominent={!pose} /> : null}
     <OpeningTopicIndex words={content.keywords} compact={!content.subtitle && hasVisual} />

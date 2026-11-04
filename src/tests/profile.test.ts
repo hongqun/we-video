@@ -1,0 +1,81 @@
+/* eslint-disable @remotion/non-pure-animation -- 回归用例中的 transition 为静态契约数据。 */
+import assert from "node:assert/strict";
+import {promises as fs} from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import sharp from "sharp";
+
+// 独立临时目录覆盖冷启动、素材组合与快照隔离，不调用模型或启动渲染。
+const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "we-video-profiles-"));
+const original = {...process.env};
+try {
+  for (const key of Object.keys(process.env)) if (key.startsWith("TALK_VIDEO_")) delete process.env[key];
+  process.env.TALK_VIDEO_PROFILES_DIR = path.join(temporary, "content");
+  process.env.TALK_VIDEO_DATA_DIR = temporary;
+  process.env.TALK_VIDEO_PIPELINE_CONFIG = path.join(process.cwd(), "config_examples/pipeline.config.example.json");
+  const {readPlatformProfile, listSourceProfiles, profileContext} = await import("../lib/profile");
+  const {saveProfile, uploadProfileAsset, scanProfiles, profileEditorData} = await import("../lib/profile-store");
+  const {freezeProfile, readProfileSnapshot} = await import("../lib/profile-snapshot");
+  const {readFixedPrompt} = await import("../lib/narration-prompts");
+  const {attachPresenterPlan} = await import("../lib/presenter-planning");
+  const {renderManifestSchema} = await import("../remotion/schema");
+  const defaults = await readPlatformProfile();
+  assert.equal(defaults.seriesTitle, "通用创作");
+  assert.equal(defaults.logoSrc, "");
+  assert.equal(defaults.presenter.poses.length, 0);
+  assert.equal((await listSourceProfiles()).length, 1);
+  await assert.rejects(readPlatformProfile("absent", "missing"));
+  assert.match(await readFixedPrompt(defaults, "visual-requirement-template.md", "配图"), /SPOKEN_TEXT/);
+  const scenes = attachPresenterPlan([{id: "plan-1", segmentId: "segment-1", startMs: 0, endMs: 4000, transition: {kind: "fade", durationMs: 315}, templateId: "rve/generic-content", content: {title: "标题", subtitle: "", text: "正文", keywords: []}}], [], []);
+  assert.equal(scenes[0].presenter.mode, "hidden");
+  assert.equal(scenes[0].presenter.poseId, "");
+  assert.equal(scenes[0].templateId, "rve/generic-content");
+  let editor = await saveProfile({title: "测试专栏"});
+  const update = async (change: Record<string, unknown>) => {
+    editor = await saveProfile({accountId: editor.accountId, seriesId: editor.seriesId, version: editor.version, accountVersion: editor.accountVersion, title: editor.title, brand: editor.brand, ...change});
+    return readPlatformProfile(editor.accountId, editor.seriesId);
+  };
+  const image = await sharp({create: {width: 4, height: 4, channels: 4, background: "#ffffff"}}).png().toBuffer();
+  const file = new File([new Uint8Array(image)], "人物.png", {type: "image/png"});
+  const logo = await uploadProfileAsset(editor.accountId, "logo", editor.accountVersion, file);
+  editor.accountVersion = logo.accountVersion;
+  let profile = await update({brand: {...editor.brand, logo: logo.filename}});
+  assert.ok(profile.logoSrc);
+  assert.equal(profile.presenter.poses.length, 0);
+  const person = await uploadProfileAsset(editor.accountId, "presenter", editor.accountVersion, file);
+  editor.accountVersion = person.accountVersion;
+  profile = await update({brand: {...editor.brand, logo: "", presenterEnabled: true}});
+  assert.equal(profile.logoSrc, "");
+  assert.equal(profile.presenter.poses.length, 1);
+  assert.notEqual(profile.presenter.poses[0].id, "neutral");
+  profile = await update({brand: {...editor.brand, logo: logo.filename, presenterEnabled: true}, prompts: {"narration-system.md": "测试提示词"}});
+  assert.ok(profile.logoSrc && profile.presenter.poses.length);
+  const frozen = await freezeProfile("test-job", profile);
+  assert.ok(frozen.logoSrc.startsWith("artifact://"));
+  assert.equal(await readFixedPrompt(frozen, "narration-system.md", "口播"), "测试提示词");
+  const oldVersion = editor.version;
+  await update({title: "修改后的专栏", archived: true});
+  await assert.rejects(saveProfile({accountId: editor.accountId, seriesId: editor.seriesId, version: oldVersion, accountVersion: editor.accountVersion, title: "冲突版本", brand: editor.brand}), /已被修改/);
+  const preserved = await readProfileSnapshot("test-job", profileContext(profile));
+  assert.equal(preserved.seriesTitle, "测试专栏");
+  assert.equal(await readFixedPrompt(preserved, "narration-system.md", "口播"), "测试提示词");
+  assert.equal((await listSourceProfiles()).length, 1);
+  const retry = await freezeProfile("retry-job", frozen, "test-job");
+  assert.notEqual(retry.logoSrc, frozen.logoSrc);
+  assert.deepEqual(await fs.readFile(path.join(temporary, "jobs/retry-job", retry.logoSrc.slice("artifact://".length))), await fs.readFile(path.join(temporary, "jobs/test-job", frozen.logoSrc.slice("artifact://".length))));
+  const bad = path.join(process.env.TALK_VIDEO_PROFILES_DIR!, "broken", "series", "broken");
+  await fs.mkdir(bad, {recursive: true}); await fs.writeFile(path.join(bad, "series.json"), "invalid");
+  assert.ok((await scanProfiles()).some((item) => item.error));
+  assert.equal((await listSourceProfiles()).length, 1);
+  await assert.rejects(uploadProfileAsset(editor.accountId, "logo", editor.accountVersion, new File(["broken"], "bad.png")));
+  const manifest = renderManifestSchema.parse({schemaVersion: "1.0", jobId: "test", title: "标题", video: {width: 1080, height: 1260, fps: 30, outroDurationMs: 0}, narration: {text: "测试", audioSrc: "", durationMs: 4000, model: "test", voice: "test"}, captions: [{text: "测试", startMs: 0, endMs: 4000, timestampMs: null, confidence: null}], scenes: scenes.map(({presenter, ...scene}) => ({...scene, spokenText: "测试", rollType: presenter.rollType, presenterMode: presenter.mode, presenterPoseId: presenter.poseId, presenterPlacement: presenter.placement})), brand: {title: "", subtitle: "", logoSrc: ""}, presenter: {poses: []}});
+  assert.equal(manifest.video.outroDurationMs, 0);
+  const {freezeLegacyBrandAssets} = await import("../lib/legacy-brand-assets");
+  const legacy = await freezeLegacyBrandAssets({...manifest, brand: {...manifest.brand, logoSrc: `profile-assets/${editor.accountId}/${logo.filename}`}}, path.join(temporary, "legacy-job"));
+  assert.ok(legacy.brand.logoSrc.startsWith("artifact://profile-assets/"));
+  assert.equal((await profileEditorData(await readPlatformProfile(editor.accountId, editor.seriesId))).title, "修改后的专栏");
+} finally {
+  for (const key of Object.keys(process.env)) if (!(key in original)) delete process.env[key];
+  Object.assign(process.env, original);
+  await fs.rm(temporary, {recursive: true, force: true});
+}

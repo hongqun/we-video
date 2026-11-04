@@ -1,10 +1,10 @@
 import type {Metadata} from "next";
 import "./globals.css";
-import {readPlatformProfile} from "@/lib/profile";
+
 
 export async function generateMetadata(): Promise<Metadata> {
-  const profile = await readPlatformProfile();
-  return {title: profile.workspaceTitle, description: profile.workspaceDescription};
+  // 应用外壳不依赖内容配置，首次使用和配置修复始终可访问。
+  return {title: "We-Video 视频创作", description: "AI 视频创作工作台"};
 }
 
 export default function RootLayout({children}: Readonly<{children: React.ReactNode}>) {

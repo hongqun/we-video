@@ -1,7 +1,8 @@
 import {cp, mkdir, readdir, readFile, writeFile} from "node:fs/promises";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
-import {loadEnvFile} from "node:process";
+import process, {loadEnvFile} from "node:process";
+import console from "node:console";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 try {
@@ -9,15 +10,13 @@ try {
 } catch (error) {
   if (error?.code !== "ENOENT") throw error;
 }
-const requiredEnv = (name) => {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`环境变量 ${name} 未设置`);
-  return value;
-};
-const profileRoot = path.resolve(root, process.env.TALK_VIDEO_PROFILES_DIR?.trim() || "content");
+const profileRoot = path.resolve(root, process.env.TALK_VIDEO_PROFILES_DIR?.trim() || "data/local/content");
 const publicRoot = path.join(root, "public", "profile-assets");
-const selected = requiredEnv("TALK_VIDEO_ACCOUNT");
-const selectedSeries = requiredEnv("TALK_VIDEO_SERIES");
+// 通用创作没有品牌资源；此命令仅保留为旧素材的手工同步入口。
+const selected = process.env.TALK_VIDEO_ACCOUNT?.trim();
+const selectedSeries = process.env.TALK_VIDEO_SERIES?.trim();
+if (!selected && !selectedSeries) process.exit(0);
+if (!selected || !selectedSeries) throw new Error("同步旧素材时需同时设置账号与专题 ID");
 const musicExtensions = new Set([".mp3", ".ogg"]);
 const musicLabel = (name) => {
   const stem = path.basename(name, path.extname(name)).replace(/[-_]\d+$/, "");
@@ -41,12 +40,14 @@ if (series.id !== selectedSeries) throw new Error(`专题目录与 series.json i
 for (const name of names) {
   const account = JSON.parse(await readFile(path.join(profileRoot, name, "account.json"), "utf8"));
   if (account.id !== name) throw new Error(`账号目录与 account.json id 不一致：${name}`);
-  const logo = name === selected ? process.env.TALK_VIDEO_LOGO?.trim() || account.logo : account.logo;
+  const logo = (name === selected ? process.env.TALK_VIDEO_LOGO?.trim() || account.logo : account.logo) || "";
   if (path.basename(logo) !== logo) throw new Error("TALK_VIDEO_LOGO 必须是品牌目录内的文件名");
+  if (logo) {
   const destination = path.join(publicRoot, name, logo);
   await mkdir(path.dirname(destination), {recursive: true});
   await cp(path.join(profileRoot, name, "brand", logo), destination);
   console.log(`synced ${name}: ${path.relative(root, destination)}`);
+  }
   if (account.ip?.directory) {
     const ipDestination = path.join(publicRoot, name, "ip");
     await mkdir(ipDestination, {recursive: true});

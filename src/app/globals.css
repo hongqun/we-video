@@ -4196,3 +4196,26 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .glb-prompt-dialog .glb-prompt-body {display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; overflow: hidden;}
 .glb-prompt-body textarea {flex: 1; min-height: 0; width: 100%; resize: none; overflow-y: auto; overflow-x: hidden; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 14px; line-height: 1.7;}
 .glb-prompt-dialog .actions {flex-wrap: wrap;}
+
+/* 专栏管理使用工作台的面板语言，窄屏时列表与表单垂直排列。 */
+.profile-manager{max-width:1200px;margin:0 auto;padding:40px 24px 80px}
+.profile-manager-header{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:28px}
+.profile-manager-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;align-items:start}
+.profile-manager-list,.profile-manager-form{padding:24px;display:flex;flex-direction:column;gap:20px}
+.profile-manager-item{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;white-space:normal;overflow-wrap:anywhere}
+.profile-manager-item small{font-weight:400;opacity:.75}
+.profile-manager-default{padding:12px 0;border-bottom:1px solid #dce3df}
+.profile-manager-form label{display:flex;flex-direction:column;gap:8px;font-size:14px}
+.profile-manager-form input,.profile-manager-form textarea,.profile-manager-form select{width:100%;box-sizing:border-box}
+.profile-manager-form fieldset{border:1px solid #dce3df;border-radius:12px;padding:20px;display:grid;gap:16px;min-width:0}
+.profile-manager-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.profile-manager-form .profile-manager-checkbox{flex-direction:row;align-items:center}
+.profile-manager-checkbox input{width:auto}
+.profile-manager-assets{display:flex;align-items:center;flex-wrap:wrap;gap:16px}
+.profile-manager-assets img{width:80px;height:100px;object-fit:contain;border:1px solid #dce3df;border-radius:8px;background:#f4f6f4}
+.profile-manager-form details{display:grid;gap:12px}
+.profile-manager-form summary{cursor:pointer;margin-bottom:16px}
+.profile-manager-error,.profile-manager-notice{padding:14px 18px;border-radius:10px;overflow-wrap:anywhere}
+.profile-manager-error{background:#fff0ed;color:#9d2929}
+.profile-manager-notice{background:#edf6ec;color:#24442a}
+@media(max-width:760px){.profile-manager-grid{grid-template-columns:1fr}.profile-manager-fields{grid-template-columns:1fr}.profile-manager-header{align-items:flex-start}.profile-manager{padding:24px 16px}.profile-manager-form,.profile-manager-list{padding:18px}}

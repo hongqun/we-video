@@ -37,7 +37,7 @@ const main = async () => {
   const job = await readJob(jobId);
   const directory = jobDir(jobId);
   artifactDirectory = directory;
-  const profile = await readJobPlatformProfile(job.contentProfile);
+  const profile = await readJobPlatformProfile(job.contentProfile, job.jobId);
   const settings = await readPipelineSettings(profile);
   const voice = requestedVoiceId ?? job.generation?.voiceId;
   if (!voice || !settings.voices.some((item) => item.id === voice)) throw new Error("任务使用的百炼音色当前不可用");

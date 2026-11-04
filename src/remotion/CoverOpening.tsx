@@ -4,6 +4,7 @@ import type {CoverConfig, RenderManifest} from "./schema";
 import {SANS_FONT_FAMILY} from "./typography";
 import {VIDEO_COLORS, useVisualTheme} from "./theme";
 import {ComicBackdrop} from "./ComicChrome";
+import {FairytaleCover} from "./FairytaleCover";
 import {OpeningEditorialBackdrop, OpeningEditorialHeader, OpeningEditorialImage, OpeningEditorialSummary, OpeningEditorialTitle, OpeningTopicIndex} from "./OpeningEditorial";
 
 const coverImageSource = (path: string) => /^(?:https?:\/\/|data:|\/)/u.test(path) ? path : staticFile(path);
@@ -13,6 +14,8 @@ export const CoverOpening: React.FC<{brand: RenderManifest["brand"]; presenter?:
   const theme = useVisualTheme();
   const content = getCoverContent(cover);
   const pose = presenter?.poses.find((item) => item.id === cover.presenterPoseId) ?? presenter?.poses.find((item) => item.id === "neutral") ?? presenter?.poses[0];
+  // 童话首帧使用独立故事书构图，不改变通用开场及其它主题。
+  if (theme.id === "dopamine-fairytale") return <FairytaleCover brand={brand} cover={cover} pose={pose} />;
   const hasVisual = Boolean(pose || cover.imagePath);
   return <AbsoluteFill style={{color: VIDEO_COLORS.ink, fontFamily: SANS_FONT_FAMILY}}>
     {/* 成片封面只占第 0 帧，背景必须直接呈现收稳状态。 */}

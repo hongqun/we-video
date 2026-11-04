@@ -2,23 +2,160 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "handdraw-image-v1.schema.json",
   "title": "HanddrawImageTemplateDataV1",
-  "description": "手绘镜头的不可变产物引用；时间图为小端 RGB24 毫秒，alpha=0 表示不显现。minimumDrawMs 保留为参考绘制成本；按镜头时长先压缩抬笔再加速绘制，整体额外加速不超过十倍，另留至少三成且不少于一秒的展示时间。",
+  "description": "手绘镜头的不可变产物引用；时间图为小端 RGB24 毫秒，alpha=0 表示不显现。handdraw-6 依次起形、描线、擦除辅助线、分区上色，必须携带起形及擦除产物和阶段边界；旧版兼容。minimumDrawMs 包含全部阶段成本；先压缩抬笔再加速，额外加速不超过十倍，成图展示至少三成且不少于一秒。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["algorithmVersion", "cacheKey", "width", "height", "minimumDrawMs", "completePath", "lineLayerPath", "colorLayerPath", "lineTimePath", "colorTimePath", "motionPath", "hashes"],
+  "required": [
+    "algorithmVersion",
+    "cacheKey",
+    "width",
+    "height",
+    "minimumDrawMs",
+    "completePath",
+    "lineLayerPath",
+    "colorLayerPath",
+    "lineTimePath",
+    "colorTimePath",
+    "motionPath",
+    "hashes"
+  ],
   "properties": {
-    "algorithmVersion": {"enum": ["handdraw-1", "handdraw-2", "handdraw-3", "handdraw-4", "handdraw-5"]},
-    "cacheKey": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "width": {"type": "integer", "minimum": 1, "maximum": 1600},
-    "height": {"type": "integer", "minimum": 1, "maximum": 1600},
-    "minimumDrawMs": {"type": "integer", "minimum": 1, "maximum": 600000},
-    "motionTiming": {"type":"object","additionalProperties":false,"required":["liftMs"],"properties":{"liftMs":{"type":"number","minimum":0,"maximum":600000}}},
-    "completePath": {"type": "string", "minLength": 1},
-    "lineLayerPath": {"type": "string", "minLength": 1},
-    "colorLayerPath": {"type": "string", "minLength": 1},
-    "lineTimePath": {"type": "string", "minLength": 1},
-    "colorTimePath": {"type": "string", "minLength": 1},
-    "motionPath": {"type": "string", "minLength": 1},
-    "hashes": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}
-  }
+    "algorithmVersion": {
+      "enum": [
+        "handdraw-1",
+        "handdraw-2",
+        "handdraw-3",
+        "handdraw-4",
+        "handdraw-5",
+        "handdraw-6"
+      ]
+    },
+    "cacheKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1600
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1600
+    },
+    "minimumDrawMs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 600000
+    },
+    "motionTiming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "liftMs"
+      ],
+      "properties": {
+        "liftMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600000
+        }
+      }
+    },
+    "completePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lineLayerPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "colorLayerPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lineTimePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "colorTimePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "motionPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "sketchLayerPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sketchTimePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "eraseTimePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stageTimings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sketchEndMs",
+        "lineEndMs",
+        "eraseEndMs",
+        "colorEndMs"
+      ],
+      "properties": {
+        "sketchEndMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600000
+        },
+        "lineEndMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600000
+        },
+        "eraseEndMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600000
+        },
+        "colorEndMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600000
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "algorithmVersion": {
+            "const": "handdraw-6"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "sketchLayerPath",
+          "sketchTimePath",
+          "eraseTimePath",
+          "stageTimings"
+        ]
+      }
+    }
+  ]
 }

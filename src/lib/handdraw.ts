@@ -99,11 +99,13 @@ export const publishHanddrawResult = async (jobId: string, sceneId: string, requ
   return {...resources, resources: resources.resources.map((item) => item.sceneId === sceneId ? {...item, handdraw: {...current, status: data ? "ready" as const : "failed" as const, data, error}} : item)};
 });
 
-const filenames = {completePath: "complete.png", lineLayerPath: "line.png", colorLayerPath: "color.png", lineTimePath: "line-time.png", colorTimePath: "color-time.png", motionPath: "motion.json"} as const;
+const filenames = {completePath: "complete.png", lineLayerPath: "line.png", colorLayerPath: "color.png", lineTimePath: "line-time.png", colorTimePath: "color-time.png", motionPath: "motion.json", sketchLayerPath: "sketch.png", sketchTimePath: "sketch-time.png", eraseTimePath: "erase-time.png"} as const;
 export const verifyHanddrawArtifacts = async (jobId: string, raw: unknown) => {
   const data = handdrawDataSchema.parse(raw);
   let liftMs: number | undefined;
   for (const key of HANDDRAW_PATH_FIELDS) {
+    // 历史缓存没有起形文件，仅校验实际存在的引用。
+    if (!data[key]) continue;
     const relative = data[key].replace(/^artifact:\/\//u, "");
     if (relative !== `handdraw/cache/${data.cacheKey}/${filenames[key]}`) throw new Error("手绘产物路径与缓存键不匹配");
     const bytes = await fs.readFile(asset(jobId, relative));
@@ -113,7 +115,7 @@ export const verifyHanddrawArtifacts = async (jobId: string, raw: unknown) => {
       if (metadata.width !== data.width || metadata.height !== data.height || metadata.format !== "png") throw new Error("手绘图层尺寸或格式无效");
     } else {
       const motion = handdrawMotionSchema.parse(JSON.parse(bytes.toString()));
-      if (motion.cacheKey !== data.cacheKey || motion.width !== data.width || motion.height !== data.height || motion.minimumDrawMs !== data.minimumDrawMs) throw new Error("手绘运动计划与图层不一致");
+      if (motion.algorithmVersion !== data.algorithmVersion || JSON.stringify(motion.stageTimings) !== JSON.stringify(data.stageTimings) || motion.cacheKey !== data.cacheKey || motion.width !== data.width || motion.height !== data.height || motion.minimumDrawMs !== data.minimumDrawMs) throw new Error("手绘运动计划与图层不一致");
       liftMs = handdrawLiftMs(motion);
       if (data.motionTiming && Math.abs(data.motionTiming.liftMs - liftMs) > .01) throw new Error("手绘抬笔统计与运动计划不一致");
     }
@@ -142,12 +144,12 @@ export const prepareHanddraw = async (jobId: string, sceneId: string, requestId:
         if (error.code === "ENOENT" || /ModuleNotFoundError|No module named/.test(error.stderr ?? "")) throw new Error("Python 环境缺失：请安装 scripts/handdraw/requirements.txt 中的依赖，并在 .env 设置 HANDDRAW_PYTHON");
         throw new Error(error.stderr?.trim().slice(-2000) || "手绘预处理超时或失败；请简化图片后重试");
       }
-      const report = await readJson<{algorithmVersion: string; cacheKey: string; width: number; height: number; minimumDrawMs: number}>(path.join(temporary, "report.json"));
+      const report = await readJson<{algorithmVersion: string; cacheKey: string; width: number; height: number; minimumDrawMs: number; stageTimings: HanddrawData["stageTimings"]}>(path.join(temporary, "report.json"));
       const paths = Object.fromEntries(HANDDRAW_PATH_FIELDS.map((key) => [key, `${relative}/${filenames[key]}`]));
       const hashes: Record<string, string> = {};
       for (const key of HANDDRAW_PATH_FIELDS) hashes[key] = digest(await fs.readFile(path.join(temporary, filenames[key])));
       const motion = handdrawMotionSchema.parse(await readJson(path.join(temporary, "motion.json")));
-      cached = handdrawDataSchema.parse({algorithmVersion: report.algorithmVersion, cacheKey: report.cacheKey, width: report.width, height: report.height, minimumDrawMs: report.minimumDrawMs, motionTiming: {liftMs: handdrawLiftMs(motion)}, ...paths, hashes});
+      cached = handdrawDataSchema.parse({algorithmVersion: report.algorithmVersion, cacheKey: report.cacheKey, width: report.width, height: report.height, minimumDrawMs: report.minimumDrawMs, stageTimings: report.stageTimings, motionTiming: {liftMs: handdrawLiftMs(motion)}, ...paths, hashes});
       await atomicWriteJson(path.join(temporary, "data.json"), cached);
       // 发布与缓存修复串行，避免同图并发任务移走另一进程刚发布的正确缓存。
       await mutateVisualResources(jobId, async (resources) => {
@@ -207,7 +209,7 @@ export const handdrawPrompts = async (jobId: string, sceneId: string) => {
     let prompt = await readFixedPrompt(profile, name, "手绘提示词");
     for (const [key, value] of Object.entries(values)) prompt = prompt.replaceAll(`{{${key}}}`, value);
     // 预算独立于冻结的创作模板，旧任务和专栏覆盖也始终获得当前镜头约束。
-    const currentBudget = `本镜头实际时长 ${budget.sceneSeconds.toFixed(1)} 秒，描线与上色合计最多 ${budget.drawSeconds.toFixed(1)} 秒，成图展示预留 ${budget.holdSeconds.toFixed(1)} 秒。`;
+    const currentBudget = `本镜头实际时长 ${budget.sceneSeconds.toFixed(1)} 秒，起形、描线、擦除与上色合计最多 ${budget.drawSeconds.toFixed(1)} 秒，其中起形和擦除预留约 ${budget.preparationSeconds.toFixed(1)} 秒，描线与上色目标不超过 ${budget.illustrationSeconds.toFixed(1)} 秒，成图展示预留 ${budget.holdSeconds.toFixed(1)} 秒。`;
     const constraints = kind === "lineart"
       ? `最多 ${budget.maxSubjects} 个主体、${budget.maxProps} 个必要道具，独立笔画以不超过约 ${budget.maxStrokes} 笔为创作目标。只表达一个核心关系，不画完整故事、多场景拼图、重复图标或密集五官；口播内容较多时主动取舍，只保留最能解释它的画面。优先完整外轮廓，删去装饰细线。`
       : `最多使用 ${budget.maxColors} 种主要填色和约 ${budget.maxRegions} 块大色区，保留白色留白。保持线稿不变，禁止通过渐变、纹理、细碎阴影或高光新增色区。`;

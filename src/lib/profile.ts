@@ -174,6 +174,8 @@ export const readPlatformProfile = async (
   const seriesId = idSchema.parse(requestedSeriesId || configuredSeriesId());
   // 通用创作是内置能力，不依赖本地账号或品牌目录。
   if (accountId === "builtin" && seriesId === "general") return builtinProfile();
+  // 通用英文与母专栏一样内置，派生及任务快照无需依赖本地账号文件。
+  if (accountId === "builtin" && seriesId === "general-en") return builtinEnglishProfile();
   const accountRoot = path.join(profilesRoot(), accountId);
   const account = accountSchema.parse(JSON.parse(await fs.readFile(path.join(accountRoot, "account.json"), "utf8")));
   if (account.id !== accountId) throw new Error("账号目录名与 account.json 的 id 不一致");
@@ -327,4 +329,12 @@ export const builtinProfile = (): PlatformProfile => ({
   workspaceName: "WE-VIDEO", workspaceTitle: "We-Video 视频创作", workspaceDescription: "AI 视频创作工作台",
   downloadPrefix: "we-video", userAgentSuffix: "We-Video", logo: "", logoSrc: "", presenter: {poses: []},
   promptRoot: path.join(REPO_ROOT, "content", "defaults"),
+});
+
+// 通用创作默认提供英文派生目标，共用系统提示词与全局声音配置。
+export const builtinEnglishProfile = (): PlatformProfile => ({
+  ...builtinProfile(),
+  seriesId: "general-en", displayLabel: "通用英文", seriesTitle: "通用英文",
+  kind: "derived", sourceSeriesId: "general", outputLanguage: "en-US",
+  downloadPrefix: "we-video-en",
 });

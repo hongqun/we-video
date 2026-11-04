@@ -2,6 +2,7 @@ import {AbsoluteFill, Easing, Img, interpolate, staticFile, useVideoConfig} from
 import {VIDEO_COLORS, useVisualTheme} from "./theme";
 import {SANS_FONT_FAMILY} from "./typography";
 import {FairytaleDecor} from "./FairytaleDecor";
+import {FAIRYTALE_PALETTE} from "./visual-style";
 
 type BrandIdentity = {logoSrc: string; title: string; subtitle: string; outro?: {title: string; subtitle: string; prompt: string}};
 type ParticleBrandOutroProps = {brand: BrandIdentity; canvasHeight: number; frame: number; outroFrames: number; showPrompt?: boolean};
@@ -45,8 +46,8 @@ export const ParticleBrandOutro: React.FC<ParticleBrandOutroProps> = ({brand, ca
         const angle = particle.angle + p * .35;
         const radius = particle.radius * (1 - p) + 92 * p;
         const opacity = progress(particle.delay, particle.delay + .1) * effectsOut;
-        // 童话片尾以四色糖果粒子呼应彩虹配饰。
-        const color = theme.id === "dopamine-fairytale" ? [theme.colors.accent, theme.colors.highlight, theme.colors.info, "#AE78E7"][index % 4] : index % 7 === 0 ? theme.colors.info : theme.colors.accent;
+        // 片尾复用童话的粉紫蜜桃粒子，与封面彩虹统一。
+        const color = theme.id === "dopamine-fairytale" ? [FAIRYTALE_PALETTE.rose, FAIRYTALE_PALETTE.peach, FAIRYTALE_PALETTE.lilac, FAIRYTALE_PALETTE.butter][index % 4] : index % 7 === 0 ? theme.colors.info : theme.colors.accent;
         return <circle key={index} cx={540 + Math.cos(angle) * radius} cy={centerY + Math.sin(angle) * radius} r={theme.id === "dopamine-fairytale" ? 6 : index % 3 === 0 ? 3.5 : 2} fill={color} opacity={opacity} />;
       })}
       {dark ? <path d={`M 360 ${centerY + 210} C 470 ${centerY + 80}, 660 ${centerY + 45}, 820 ${centerY - 110}`} fill="none" stroke={theme.colors.accent} strokeWidth={2} opacity={.34 * effectsOut} /> : null}

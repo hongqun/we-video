@@ -1,6 +1,7 @@
 import {AbsoluteFill, Easing, interpolate, interpolateColors, Sequence, useCurrentFrame, useVideoConfig} from "remotion";
 import type {Caption, CaptionStyle, VideoScene} from "./schema";
 import {SANS_FONT_FAMILY, SERIF_FONT_FAMILY} from "./typography";
+import {FAIRYTALE_PALETTE} from "./visual-style";
 import {VIDEO_COLORS, VIDEO_RADIUS, VIDEO_SHADOW, VIDEO_TYPE, useVisualTheme} from "./theme";
 
 export type CaptionPage = {
@@ -311,6 +312,14 @@ export const captionTokenColor = (elapsedFrames: number, baseColor: string, acce
 const CaptionPageView: React.FC<{page: CaptionPage; captionStyle: CaptionStyle; startFrame: number}> = ({page, captionStyle, startFrame}) => {
   const selectedStyle = captionStyles[captionStyle];
   const theme = useVisualTheme();
+  const fairytale = theme.id === "dopamine-fairytale";
+  // 童话字幕使用圆润糖果气泡，三种字幕模式保留原来的字号与安全区。
+  const fairytaleBox: React.CSSProperties = fairytale ? {
+    position: "relative", backgroundColor: captionStyle === "impact" ? "#FFE0EF" : "#FFFBF5",
+    border: `2px solid ${FAIRYTALE_PALETTE.outline}`, borderLeft: `2px solid ${FAIRYTALE_PALETTE.outline}`,
+    borderRadius: 30, boxShadow: "0 5px 0 rgba(188,139,232,.16), 0 9px 22px rgba(218,67,137,.08)",
+    fontWeight: captionStyle === "impact" ? 750 : 650, letterSpacing: .2, color: theme.colors.ink,
+  } : {};
   const {fps} = useVideoConfig();
   const frame = useCurrentFrame();
   // 以 Sequence 的绝对起始帧换算当前时间；页起点经 ceil 取整，若直接用 page.startMs 会引入 0~1 帧偏差。
@@ -321,18 +330,28 @@ const CaptionPageView: React.FC<{page: CaptionPage; captionStyle: CaptionStyle; 
         style={{
           ...selectedStyle.box,
           color: selectedStyle.inactiveColor,
-          // 中文采用编辑感更强的衬线体，英文和代码词保留无衬线体，避免整块字幕像后台 UI。
-          fontFamily: SERIF_FONT_FAMILY,
+          // 童话采用更圆润的无衬线字形，沿用已内置字体保证各端一致。
+          fontFamily: fairytale ? SANS_FONT_FAMILY : SERIF_FONT_FAMILY,
+          ...fairytaleBox,
           lineHeight: 1.42,
           textAlign: "center",
           whiteSpace: "nowrap",
         }}
       >
+        {/* 点缀放在气泡边缘，不占文字宽度，也不遮挡字幕。 */}
+        {fairytale ? <>
+          <svg aria-hidden="true" width={23} height={23} viewBox="0 0 24 24" style={{position: "absolute", right: 13, top: -13, overflow: "visible", pointerEvents: "none"}}>
+            <path d="m12 1 3.1 6.4 7.1 1-5.1 5 1.2 7.1-6.3-3.3-6.3 3.3 1.2-7.1-5.1-5 7.1-1Z" fill={FAIRYTALE_PALETTE.butter} stroke="#D5A66B" strokeWidth={1.2} strokeLinejoin="round" />
+          </svg>
+          <svg aria-hidden="true" width={17} height={17} viewBox="0 0 24 24" style={{position: "absolute", left: -7, bottom: 5, pointerEvents: "none"}}>
+            <path d="M12 21 3 12C-2 5 7-1 12 6c5-7 14-1 9 6Z" fill={FAIRYTALE_PALETTE.rose} stroke="#FFFCFE" strokeWidth={2} strokeLinejoin="round" />
+          </svg>
+        </> : null}
         {page.tokens.map((token, index) => {
           const elapsedFrames = ((currentMs - token.startMs) / 1000) * fps;
           const motion = captionTokenMotion(elapsedFrames);
           // 颜色插值必须使用实际色值，CSS 变量只用于普通样式继承。
-          const inactiveColor = captionStyle === "impact" ? theme.colors.surface : theme.colors.ink;
+          const inactiveColor = captionStyle === "impact" && !fairytale ? theme.colors.surface : theme.colors.ink;
           const color = captionTokenColor(elapsedFrames, inactiveColor, theme.colors.accent);
           return (
             <span

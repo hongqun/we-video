@@ -1,9 +1,11 @@
 import {z} from "zod";
 
 // 算法版本参与缓存键，预览与导出只消费相同版本的不可变产物。
-export const HANDDRAW_VERSION = "handdraw-5";
-// 老任务仍能播放；支持局部填黑补画的新产物使用独立缓存键。
-const handdrawVersionSchema = z.enum(["handdraw-1", "handdraw-2", "handdraw-3", "handdraw-4", HANDDRAW_VERSION]);
+export const HANDDRAW_VERSION = "handdraw-6";
+// 老任务仍能播放；四阶段绘制产物使用独立缓存键。
+const handdrawVersionSchema = z.enum(["handdraw-1", "handdraw-2", "handdraw-3", "handdraw-4", "handdraw-5", HANDDRAW_VERSION]);
+// 阶段边界使用源时间，压缩空程后仍与笔尖和像素共享同一映射。
+const stageTimingsSchema = z.object({sketchEndMs: z.number().nonnegative(), lineEndMs: z.number().nonnegative(), eraseEndMs: z.number().nonnegative(), colorEndMs: z.number().nonnegative()}).strict();
 const fileSchema = z.object({path: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/), width: z.number().int().positive(), height: z.number().int().positive()}).strict();
 export const handdrawDataSchema = z.object({
   algorithmVersion: handdrawVersionSchema, cacheKey: z.string().regex(/^[a-f0-9]{64}$/),
@@ -13,9 +15,20 @@ export const handdrawDataSchema = z.object({
   motionTiming: z.object({liftMs: z.number().finite().nonnegative().max(600000)}).strict().optional(),
   completePath: z.string().min(1), lineLayerPath: z.string().min(1), colorLayerPath: z.string().min(1),
   lineTimePath: z.string().min(1), colorTimePath: z.string().min(1), motionPath: z.string().min(1),
+  sketchLayerPath: z.string().min(1).optional(), sketchTimePath: z.string().min(1).optional(), eraseTimePath: z.string().min(1).optional(),
+  stageTimings: stageTimingsSchema.optional(),
   hashes: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)),
-}).strict();
-export const HANDDRAW_PATH_FIELDS = ["completePath", "lineLayerPath", "colorLayerPath", "lineTimePath", "colorTimePath", "motionPath"] as const;
+}).strict().superRefine((data, ctx) => {
+  // 新版必须携带完整起形产物；旧任务继续使用原有双层合成。
+  if (data.algorithmVersion === HANDDRAW_VERSION) for (const key of ["sketchLayerPath", "sketchTimePath", "eraseTimePath", "stageTimings"] as const) {
+    if (!data[key]) ctx.addIssue({code: "custom", path: [key], message: "新版手绘缺少起形或阶段产物"});
+  }
+  if (data.stageTimings) {
+    const values = [0, ...Object.values(data.stageTimings), data.minimumDrawMs];
+    if (values.some((value, i) => i > 0 && value < values[i - 1]!)) ctx.addIssue({code: "custom", path: ["stageTimings"], message: "手绘阶段时间无效"});
+  }
+});
+export const HANDDRAW_PATH_FIELDS = ["completePath", "lineLayerPath", "colorLayerPath", "lineTimePath", "colorTimePath", "motionPath", "sketchLayerPath", "sketchTimePath", "eraseTimePath"] as const;
 export const handdrawResourceSchema = z.object({
   lineart: fileSchema.optional(), color: fileSchema.optional(),
   status: z.enum(["waiting", "processing", "ready", "failed"]),
@@ -27,14 +40,30 @@ export type HanddrawData = z.infer<typeof handdrawDataSchema>;
 // PNG 的 RGB 通道存储毫秒整数，alpha=0 表示永不显现；禁止有损编码或色彩变换。
 export const handdrawMotionSchema = z.object({
   algorithmVersion: handdrawVersionSchema, cacheKey: z.string(), width: z.number().int().positive(), height: z.number().int().positive(), minimumDrawMs: z.number().int().positive(),
-  points: z.array(z.tuple([z.number().nonnegative(), z.number().finite(), z.number().finite(), z.union([z.literal(0), z.literal(1), z.literal(2)])])).min(2),
-}).strict();
+  stageTimings: stageTimingsSchema.optional(),
+  points: z.array(z.tuple([z.number().nonnegative(), z.number().finite(), z.number().finite(), z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)])])).min(2),
+}).strict().superRefine((motion, ctx) => {
+  if (motion.algorithmVersion === HANDDRAW_VERSION && !motion.stageTimings) ctx.addIssue({code: "custom", path: ["stageTimings"], message: "新版手绘缺少阶段边界"});
+  const bounds = motion.stageTimings ? [0, ...Object.values(motion.stageTimings), motion.minimumDrawMs] : [];
+  if (bounds.some((value, i) => i > 0 && value < bounds[i - 1]!)) ctx.addIssue({code: "custom", message: "手绘阶段时间无效"});
+  const stages = motion.stageTimings;
+  const windows = stages ? {3: [0, stages.sketchEndMs], 1: [stages.sketchEndMs, stages.lineEndMs], 4: [stages.lineEndMs, stages.eraseEndMs], 2: [stages.eraseEndMs, stages.colorEndMs]} : undefined;
+  for (let i = 0; i < motion.points.length; i++) {
+    const point = motion.points[i]!;
+    // 非抬笔点必须落在所属阶段窗口内，避免损坏计划导致工具与图层错位。
+    if (windows && point[3] !== 0) {
+      const [start, end] = windows[point[3]];
+      if (point[0] < start! || point[0] > end!) ctx.addIssue({code: "custom", path: ["points", i], message: "笔画超出所属阶段"});
+    }
+    if (point[0] > motion.minimumDrawMs || (i > 0 && point[0] < motion.points[i - 1]![0]) || (motion.algorithmVersion !== HANDDRAW_VERSION && point[3] > 2)) ctx.addIssue({code: "custom", path: ["points", i], message: "手绘运动时间或阶段无效"});
+  }
+});
 export type HanddrawMotion = z.infer<typeof handdrawMotionSchema>;
 
 export const handdrawTemplateData = (resource: HanddrawResource | undefined, resolve: (path: string) => string): HanddrawData | undefined => {
   if (resource?.status !== "ready" || !resource.data) return undefined;
   const data = handdrawDataSchema.parse(resource.data);
-  return {...data, ...Object.fromEntries(HANDDRAW_PATH_FIELDS.map((key) => [key, resolve(data[key])]))};
+  return {...data, ...Object.fromEntries(HANDDRAW_PATH_FIELDS.flatMap((key) => data[key] ? [[key, resolve(data[key])]] : []))};
 };
 
 export type HanddrawSceneWindow = {startMs: number; endMs: number; transition?: {durationMs: number}};
@@ -51,11 +80,13 @@ export const handdrawWindow = (scene: HanddrawSceneWindow) => {
 export const handdrawPromptBudget = (scene: HanddrawSceneWindow) => {
   const window = handdrawWindow(scene);
   const seconds = window.budget / 1000;
+  // 起形与擦除预留两成预算，不能通过忽略阶段提高出图复杂度。
+  const illustrationSeconds = seconds * .8;
   // 生成目标按自然速度留余量，不把最高加速额度预先消耗在生图复杂度上。
   return {
-    sceneSeconds: window.duration / 1000, drawSeconds: seconds,
+    sceneSeconds: window.duration / 1000, drawSeconds: seconds, illustrationSeconds, preparationSeconds: seconds - illustrationSeconds,
     holdSeconds: Math.max(0, window.available - window.budget) / 1000,
-    maxStrokes: Math.max(4, Math.min(120, Math.floor(seconds * 1.8))),
+    maxStrokes: Math.max(4, Math.min(120, Math.floor(illustrationSeconds * 1.8))),
     maxSubjects: seconds < 30 ? 1 : 2,
     maxProps: seconds < 15 ? 1 : 2,
     maxColors: seconds < 15 ? 3 : seconds < 30 ? 4 : 5,
@@ -118,4 +149,16 @@ export const handdrawPenAt = (motion: HanddrawMotion, time: number) => {
   const a = points[lo]!; const b = points[hi]!;
   const t = Math.max(0, Math.min(1, (time - a[0]) / Math.max(1, b[0] - a[0])));
   return {x: a[1] + (b[1] - a[1]) * t, y: a[2] + (b[2] - a[2]) * t, lifted: a[3] === 0};
+};
+
+// 抬笔时提前取下一支工具；兼容旧版笔尖接口，工具属性独立查询。
+export const handdrawToolAt = (motion: HanddrawMotion, time: number): "pencil" | "ink" | "marker" | "eraser" => {
+  let lo = 0; let hi = motion.points.length - 1;
+  while (lo < hi) {const mid = (lo + hi + 1) >> 1; if (motion.points[mid]![0] <= time) lo = mid; else hi = mid - 1;}
+  let phase = motion.points[lo]![3];
+  if (phase === 0) for (let i = lo + 1; i < motion.points.length; i++) {
+    phase = motion.points[i]![3];
+    if (phase !== 0) break;
+  }
+  return phase === 3 ? "pencil" : phase === 4 ? "eraser" : phase === 2 ? "marker" : "ink";
 };

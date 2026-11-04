@@ -8,16 +8,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 from scipy import ndimage
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 from line_first import register, move, luminance, MIN_KEPT, MAX_ADDED, MAX_SHIFT
 from line_topology import extract_strokes, cover_ink_edges
+from choreography import ordered_strokes, construction, densify, path_times, sweeps, to_render, to_plan
 
 # 补画局部实心墨迹后使用独立缓存，重新处理不会复用旧轨迹。
-VERSION = "handdraw-5"
+VERSION = "handdraw-6"
 
 
 def clean_line_gray(gray):
@@ -173,149 +174,148 @@ def run(line_path, color_path, output, cache_key):
         raise ValueError("整图绘制过于复杂；请减少对象、线条和色块")
     out = Path(output)
     out.mkdir(parents=True, exist_ok=True)
+    scale = np.array([line.width / w, line.height / h])
     now, points, samples, sample_times = 50., [], [], []
     tip = np.array([0., 0.])
 
     def path(points_xy, speed, phase):
         nonlocal now, tip
-        points_xy = np.asarray(points_xy, float)
-        gap = max(60., np.linalg.norm(points_xy[0] - tip) / 2.)
-        points.append([round(now, 3), float(tip[0]), float(tip[1]), 0])
+        xy = densify(points_xy)
+        # 抬笔也采样缓动路径，播放器线性插值即可保持与显现图一致。
+        gap = max(60., np.linalg.norm(xy[0] - tip) / 2.)
+        travel_start = now
+        for fraction in np.linspace(0, 1, max(3, math.ceil(gap / 15))):
+            ease = fraction * fraction * (3 - 2 * fraction)
+            at = tip + (xy[0] - tip) * ease
+            points.append([round(travel_start + gap * fraction, 3), float(at[0]), float(at[1]), 0])
         now += gap
-        points.append([round(now, 3), float(points_xy[0, 0]), float(points_xy[0, 1]), phase])
-        times = [now]
-        for a, b in zip(points_xy[:-1], points_xy[1:]):
-            now += max(.5, float(np.linalg.norm(b - a)) / speed * 1000.)
-            times.append(now)
-            points.append([round(now, 3), float(b[0]), float(b[1]), phase])
-        tip = points_xy[-1]
-        now += 35.
+        times = path_times(xy, speed, now)
+        for time, at in zip(times, xy):
+            points.append([round(float(time), 3), float(at[0]), float(at[1]), phase])
+        now = float(times[-1]) + 35.
+        tip = xy[-1]
         points.append([round(now, 3), float(tip[0]), float(tip[1]), 0])
         if now > 600000 or len(points) > 500000:
             raise ValueError("整图绘制过于复杂；请减少对象、线条和色块")
-        return np.asarray(times)
+        return xy, times
 
-    # 长轮廓优先，阶段内就近接续；只移动笔，不把不连通的线硬接起来。
-    pool = sorted(strokes, key=lambda s: -s["length"])
-    while pool:
-        candidates = pool[:min(16, len(pool))]
-        index = min(range(len(candidates)), key=lambda i: min(np.linalg.norm(candidates[i]["points"][0] - tip), np.linalg.norm(candidates[i]["points"][-1] - tip)))
-        stroke = pool.pop(index)
-        xy = stroke["points"]
-        if np.linalg.norm(xy[-1] - tip) < np.linalg.norm(xy[0] - tip):
-            xy = xy[::-1]
-        times = path(xy, 1100., 1)
-        samples.extend(xy.tolist())
+    ordered, objects = ordered_strokes(strokes, ink)
+    shapes = construction(objects)
+    if not shapes:
+        raise ValueError("线稿过于零碎，无法提取起形；请简化主体")
+    sketch_alpha = np.zeros((line.height, line.width), np.uint8)
+    sketch_times = np.full(sketch_alpha.shape, np.inf)
+    # 起形保留独立透明图层，擦除不会改变真实墨迹或完成图。
+    for shape in shapes:
+        xy, times = path(shape, 1600., 3)
+        rendered = to_render(xy, scale)
+        layer = Image.new("L", line.size)
+        ImageDraw.Draw(layer).line([tuple(point) for point in rendered], fill=110, width=max(1, round(1.4 * scale.mean())))
+        mask = np.array(layer) > 0
+        ys, xs = np.where(mask)
+        _, nearest = cKDTree(rendered).query(np.c_[xs, ys])
+        sketch_times[ys, xs] = np.minimum(sketch_times[ys, xs], times[nearest])
+        sketch_alpha[mask] = 110
+    sketch_end = now
+
+    previous_object = None
+    for stroke in ordered:
+        # 模块切换留下思考停顿；预算压缩时仍归入抬笔成本。
+        if previous_object is not None and previous_object != stroke["object"]:
+            now += 100.
+        previous_object = stroke["object"]
+        xy, times = path(stroke["points"], 1100., 1)
+        samples.extend(to_render(xy, scale).tolist())
         sample_times.extend(times.tolist())
-    # 每个墨迹连通域独立寻找笔尖经过时间，孤立小点也安排真实落笔。
-    labels, count = ndimage.label(gray < 245, structure=np.ones((3, 3)))
-    line_times = np.full((h, w), np.inf)
-    sample_array = np.asarray(samples)
-    sample_time_array = np.asarray(sample_times)
-    cells = np.clip(np.rint(sample_array).astype(int), 0, [w - 1, h - 1])
-    sample_labels = labels[cells[:, 1], cells[:, 0]]
-    for label, box in enumerate(ndimage.find_objects(labels), 1):
-        if box is None:
-            continue
-        ys, xs = np.where(labels[box] == label)
-        ys += box[0].start; xs += box[1].start
-        if not len(xs):
-            continue
-        component_points = np.c_[xs, ys]
-        selected = sample_labels == label
-        if selected.any():
-            distance, nearest = cKDTree(sample_array[selected]).query(component_points)
-            if distance.max() > 12:
-                raise ValueError("线稿局部墨迹仍无法被绘制路径覆盖；请简化该区域后重试")
-            line_times[ys, xs] = sample_time_array[selected][nearest]
-        else:
-            # 极小连通域用一次点按覆盖，仍参与时长预算。
-            if len(xs) > 100:
-                raise ValueError("线稿存在无法连续描绘的区域；请简化该区域")
-            center = [float(xs.mean()), float(ys.mean())]
-            time = path([center, center], 1100., 1)[-1]
-            line_times[ys, xs] = time
-    line_end = now
-    paint = moved[..., :3]
-    # 按真实色块分区，线稿附近视作边界；色块内保留原始像素颜色。
-    fill_mask, regions = paint_regions(paint, gray)
-    groups = {}
-    for region in regions:
-        groups.setdefault(region[3], []).append(region)
-
-    def marker_order():
-        # 一支颜色涂完再换笔，同色的区域按笔尖距离就近处理。
-        for code in sorted(groups, key=lambda value: -np.mean([r[0] for r in groups[value]])):
-            pool = groups[code]
-            while pool:
-                index = min(range(min(32, len(pool))), key=lambda i: (pool[i][2].mean() - tip[0]) ** 2 + (pool[i][1].mean() - tip[1]) ** 2)
-                yield pool.pop(index)
-    color_times = np.full((h, w), np.inf)
-    # 马克笔按斜向行往复扫过，每条路径仅显现所属色块的像素，避免越界。
-    radius = 7.
-    for _, ys, xs, _ in marker_order():
-        bands = np.floor((ys + xs * .35) / (radius * 1.6)).astype(int)
-        reverse = False
-        for band in np.unique(bands):
-            pick = bands == band
-            bx, by = xs[pick], ys[pick]
-            order = np.argsort(bx)
-            if reverse:
-                order = order[::-1]
-            reverse = not reverse
-            # 行内长空白处抬笔，不能跨越无关物体时继续出墨。
-            breaks = np.r_[0, np.where(np.abs(np.diff(bx[order])) > 3)[0] + 1, len(order)]
-            for start, end in zip(breaks[:-1], breaks[1:]):
-                group = order[start:end]
-                coords = np.c_[bx[group], by[group]]
-                # 中心轨迹沿横向笔道，像素按笔头半径首次接触时显现。
-                a, b = coords[0].astype(float), coords[-1].astype(float)
-                band_center = np.median(by[group] + bx[group] * .35)
-                a[1] = band_center - a[0] * .35
-                b[1] = band_center - b[0] * .35
-                length = np.linalg.norm(b - a)
-                route = np.linspace(a, b, max(2, int(length / 2) + 1))
-                times = path(route, 950., 2)
-                distance = np.abs(coords[:, 0] - a[0])
-                fractions = np.clip((distance - radius) / max(1., abs(b[0] - a[0])), 0, 1)
-                color_times[by[group], bx[group]] = times[0] + fractions * (times[-1] - times[0])
-    if now > 600000 or len(points) > 500000:
-        raise ValueError("整图绘制过于复杂；请减少对象、线条和色块")
-    duration = math.ceil(now)
-    # 墨线与底色在原始分辨率独立清理，低分辨率规划场只负责时间，不裁切显示边缘。
+    # 墨线和底色继续以原分辨率清理；显现时间也在此分辨率计算，不再放大格子。
     full_gray = clean_line_gray(np.array(line.convert("L")))
     aligned = move(np.array(color), round(dy * line.height / h), round(dx * line.width / w))
     alpha = 255 - full_gray
     line_rgba = np.zeros((line.height, line.width, 4), np.uint8)
     line_rgba[..., 3] = alpha
-    color_rgba = color_layer(aligned, full_gray, edge_margin=2 * max(line.width / w, line.height / h))
-    if not fill_mask.any():
+    color_rgba = color_layer(aligned, full_gray, edge_margin=2 * max(scale))
+    full_mask, regions = paint_regions(color_rgba[..., :3], full_gray)
+    if not full_mask.any():
         color_rgba[..., 3] = 0
-    Image.fromarray(line_rgba).save(out / "line.png")
-    Image.fromarray(color_rgba).save(out / "color.png")
-    time_png(line_times, out / "line-time.png", line.size)
-    time_png(color_times, out / "color-time.png", line.size)
-    # 高分辨率边缘的时间取规划场最近有效点，避免细线在最后一帧才补现。
-    for name, mask in [("line-time.png", alpha > 0), ("color-time.png", color_rgba[..., 3] > 0)]:
-        image = np.array(Image.open(out / name))
-        valid = image[..., 3] > 0
-        missing = mask & ~valid
-        if missing.any():
-            if not valid.any():
-                raise ValueError("绘制路径无法覆盖素材；请检查线稿或上色图")
-            indices = ndimage.distance_transform_edt(~valid, return_distances=False, return_indices=True)
-            image[missing] = image[indices[0][missing], indices[1][missing]]
-        image[..., 3][~mask] = 0
-        Image.fromarray(image).save(out / name)
+
+    # 同一墨迹连通域只能引用本域的笔画，内部孤立点不会被其他对象提前显现。
+    labels, _ = ndimage.label(alpha > 0, structure=np.ones((3, 3)))
+    line_times = np.full(alpha.shape, np.inf)
+    sample_array = np.asarray(samples)
+    sample_time_array = np.asarray(sample_times)
+    cells = np.clip(np.rint(sample_array).astype(int), 0, [line.width - 1, line.height - 1])
+    nearest_ink = ndimage.distance_transform_edt(labels == 0, return_distances=False, return_indices=True)
+    sample_labels = labels[nearest_ink[0][cells[:, 1], cells[:, 0]], nearest_ink[1][cells[:, 1], cells[:, 0]]]
+    for label, box in enumerate(ndimage.find_objects(labels), 1):
+        if box is None:
+            continue
+        ys, xs = np.where(labels[box] == label)
+        ys += box[0].start
+        xs += box[1].start
+        selected = sample_labels == label
+        if not selected.any():
+            if len(xs) > 100 * max(scale) ** 2:
+                raise ValueError("线稿存在无法连续描绘的区域；请简化该区域")
+            center = to_plan([xs.mean(), ys.mean()], scale)
+            _, dot_times = path([center, center], 1100., 1)
+            line_times[ys, xs] = dot_times[-1]
+            continue
+        distance, nearest = cKDTree(sample_array[selected]).query(np.c_[xs, ys])
+        if distance.max() > 12 * max(scale):
+            raise ValueError("线稿局部墨迹仍无法被绘制路径覆盖；请简化该区域后重试")
+        line_times[ys, xs] = sample_time_array[selected][nearest]
+
+    line_end = now
+
+    erase_times = np.full(sketch_alpha.shape, np.inf)
+    ys, xs = np.where(sketch_alpha > 0)
+    for route, group, fractions in sweeps(ys, xs, scale, radius=20.):
+        xy, times = path(route, 1400., 4)
+        arc = np.r_[0., np.cumsum(np.linalg.norm(np.diff(xy, axis=0), axis=1))]
+        erase_times[ys[group], xs[group]] = np.interp(fractions * arc[-1], arc, times)
+    erase_end = now
+
+    groups = {}
+    for region in regions:
+        groups.setdefault(region[3], []).append(region)
+    color_times = np.full(alpha.shape, np.inf)
+    # 浅色先画，同色区域就近；小色块使用自身像素，不并入其他颜色。
+    for code in sorted(groups, key=lambda value: -np.mean([r[0] for r in groups[value]])):
+        pool = groups[code]
+        while pool:
+            index = min(range(len(pool)), key=lambda i: np.linalg.norm((np.array([pool[i][2].mean(), pool[i][1].mean()]) + .5) / scale - .5 - tip))
+            _, ys, xs, _ = pool.pop(index)
+            for route, group, fractions in sweeps(ys, xs, scale):
+                xy, times = path(route, 950., 2)
+                arc = np.r_[0., np.cumsum(np.linalg.norm(np.diff(xy, axis=0), axis=1))]
+                color_times[ys[group], xs[group]] = np.interp(fractions * arc[-1], arc, times)
+    duration = math.ceil(now)
+    # 只补色层延伸到墨线下的时间；显示色区本身全部由上述真实笔刷覆盖。
+    missing = (color_rgba[..., 3] > 0) & ~np.isfinite(color_times)
+    if missing.any():
+        valid = np.isfinite(color_times)
+        if not valid.any():
+            raise ValueError("绘制路径无法覆盖上色素材")
+        indices = ndimage.distance_transform_edt(~valid, return_distances=False, return_indices=True)
+        color_times[missing] = color_times[indices[0][missing], indices[1][missing]]
+    sketch_rgba = np.zeros_like(line_rgba)
+    sketch_rgba[..., :3] = [105, 145, 196]
+    sketch_rgba[..., 3] = sketch_alpha
+    for name, layer in [("line.png", line_rgba), ("color.png", color_rgba), ("sketch.png", sketch_rgba)]:
+        Image.fromarray(layer).save(out / name)
+    for name, values in [("line-time.png", line_times), ("color-time.png", color_times), ("sketch-time.png", sketch_times), ("erase-time.png", erase_times)]:
+        time_png(values, out / name, line.size)
     complete = Image.new("RGBA", line.size, "white")
     complete.alpha_composite(Image.fromarray(color_rgba))
     complete.alpha_composite(Image.fromarray(line_rgba))
     complete.convert("RGB").save(out / "complete.png")
-    motion = {"algorithmVersion": VERSION, "cacheKey": cache_key, "width": line.width, "height": line.height, "minimumDrawMs": duration,
-              "points": [[t, round(x / w * line.width, 3), round(y / h * line.height, 3), phase] for t, x, y, phase in points]}
+    stages = {"sketchEndMs": round(sketch_end, 3), "lineEndMs": round(line_end, 3), "eraseEndMs": round(erase_end, 3), "colorEndMs": round(now, 3)}
+    render_points = to_render(np.asarray(points)[:, 1:3], scale)
+    motion = {"algorithmVersion": VERSION, "cacheKey": cache_key, "width": line.width, "height": line.height, "minimumDrawMs": duration, "stageTimings": stages,
+              "points": [[t, round(float(xy[0]), 3), round(float(xy[1]), 3), phase] for (t, _, _, phase), xy in zip(points, render_points)]}
     (out / "motion.json").write_text(json.dumps(motion, separators=(",", ":")))
-    report = {"algorithmVersion": VERSION, "cacheKey": cache_key, "width": line.width, "height": line.height, "minimumDrawMs": duration,
-              "lineEndMs": math.ceil(line_end), "registration": measures, "statistics": {**stats, "paint_regions": len(regions)}}
+    report = {"algorithmVersion": VERSION, "cacheKey": cache_key, "width": line.width, "height": line.height, "minimumDrawMs": duration, "stageTimings": stages,
+              "lineEndMs": math.ceil(line_end), "registration": measures, "statistics": {**stats, "paint_regions": len(regions), "construction_shapes": len(shapes), "objects": int(objects.max())}}
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False))
 
 

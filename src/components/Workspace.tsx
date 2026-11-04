@@ -1409,6 +1409,19 @@ export const Workspace: React.FC = () => {
         </div>
         <div className="hero-actions">
           <Link className="secondary" href="/profiles">管理专栏</Link>
+          {/* 翻译派生放在各步骤共用的顶部，未完成母稿时保留入口并说明条件。 */}
+          {snapshot && profile?.derivedTargets?.map((target) => (
+            <button
+              key={target.seriesId}
+              type="button"
+              className="secondary"
+              disabled={busy || profile.profileMigrationRequired || snapshot.job.state !== "completed"}
+              title={snapshot.job.state !== "completed" ? "请先完成中文母稿成片，再翻译派生英文视频" : profile.profileMigrationRequired ? "请先确认采用当前专栏配置" : `从当前任务派生到${target.title}`}
+              onClick={() => void deriveEnglishVideo(target.seriesId)}
+            >
+              <Icon name="arrow-right" />翻译派生：{target.title}
+            </button>
+          ))}
           <div className="settings-menu" ref={settingsMenuRef}>
             <button
               className="secondary icon-label settings-menu-trigger"
@@ -2165,7 +2178,6 @@ export const Workspace: React.FC = () => {
               </a>
             ) : <span className="metadata">{snapshot.job.state === "rendering" ? "请稍候，渲染完成后即可下载" : "当前暂无可下载成片"}</span>}
           </div>
-          {snapshot.job.state === "completed" && profile?.derivedTargets?.length ? <div className="actions">{profile.derivedTargets.map((target) => <button key={target.seriesId} disabled={busy || profile.profileMigrationRequired} onClick={() => void deriveEnglishVideo(target.seriesId)}><Icon name="arrow-right" />派生：{target.title}</button>)}</div> : null}
         </section>
       ) : null}
       {visualRequirementDialog ? (

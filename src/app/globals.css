@@ -3234,11 +3234,11 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-style-option-deep-signal .visual-style-swatch i:nth-child(1) { border: 1px solid #62ed35; border-radius: 50%; bottom: -78%; height: 140%; right: -8%; width: 70%; }
 .visual-style-option-deep-signal .visual-style-swatch i:nth-child(2) { border-top: 2px dotted #62ed35; height: 40%; right: -3%; rotate: -17deg; top: 48%; width: 76%; }
 .visual-style-option-deep-signal .visual-style-swatch i:nth-child(3) { background: radial-gradient(circle, rgb(98 237 53 / 58%), transparent 68%); filter: blur(5px); height: 65%; right: 2%; top: 40%; width: 58%; }
-/* 童话卡以糖果彩虹、白云与星星预告全片的多巴胺配饰。 */
-.visual-style-option-dopamine-fairytale .visual-style-swatch { background: #fff0f7; }
-.visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(1) { background: radial-gradient(ellipse at 50% 100%, transparent 35%, #ae78e7 36% 44%, #33c9ed 45% 53%, #ffdc45 54% 62%, #ff69a7 63% 71%, transparent 72%); height: 95%; right: -6%; top: -15%; width: 85%; }
+/* 童话卡以粉紫蜜桃彩虹、白云与奶油黄星星呼应全片童话配饰。 */
+.visual-style-option-dopamine-fairytale .visual-style-swatch { background: #fff0f8; }
+.visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(1) { background: radial-gradient(ellipse at 50% 100%, transparent 35%, #ffe2a6 36% 44%, #bc8be8 45% 53%, #ffc0ac 54% 62%, #f36ca8 63% 71%, transparent 72%); height: 95%; right: -6%; top: -15%; width: 85%; }
 .visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(2) { background: #fff; border-radius: 50px; box-shadow: 12px -9px 0 1px #fff, 25px 0 0 #fff; height: 18%; right: 26%; top: 57%; width: 21%; }
-.visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(3) { background: #ffdc45; clip-path: polygon(50% 0, 62% 33%, 98% 36%, 70% 59%, 79% 96%, 50% 76%, 21% 96%, 30% 59%, 2% 36%, 38% 33%); height: 30%; left: 12%; top: 25%; width: 18%; }
+.visual-style-option-dopamine-fairytale .visual-style-swatch i:nth-child(3) { background: #ffe2a6; clip-path: polygon(50% 0, 62% 33%, 98% 36%, 70% 59%, 79% 96%, 50% 76%, 21% 96%, 30% 59%, 2% 36%, 38% 33%); height: 30%; left: 12%; top: 25%; width: 18%; }
 .visual-style-copy { display: grid; gap: 4px; }
 .visual-style-copy strong { color: #253d32; font-size: 14px; }
 .visual-style-copy small { color: #66786f; line-height: 1.45; }

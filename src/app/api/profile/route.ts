@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {publicPlatformProfile, readPlatformProfile, readJobPlatformProfile, profileContext} from "@/lib/profile";
+import {publicPlatformProfile, readPlatformProfile, readJobPlatformProfile, profileContext, builtinEnglishProfile} from "@/lib/profile";
 import {requireAuth} from "@/lib/auth";
 import {readJob, resolveArtifactValues, atomicWriteJson, jobDir} from "@/lib/jobs";
 import {freezeCurrentProfile, hasProfileSnapshot} from "@/lib/profile-snapshot";
@@ -16,6 +16,11 @@ export async function GET(request: Request) {
     const profile = job ? needsMigration ? await readPlatformProfile(job.contentProfile.accountId, job.contentProfile.seriesId) : await readJobPlatformProfile(job.contentProfile, job.jobId)
       : await readPlatformProfile(url.searchParams.get("accountId") || undefined, url.searchParams.get("seriesId") || undefined);
     const targets = job ? (await scanProfiles(profile.accountId)).flatMap((item) => item.profile?.kind === "derived" && !item.profile.archived && item.profile.sourceSeriesId === profile.seriesId && item.profile.outputLanguage === "en-US" ? [{seriesId: item.seriesId, title: item.profile.seriesTitle}] : []) : [];
+    // 内置通用配置没有账号目录，单独加入可实际读取和派生的英文目标。
+    if (job && profile.accountId === "builtin" && profile.seriesId === "general") {
+      const target = builtinEnglishProfile();
+      if (!targets.some((item) => item.seriesId === target.seriesId)) targets.unshift({seriesId: target.seriesId, title: target.seriesTitle});
+    }
     const data = publicPlatformProfile(profile);
     // 与 Manifest 使用同一资源解析器，预览及离线渲染均读取任务内的图片副本。
     const resolved = job ? resolveArtifactValues(data, job.jobId, url.origin, createRenderArtifactToken(job.jobId)) : data;

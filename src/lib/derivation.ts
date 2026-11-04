@@ -32,9 +32,20 @@ const requestTranslationModel = async (profile: PlatformProfile, model: string |
   const response = await fetch(`${settings.deepseek.baseUrl}/chat/completions`, {
     method: "POST", signal: AbortSignal.timeout(600_000),
     headers: {"Content-Type": "application/json", Authorization: `Bearer ${settings.deepseek.apiKey}`},
-    body: JSON.stringify({model: model ?? profile.defaultTextModel ?? "deepseek-v4-flash", messages: [{role: "system", content: system}, {role: "user", content: prompt}], response_format: {type: "json_object"}}),
+    // 与镜头规划保持一致：JSON 翻译显式关闭思考，并保证各阶段提示词声明 JSON 输出。
+    body: JSON.stringify({model: model ?? settings.defaultTextModel, messages: [{role: "system", content: `${system}\n只输出合法 JSON 对象，不要添加 Markdown 代码围栏或解释。`}, {role: "user", content: prompt}], response_format: {type: "json_object"}, thinking: {type: "disabled"}}),
   });
-  if (!response.ok) throw new Error(`英文派生处理失败：HTTP ${response.status}`);
+  if (!response.ok) {
+    // 保留服务端拒绝原因，避免所有参数或模型错误都退化成无法定位的 HTTP 400。
+    const raw = await response.text().catch(() => "");
+    let detail = raw;
+    try {
+      const body = JSON.parse(raw) as {error?: {message?: unknown}};
+      if (typeof body.error?.message === "string") detail = body.error.message;
+    } catch { /* 非 JSON 错误页仍提供有限长度的诊断信息。 */ }
+    detail = detail.replaceAll(settings.deepseek.apiKey, "[已隐藏]").slice(0, 500);
+    throw new Error(`英文派生处理失败：HTTP ${response.status}${detail ? `：${detail}` : ""}`);
+  }
   const body = await response.json() as {choices?: Array<{message?: {content?: string}}>};
   const content = body.choices?.[0]?.message?.content;
   if (!content) throw new Error("英文派生处理未返回内容");

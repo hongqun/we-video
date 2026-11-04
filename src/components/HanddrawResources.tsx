@@ -74,12 +74,12 @@ export const HanddrawResources = ({jobId, sceneId, scene, resource, disabled, ur
     if (!resource?.data || resource.status !== "ready") return null;
     try {
       const timing = handdrawTiming(scene, resource.data);
-      return {error: false, text: `按当前镜头编排：描线与上色合计 ${(timing.drawDurationMs / 1000).toFixed(1)} 秒，成图展示 ${(timing.holdMs / 1000).toFixed(1)} 秒，额外加速 ${timing.acceleration.toFixed(1)} 倍。`};
+      return {error: false, text: `按当前镜头编排：完整绘制合计 ${(timing.drawDurationMs / 1000).toFixed(1)} 秒，成图展示 ${(timing.holdMs / 1000).toFixed(1)} 秒，额外加速 ${timing.acceleration.toFixed(1)} 倍。`};
     } catch (cause) {return {error: true, text: cause instanceof Error ? cause.message : "镜头时间不足，请简化配图"};}
   })();
   return <section className="visual-plan-image-resources" aria-label="当前镜头手绘素材">
     <div className="visual-plan-section-heading"><h3>手绘插画</h3><span role="status">{labels[resource?.status ?? "waiting"]}</span></div>
-    <p className="field-hint">先生成线稿，再将线稿附给外部模型上色。上传两图后自动处理，先描线再涂色，最后停留展示成图。</p>
+    <p className="field-hint">先生成线稿，再将线稿附给外部模型上色。上传两图后自动处理，新版依次浅蓝起形、分模块描线、擦除起形、分区上色，最后停留展示成图。</p>
     <div className="actions"><button type="button" className="secondary" disabled={locked} onClick={() => void openPrompts()}>查看生成提示词</button>
       {resource?.lineart && resource.color ? <button type="button" disabled={locked || resource.status === "processing"} onClick={() => void change()}>{resource.status === "failed" ? "重试处理" : "重新处理"}</button> : null}
     </div>
@@ -95,7 +95,9 @@ export const HanddrawResources = ({jobId, sceneId, scene, resource, disabled, ur
         {resource?.[kind] ? <img src={url(resource[kind]!.path)} alt={kind === "lineart" ? "手绘黑白线稿" : "手绘上色图"} style={{display: "block", width: "100%", marginTop: 12, background: "white"}} /> : null}
       </div>)}
     </div>
-    {resource?.status === "ready" && resource.data ? <div><p>参考绘制时间：{(resource.data.minimumDrawMs / 1000).toFixed(1)} 秒。</p>{timingStatus ? <p className={timingStatus.error ? "error-text" : "field-hint"} role={timingStatus.error ? "alert" : "status"}>{timingStatus.text}</p> : null}<img src={url(resource.data.completePath)} alt="配准后的手绘完成图" style={{maxWidth: "100%", maxHeight: 400, objectFit: "contain"}} /></div> : null}
+    {resource?.status === "ready" && resource.data ? <div><p>参考绘制时间：{(resource.data.minimumDrawMs / 1000).toFixed(1)} 秒。</p>
+      {/* 源时间含各阶段抬笔成本，实际播放仍统一按镜头预算调整。 */}
+      {resource.data.stageTimings ? <p className="field-hint">参考阶段耗时：起形 {(resource.data.stageTimings.sketchEndMs / 1000).toFixed(1)} 秒，描线 {((resource.data.stageTimings.lineEndMs - resource.data.stageTimings.sketchEndMs) / 1000).toFixed(1)} 秒，擦除 {((resource.data.stageTimings.eraseEndMs - resource.data.stageTimings.lineEndMs) / 1000).toFixed(1)} 秒，上色 {((resource.data.stageTimings.colorEndMs - resource.data.stageTimings.eraseEndMs) / 1000).toFixed(1)} 秒。</p> : <p className="field-hint">当前为历史绘制计划，点击“重新处理”升级为起形、描线、擦除和上色流程。</p>}{timingStatus ? <p className={timingStatus.error ? "error-text" : "field-hint"} role={timingStatus.error ? "alert" : "status"}>{timingStatus.text}</p> : null}<img src={url(resource.data.completePath)} alt="配准后的手绘完成图" style={{maxWidth: "100%", maxHeight: 400, objectFit: "contain"}} /></div> : null}
     {resource?.error ? <p className="error-text" role="alert">{resource.error}</p> : null}
     {error ? <p className="error-text" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}

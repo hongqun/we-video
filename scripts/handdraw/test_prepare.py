@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy.spatial import cKDTree
 from prepare import run, clean_line_gray, paint_regions, color_layer
+from choreography import ordered_strokes, construction, sweeps, to_render, path_times
 
 
 class HanddrawPreparationTests(unittest.TestCase):
@@ -115,6 +116,94 @@ class HanddrawPreparationTests(unittest.TestCase):
         paper.alpha_composite(Image.fromarray(color))
         paper.alpha_composite(Image.fromarray(line))
         self.assertTrue(np.array_equal(np.array(paper.convert("RGB")), np.array(Image.open(self.root / "out/complete.png"))))
+
+    def test_construction_is_drawn_then_completely_erased_before_color(self):
+        # 每个辅助线像素有出现和擦除时刻，擦除只修改独立图层。
+        run(self.root / "line.png", self.root / "color.png", self.root / "out", "d" * 64)
+        motion = json.loads((self.root / "out/motion.json").read_text())
+        stages = motion["stageTimings"]
+        self.assertEqual(sorted(stages.values()), list(stages.values()))
+        self.assertTrue({0, 1, 2, 3, 4}.issubset({point[3] for point in motion["points"]}))
+        sketch = np.array(Image.open(self.root / "out/sketch.png"))
+        def decode(name):
+            data = np.array(Image.open(self.root / "out" / (name + ".png")))
+            return data[..., 0].astype(np.uint32) + data[..., 1].astype(np.uint32) * 256 + data[..., 2].astype(np.uint32) * 65536, data[..., 3] > 0
+        drawn, valid = decode("sketch-time")
+        erased, removed = decode("erase-time")
+        mask = sketch[..., 3] > 0
+        self.assertTrue(mask.any())
+        self.assertTrue(np.array_equal(mask, valid))
+        self.assertTrue(np.array_equal(mask, removed))
+        self.assertTrue(np.all(drawn[mask] < stages["sketchEndMs"]))
+        self.assertTrue(np.all(erased[mask] > stages["lineEndMs"]))
+        self.assertTrue(np.all(erased[mask] < stages["eraseEndMs"]))
+        self.assertLessEqual(len(np.unique(drawn[mask])), int(mask.sum()))
+        self.assertGreater(len(np.unique(drawn[mask])), 20)
+        for phase, lower, upper in [(3, 0, stages["sketchEndMs"]), (1, stages["sketchEndMs"], stages["lineEndMs"]), (4, stages["lineEndMs"], stages["eraseEndMs"]), (2, stages["eraseEndMs"], stages["colorEndMs"])]:
+            self.assertTrue(all(lower <= point[0] <= upper for point in motion["points"] if point[3] == phase))
+
+    def test_object_order_keeps_interior_details_with_their_outline(self):
+        # 两个分离对象及各自内部的孤立小线段，不能先画完两边轮廓再来回补细节。
+        ink = np.zeros((120, 240), bool)
+        strokes = []
+        for x in [20, 150]:
+            ink[20:100, x] = ink[20:100, x + 60] = True
+            ink[20, x:x + 61] = ink[99, x:x + 61] = True
+            ink[50, x + 20:x + 31] = True
+            outline = np.array([[x, 20], [x + 60, 20], [x + 60, 99], [x, 99], [x, 20]], float)
+            strokes.extend([{"points": outline, "length": 278, "closed": True}, {"points": np.array([[x + 20, 50], [x + 30, 50]], float), "length": 10, "closed": False}])
+        ordered, objects = ordered_strokes(strokes[::-1], ink)
+        self.assertEqual([stroke['tier'] for stroke in ordered], [0, 2, 0, 2])
+        self.assertEqual(ordered[0]['object'], ordered[1]['object'])
+        self.assertNotEqual(ordered[1]['object'], ordered[2]['object'])
+        self.assertEqual(len(construction(objects)), 2)
+        self.assertLessEqual(len(construction(objects)), 16)
+
+    def test_output_sweeps_cover_concave_regions_without_crossing_empty_space(self):
+        # 凹形、小色块均按自身掩膜覆盖，笔尖触及时距离不超过半径。
+        mask = np.zeros((240, 320), bool)
+        mask[20:210, 20:80] = True
+        mask[150:210, 20:290] = True
+        mask[10:13, 300:303] = True
+        ys, xs = np.where(mask)
+        visited = np.zeros(len(xs), int)
+        scale = np.array([2.3, 1.7])
+        for route, group, fractions in sweeps(ys, xs, scale):
+            visited[group] += 1
+            contacts = route[0] + (route[-1] - route[0]) * fractions[:, None]
+            actual = (np.c_[xs[group], ys[group]] + .5) / scale - .5
+            self.assertLessEqual(np.linalg.norm(actual - contacts, axis=1).max(), 7.00001)
+            self.assertLessEqual(np.linalg.norm(route[-1] - route[0]), 63.00001)
+        self.assertTrue(np.all(visited == 1))
+        self.assertTrue(np.allclose(to_render([[0, 0], [3, 4]], [2.3, 1.7]), [[.65, .35], [7.55, 7.15]]))
+        xy = np.c_[np.arange(101), np.zeros(101)]
+        dt = np.diff(path_times(xy, 1000, 0))
+        self.assertGreater(dt[0], dt[50])
+        self.assertGreater(dt[-1], dt[50])
+
+    def test_high_resolution_time_fields_follow_the_active_brush(self):
+        # 1440 像素画布会触发 720 像素规划；检查输出像素对应的真实触笔位置。
+        line = Image.new("RGB", (1440, 960), "white")
+        draw = ImageDraw.Draw(line)
+        draw.rectangle((120, 120, 1300, 820), outline="black", width=8)
+        color = line.copy()
+        ImageDraw.Draw(color).rectangle((128, 128, 1292, 812), fill=(240, 160, 80))
+        line.save(self.root / "hi-line.png")
+        color.save(self.root / "hi-color.png")
+        run(self.root / "hi-line.png", self.root / "hi-color.png", self.root / "out", "e" * 64)
+        data = np.array(Image.open(self.root / "out/color-time.png"))
+        ticks = data[..., 0].astype(np.uint32) + data[..., 1].astype(np.uint32) * 256 + data[..., 2].astype(np.uint32) * 65536
+        ys, xs = np.where((data[..., 3] > 0) & (np.array(line.convert("L")) > 245))
+        motion = np.asarray(json.loads((self.root / "out/motion.json").read_text())["points"])
+        selected = np.linspace(0, len(xs) - 1, 400).astype(int)
+        for x, y in zip(xs[selected], ys[selected]):
+            time = ticks[y, x]
+            k = min(len(motion) - 2, max(0, np.searchsorted(motion[:, 0], time, side='right') - 1))
+            a, b = motion[k:k + 2]
+            fraction = (time - a[0]) / max(.000001, b[0] - a[0])
+            tip = a[1:3] + (b[1:3] - a[1:3]) * fraction
+            self.assertLessEqual(np.linalg.norm(tip - [x, y]), 16.5)
+        self.assertGreater(len(np.unique(ticks[450, 150:1250])), 200)
 
     def test_mismatch_and_blank_lineart_are_rejected(self):
         Image.new("RGB", (100, 100), "white").save(self.root / "small.png")

@@ -417,9 +417,10 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
         <div className="visual-plan-cover-editor">
         <div className="visual-plan-cover-form">
           {/* 封面标题支持手动换行，直接复用渲染端的显式换行处理。 */}
-          <label>封面标题<textarea rows={2} value={cover.title} disabled={locked} maxLength={40} onChange={(event) => updateCover({title: event.target.value})} placeholder="可按 Enter 手动换行" /></label>
+          {/* 封面文案与共享契约一致，不用中文字符上限阻断英文编辑。 */}
+          <label>封面标题<textarea rows={2} value={cover.title} disabled={locked} onChange={(event) => updateCover({title: event.target.value})} placeholder="可按 Enter 手动换行" /></label>
           {/* 副标题使用多行输入，保存时保留手动换行。 */}
-          <label>封面副标题<textarea rows={3} value={cover.subtitle} disabled={locked} maxLength={120} onChange={(event) => updateCover({subtitle: event.target.value})} /></label>
+          <label>封面副标题<textarea rows={3} value={cover.subtitle} disabled={locked} onChange={(event) => updateCover({subtitle: event.target.value})} /></label>
           {/* 编辑时保留关键词内部和末尾空格，避免输入英文多词关键词时受控回写吞掉空格。 */}
           <label>封面关键词<input value={cover.keywords.join("、")} disabled={locked} onChange={(event) => updateCover({keywords: event.target.value.split(/[,，、]/).slice(0, 8)})} /></label>
           {profile.presenter.poses.length > 0 ? <label>封面人物姿势<select value={cover.presenterPoseId} disabled={locked || !profile.presenter.poses.length} onChange={(event) => updateCover({presenterPoseId: event.target.value as NonNullable<VisualPlan["cover"]>["presenterPoseId"]})}>{retiredCoverPose ? <option value={retiredCoverPose.id}>历史姿态 · {retiredCoverPose.label}</option> : null}{profile.presenter.poses.map((pose) => <option key={pose.id} value={pose.id}>{pose.label ?? pose.id}</option>)}</select></label> : null}

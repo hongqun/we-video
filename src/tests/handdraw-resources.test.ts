@@ -1,6 +1,7 @@
 /* eslint-disable @remotion/non-pure-animation -- 时间只用于任务元数据与输入夹具。 */
 import assert from "node:assert/strict";
 import {promises as fs} from "node:fs";
+import {createHash} from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -36,7 +37,53 @@ try {
   const processing = {...original, color: original.lineart, status: "processing" as const, requestId: "new-request", startedAt: new Date().toISOString()};
   await resources.saveVisualResource(jobId, "n1", {handdraw: processing}, scene.id);
   const cacheKey = handdraw.handdrawCacheKey(processing)!;
-  const data: HanddrawData = {algorithmVersion: HANDDRAW_VERSION, cacheKey, width: 64, height: 64, minimumDrawMs: 500, completePath: "complete.png", lineLayerPath: "line.png", colorLayerPath: "color.png", lineTimePath: "line-time.png", colorTimePath: "color-time.png", motionPath: "motion.json", hashes: {}};
+  const data: HanddrawData = {algorithmVersion: HANDDRAW_VERSION, sketchLayerPath: "sketch.png", sketchTimePath: "sketch-time.png", eraseTimePath: "erase-time.png", stageTimings: {sketchEndMs: 100, lineEndMs: 200, eraseEndMs: 300, colorEndMs: 450}, cacheKey, width: 64, height: 64, minimumDrawMs: 500, completePath: "complete.png", lineLayerPath: "line.png", colorLayerPath: "color.png", lineTimePath: "line-time.png", colorTimePath: "color-time.png", motionPath: "motion.json", hashes: {}};
+  // 完整新版缓存按内容寻址，任何新增起形文件缺失或损坏都必须失败。
+  const hash = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
+  assert.notEqual(cacheKey, hash(`handdraw-5:${processing.lineart!.sha256}:${processing.color!.sha256}`));
+  const cacheDir = path.join(dir, "handdraw/cache", cacheKey);
+  await fs.mkdir(cacheDir, {recursive: true});
+  const filenames = {completePath: "complete.png", lineLayerPath: "line.png", colorLayerPath: "color.png", lineTimePath: "line-time.png", colorTimePath: "color-time.png", motionPath: "motion.json", sketchLayerPath: "sketch.png", sketchTimePath: "sketch-time.png", eraseTimePath: "erase-time.png"} as const;
+  const cachedData = {...data, hashes: {} as Record<string, string>};
+  for (const [field, filename] of Object.entries(filenames)) {
+    const content = field === "motionPath" ? Buffer.from(JSON.stringify({algorithmVersion: HANDDRAW_VERSION, cacheKey, width: 64, height: 64, minimumDrawMs: 500, stageTimings: data.stageTimings, points: [[0, 0, 0, 0], [10, 1, 1, 3], [100, 1, 1, 1], [200, 1, 1, 4], [300, 1, 1, 2], [450, 1, 1, 0]]})) : bytes;
+    await fs.writeFile(path.join(cacheDir, filename), content);
+    Object.assign(cachedData, {[field]: `handdraw/cache/${cacheKey}/${filename}`});
+    cachedData.hashes[field] = hash(content);
+  }
+  assert.equal((await handdraw.verifyHanddrawArtifacts(jobId, cachedData)).algorithmVersion, HANDDRAW_VERSION);
+  for (const field of ["sketchLayerPath", "sketchTimePath", "eraseTimePath"] as const) {
+    await assert.rejects(() => handdraw.verifyHanddrawArtifacts(jobId, {...cachedData, [field]: undefined}));
+    await fs.rm(path.join(cacheDir, filenames[field]));
+    await assert.rejects(() => handdraw.verifyHanddrawArtifacts(jobId, cachedData), /ENOENT/);
+    await fs.writeFile(path.join(cacheDir, filenames[field]), "damaged");
+    await assert.rejects(() => handdraw.verifyHanddrawArtifacts(jobId, cachedData), /产物已变化/);
+    await fs.writeFile(path.join(cacheDir, filenames[field]), bytes);
+  }
+  const verifiedMotion = JSON.parse(await fs.readFile(path.join(cacheDir, "motion.json"), "utf8"));
+  const invalidMotion = JSON.stringify({...verifiedMotion, stageTimings: {...data.stageTimings, lineEndMs: 190}});
+  await fs.writeFile(path.join(cacheDir, "motion.json"), invalidMotion);
+  await assert.rejects(() => handdraw.verifyHanddrawArtifacts(jobId, {...cachedData, hashes: {...cachedData.hashes, motionPath: hash(invalidMotion)}}), /运动计划与图层不一致/);
+  await fs.writeFile(path.join(cacheDir, "motion.json"), JSON.stringify(verifiedMotion));
+  await jobs.atomicWriteJson(path.join(cacheDir, "data.json"), cachedData);
+  const legacyKey = hash(`handdraw-5:${processing.lineart!.sha256}:${processing.color!.sha256}`);
+  const legacyDir = path.join(dir, "handdraw/cache", legacyKey);
+  await fs.mkdir(legacyDir, {recursive: true});
+  const legacyData: HanddrawData = {...cachedData, algorithmVersion: "handdraw-5", cacheKey: legacyKey, stageTimings: undefined, sketchLayerPath: undefined, sketchTimePath: undefined, eraseTimePath: undefined, hashes: {}};
+  for (const field of ["completePath", "lineLayerPath", "colorLayerPath", "lineTimePath", "colorTimePath", "motionPath"] as const) {
+    const content = field === "motionPath" ? Buffer.from(JSON.stringify({algorithmVersion: "handdraw-5", cacheKey: legacyKey, width: 64, height: 64, minimumDrawMs: 500, points: [[0, 0, 0, 0], [10, 1, 1, 1], [300, 1, 1, 2], [450, 1, 1, 0]]})) : bytes;
+    await fs.writeFile(path.join(legacyDir, filenames[field]), content);
+    legacyData[field] = `handdraw/cache/${legacyKey}/${filenames[field]}`;
+    legacyData.hashes[field] = hash(content);
+  }
+  await handdraw.verifyHanddrawArtifacts(jobId, legacyData);
+  await resources.saveVisualResource(jobId, "n1", {handdraw: {...processing, data: legacyData}}, scene.id);
+  // 重新处理历史资源会按新版键命中已验证产物，不改写历史缓存。
+  await handdraw.prepareHanddraw(jobId, scene.id, "new-request");
+  assert.equal((await resources.readVisualResources(jobId)).resources[0]!.handdraw!.data!.algorithmVersion, HANDDRAW_VERSION);
+  assert.equal((await handdraw.verifyHanddrawArtifacts(jobId, legacyData)).algorithmVersion, "handdraw-5");
+  await resources.saveVisualResource(jobId, "n1", {handdraw: processing}, scene.id);
+  await fs.rm(cacheDir, {recursive: true});
   const revision = (await resources.readVisualResources(jobId)).revision;
   await handdraw.publishHanddrawResult(jobId, scene.id, "old-request", data);
   assert.equal((await resources.readVisualResources(jobId)).revision, revision);

@@ -63,11 +63,16 @@ const main = async () => {
     let replies: unknown[] = [english];
     const prompts: string[] = [];
     globalThis.fetch = async (_input, init) => {
-      const request = JSON.parse(String(init?.body)) as {messages: Array<{content: string}>};
+      const request = JSON.parse(String(init?.body)) as {messages: Array<{content: string}>; thinking: {type: string}; response_format: {type: string}};
+      // JSON 翻译各阶段都显式关闭思考，避免退回供应商默认模式。
+      assert.equal(request.thinking.type, "disabled");
+      assert.equal(request.response_format.type, "json_object");
+      assert.match(request.messages[0]!.content, /JSON/);
       prompts.push(request.messages[1]!.content);
       if (!replies.length) throw new Error("测试禁止未预期的模型调用");
       const reply = replies.shift();
       if (reply instanceof Error) throw reply;
+      if (reply instanceof Response) return reply;
       return new Response(JSON.stringify({choices: [{message: {content: JSON.stringify(reply)}}]}), {status: 200});
     };
     await updateJobState(childId, {state: "translating"});
@@ -76,6 +81,13 @@ const main = async () => {
     assert.doesNotMatch(prompts[0]!, /narrationSegments|visualPlan|pauseAfter|ttsText/);
     assert.deepEqual((await readTranslationReview(childId)).translated, english);
     assert.equal((await snapshot(childId)).draft, null);
+
+    // 接口错误保留具体原因，任务回到可重试状态且已生成译稿不丢失。
+    replies = [new Response(JSON.stringify({error: {message: "模拟参数不兼容"}}), {status: 400})];
+    await updateJobState(childId, {state: "translating"});
+    await assert.rejects(runTranslation(childId, "generate"), /HTTP 400：模拟参数不兼容/);
+    assert.equal((await readJob(childId)).state, "awaiting_translation_review");
+    assert.deepEqual((await readTranslationReview(childId)).translated, english);
 
     const pasted = {...english, text: "  LLMs call an API.\n\nThen check 2 orders.  "};
     await submitTranslation(childId, "save", pasted);

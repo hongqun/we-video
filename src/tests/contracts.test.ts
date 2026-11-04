@@ -16,6 +16,9 @@ assert.deepEqual(getCoverContent({title: "编辑封面", subtitle: "", keywords:
 // 封面组件只接受 cover，不能再从 draft 标题或首镜头内容补值。
 assert.deepEqual(getCoverContent({title: "独立封面", subtitle: "", keywords: ["封面关键词"], presenterPoseId: "neutral"}), {title: "独立封面", subtitle: "", keywords: ["封面关键词"]});
 assert.equal(renderManifestSchema.safeParse({...manifest, cover: {title: "", subtitle: "", keywords: [], presenterPoseId: "neutral"}}).success, false);
+// 英文翻译膨胀后仍可完整保存封面，标题、副标题和关键词均不沿用旧字符上限。
+const longEnglishCover = {title: "A complete English cover title exceeding forty characters", subtitle: "A complete English subtitle with its original meaning preserved. ".repeat(3), keywords: ["Independent decision making and execution"], presenterPoseId: "neutral"};
+assert.deepEqual(renderManifestSchema.parse({...manifest, cover: longEnglishCover}).cover, longEnglishCover);
 assert.equal(renderManifestSchema.safeParse({...manifest, cover: {title: "封面", subtitle: "副标题", keywords: [], presenterPoseId: "?"}}).success, false);
 assert.equal(renderManifestSchema.safeParse({...manifest, cover: {title: "封面", subtitle: "副标题", keywords: [], presenterPoseId: "neutral", imagePath: "uploaded-images/cover.png", imageWidth: 1}}).success, false);
 assert.equal(renderManifestSchema.safeParse({...manifest, cover: {title: "封面", subtitle: "副标题", keywords: [], presenterPoseId: "neutral", imagePath: "artifact://uploaded-images/cover.png", imageWidth: 1, imageHeight: 1}}).success, true);

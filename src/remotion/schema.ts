@@ -28,9 +28,10 @@ export const presenterPlacementSchema = z.enum(PRESENTER_PLACEMENTS);
 export const presenterFramingSchema = z.enum(PRESENTER_FRAMINGS);
 // 封面只保存可编辑文案和人物姿势，布局仍由 CoverOpening 统一控制。
 export const coverSchema = z.object({
-  title: z.string().trim().min(1).max(40),
-  subtitle: z.string().trim().max(120),
-  keywords: z.array(z.string().trim().min(1).max(24)).max(8),
+  // 与镜头文案一致，不按字符数截断封面译文；中英文保留完整文本。
+  title: z.string().trim().min(1),
+  subtitle: z.string().trim(),
+  keywords: z.array(z.string().trim().min(1)).max(8),
   presenterPoseId: presenterPoseIdSchema,
   imagePath: z.string().trim().min(1).optional(),
   imageWidth: z.number().int().positive().optional(),

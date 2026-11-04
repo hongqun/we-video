@@ -22,6 +22,13 @@ https://github.com/user-attachments/assets/c35ecc91-e41a-4efd-b185-ddf2efff3b56
 
 https://github.com/user-attachments/assets/8ce4361f-9ddd-4b2c-9de7-99c0a0a18d72
 
+### 手绘插画
+
+
+https://github.com/user-attachments/assets/63047ef0-d178-4486-9c87-7bf7db18ae30
+
+
+
 ## 目前支持的镜头类型
 
 - **IP 动态开场舞台**：以角色与动态舞台引出主题。

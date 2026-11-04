@@ -64,6 +64,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   const [relationEditorMaximized, setRelationEditorMaximized] = useState(false);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("step");
   const [stepPlaybackCompleted, setStepPlaybackCompleted] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -293,37 +294,41 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     const target = value.scenes[selectedRef.current];
     const element = audio.current;
     if (!target || !element) return;
-    // 由业务按钮在同一次用户操作中完成定位和播放，避免原生 controls 先从 0 秒启动。
+    setPlaybackError(null);
+    // 元数据未就绪时先记录定位目标，仍在点击内请求播放，保留浏览器的有声播放授权。
     if (element.readyState < 1) {
       pendingSeekRef.current = target.startMs;
-      const playWhenReady = () => {
-        element.removeEventListener("loadedmetadata", playWhenReady);
-        element.currentTime = target.startMs / 1000;
-        setTime(target.startMs);
-        pendingSeekRef.current = null;
-        void element.play();
-      };
-      element.addEventListener("loadedmetadata", playWhenReady);
-      return;
+      setTime(target.startMs);
+      setStepPlaybackCompleted(null);
     }
     const currentTimeMs = element.currentTime * 1000;
     const restartPreview = (
-      stepPlaybackCompleted === selectedRef.current
+      element.readyState < 1
+      || stepPlaybackCompleted === selectedRef.current
       || currentTimeMs < target.startMs
       || currentTimeMs >= target.endMs
     );
     if (restartPreview) {
-      element.currentTime = target.startMs / 1000;
+      if (element.readyState >= 1) element.currentTime = target.startMs / 1000;
       setTime(target.startMs);
       setStepPlaybackCompleted(null);
     }
-    pendingSeekRef.current = null;
+    if (element.readyState >= 1) pendingSeekRef.current = null;
+    // 口播使用独立 audio，Player 的音量设置不会解除它的静音。
+    element.muted = false;
+    element.volume = 1;
     // 与口播在同一次点击中启动并解锁 Player 音频，避免浏览器拦截模板内的打字机音效。
     previewPlayer.current?.unmute();
     previewPlayer.current?.setVolume(1);
     if (restartPreview) previewPlayer.current?.seekTo(0);
     previewPlayer.current?.play();
-    void element.play();
+    void element.play().catch((error: unknown) => {
+      // 切镜头或重载资源会中止尚未开始的播放，不作为加载失败提示。
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setPlaying(false);
+      previewPlayer.current?.pause();
+      setPlaybackError("口播音频暂时无法播放，请重试；若仍无声音，请刷新页面。");
+    });
   };
   const handleAudioLoadedMetadata = () => {
     if (pendingSeekRef.current === null) return;
@@ -494,6 +499,9 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           }} /> : null}
         </section> : null}
         {current.templateId === "rve/handdraw-image" ? <HanddrawResources key={`${jobId}-${current.id}`} jobId={jobId} sceneId={current.id} scene={current} resource={currentResource?.handdraw} disabled={locked} url={(relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision)} onResources={(next) => setHanddrawSnapshot((old) => !old || (next.revision ?? 0) >= (old.revision ?? 0) ? next : old)} onInvalidate={onHanddrawChange} onBusyChange={setHanddrawBusy} beforeChange={async () => {
+          // 处理期间预览会卸载，先停止并回到镜头起点，防止口播在后台播完。
+          seek(selectedRef.current);
+          previewPlayer.current?.pause();
           // 先持久化新镜头和时间边界，再以 sceneId 上传素材或生成提示词。
           if (dirty) {const next = await save(); if (!next) throw new Error("请先保存镜头规划后重试");}
         }} /> : null}
@@ -546,10 +554,12 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
         </div>
         {/* 不使用原生 controls，场景播放必须先定位到当前镜头再启动音频。 */}
         <div className="visual-plan-audio-controls">
-          <audio ref={audio} src={audioSrc} preload="metadata" onLoadedMetadata={handleAudioLoadedMetadata} onSeeked={handleAudioSeeked} onTimeUpdate={handleAudioTimeUpdate} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
+          {/* 重处理刷新音频地址时同步清理播放状态，避免画面仍播放而口播已经停止。 */}
+          <audio ref={audio} src={audioSrc} preload="metadata" onLoadedMetadata={handleAudioLoadedMetadata} onSeeked={handleAudioSeeked} onTimeUpdate={handleAudioTimeUpdate} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEmptied={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={() => {setPlaying(false); setPlaybackError("口播音频加载失败，请刷新页面后重试。");}} />
           <button type="button" className="secondary" onClick={() => playing ? audio.current?.pause() : playSelectedScene()}><Icon name="play" />{playing ? "暂停" : "播放当前镜头"}</button>
           <span className="metadata">{clock(time)} / {clock(current.endMs)}</span>
         </div>
+        {playbackError ? <p className="error-text" role="alert">{playbackError}</p> : null}
         {playbackMode === "step" && selected < value.scenes.length - 1 ? <button type="button" className="visual-plan-next-step" onClick={continueStepPlayback}><Icon name="arrow-right" />下一步</button> : null}
         <div className="visual-plan-rail">{value.scenes.map((scene, index) => <button type="button" className={`${index === selected ? "is-selected" : ""} ${index === playingIndex ? "is-playing" : ""}`} key={scene.id} onClick={() => seek(index)}><b>{String(index + 1).padStart(2, "0")}</b><span>{scene.content.title}</span><small>{`${clock(scene.startMs)}–${clock(scene.endMs)}`}</small></button>)}</div>
       </aside>

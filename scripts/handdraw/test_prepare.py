@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
-from prepare import run, clean_line_gray, paint_regions
+from prepare import run, clean_line_gray, paint_regions, color_layer
 
 
 class HanddrawPreparationTests(unittest.TestCase):
@@ -22,6 +22,64 @@ class HanddrawPreparationTests(unittest.TestCase):
         paint[15:45:2, 18:48:2] = [223, 127, 63]
         _, regions = paint_regions(paint, cleaned)
         self.assertLess(len(regions), 10)
+
+    def test_smooth_gradient_uses_one_region_without_changing_source_pixels(self):
+        # 渐变跨越多个旧 RGB 档位时，仍应一次连续上色。
+        gray = np.full((64, 96), 255.)
+        paint = np.full((64, 96, 3), 255, np.uint8)
+        paint[12:52, 8:88] = np.c_[np.linspace(60, 220, 80).astype(np.uint8), np.full(80, 160), np.full(80, 80)]
+        original = paint.copy()
+        mask, regions = paint_regions(paint, gray)
+        self.assertEqual(len(regions), 1)
+        self.assertEqual(len(regions[0][1]), int(mask.sum()))
+        self.assertTrue(np.array_equal(paint, original))
+
+    def test_sharp_color_changes_and_ink_keep_regions_separate(self):
+        # 相接的红蓝两色分别落笔；相同颜色被墨线隔开时也不能合并。
+        gray = np.full((64, 96), 255.)
+        paint = np.full((64, 96, 3), 255, np.uint8)
+        paint[12:52, 8:48] = [230, 80, 70]
+        paint[12:52, 48:88] = [70, 150, 230]
+        _, regions = paint_regions(paint, gray)
+        self.assertEqual(len(regions), 2)
+        paint[12:52, 48:88] = [230, 80, 70]
+        gray[:, 47:49] = 0
+        mask, regions = paint_regions(paint, gray)
+        self.assertEqual(len(regions), 2)
+        self.assertFalse(mask[:, 47:49].any())
+
+    def test_translucent_line_edges_have_color_beneath_and_white_outside(self):
+        # 模拟黑线的灰色抗锯齿边缘，成图应与原始彩图一致，避免叠加白边或重复黑线。
+        gray = np.full((40, 40), 255.)
+        gray[:, 11:14] = [160, 0, 160]
+        paint = np.full((40, 40, 3), 255, np.uint8)
+        fill = np.array([220, 140, 60], np.uint8)
+        paint[:, 14:] = fill
+        paint[:, 11] = 160
+        paint[:, 12] = 0
+        paint[:, 13] = np.rint(fill * (160 / 255)).astype(np.uint8)
+        layer = color_layer(paint, gray, edge_margin=3)
+        self.assertTrue(np.all(layer[:, 13, :3] == fill))
+        self.assertTrue(np.all(layer[:, 13, 3] == 255))
+        self.assertFalse(layer[:, :11, 3].any())
+        base = np.where(layer[..., 3:4] > 0, layer[..., :3], 255)
+        complete = np.rint(base * (gray[..., None] / 255)).astype(np.uint8)
+        self.assertTrue(np.array_equal(complete, paint))
+
+    def test_edge_repair_preserves_small_closed_fills_and_open_color_marks(self):
+        # 边缘修复范围大于小色区时，也应留下闭合色点和开放线条旁的细笔触。
+        gray = np.full((40, 40), 255.)
+        gray[:, 8] = 0
+        gray[20:28, 20:28] = 0
+        gray[22:26, 22:26] = 255
+        paint = np.repeat(gray[..., None], 3, axis=2).astype(np.uint8)
+        paint[22:26, 22:26] = [230, 90, 70]
+        paint[10:18, 9] = [70, 160, 230]
+        layer = color_layer(paint, gray, edge_margin=8)
+        self.assertTrue(np.all(layer[22:26, 22:26, :3] == [230, 90, 70]))
+        self.assertTrue(np.all(layer[22:26, 22:26, 3] == 255))
+        self.assertTrue(np.all(layer[10:18, 9, :3] == [70, 160, 230]))
+        self.assertFalse(layer[:, :8, 3].any())
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

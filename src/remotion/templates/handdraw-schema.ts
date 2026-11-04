@@ -1,9 +1,9 @@
 import {z} from "zod";
 
 // 算法版本参与缓存键，预览与导出只消费相同版本的不可变产物。
-export const HANDDRAW_VERSION = "handdraw-3";
-// 老任务仍能播放，修正色块归并后的新缓存使用独立版本键。
-const handdrawVersionSchema = z.enum(["handdraw-1", "handdraw-2", HANDDRAW_VERSION]);
+export const HANDDRAW_VERSION = "handdraw-4";
+// 老任务仍能播放，修复白边与渐变分区后的新产物使用独立缓存键。
+const handdrawVersionSchema = z.enum(["handdraw-1", "handdraw-2", "handdraw-3", HANDDRAW_VERSION]);
 const fileSchema = z.object({path: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/), width: z.number().int().positive(), height: z.number().int().positive()}).strict();
 export const handdrawDataSchema = z.object({
   algorithmVersion: handdrawVersionSchema, cacheKey: z.string().regex(/^[a-f0-9]{64}$/),

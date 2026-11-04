@@ -10,11 +10,13 @@ sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 import numpy as np
 from PIL import Image
 from scipy import ndimage
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 from line_first import register, move, luminance, MIN_KEPT, MAX_ADDED, MAX_SHIFT
 from line_topology import extract_strokes
 
-VERSION = "handdraw-3"
+VERSION = "handdraw-4"
 
 
 def clean_line_gray(gray):
@@ -25,8 +27,8 @@ def clean_line_gray(gray):
     return np.where(supported[labels], gray, 255.)
 
 
-def paint_regions(paint, gray):
-    """按实际连通区域归并抗锯齿碎片，保留原始颜色，只简化画笔分区。"""
+def paint_mask(paint, gray):
+    """只清理墨线和孤立噪点，不改动真实填色像素。"""
     mask = (paint.min(axis=2) < 247) & ~(gray < 245)
     labels, _ = ndimage.label(mask)
     sizes = np.bincount(labels.ravel())
@@ -34,43 +36,94 @@ def paint_regions(paint, gray):
     neutral = np.ptp(paint.astype(int), axis=2) < 20
     # 一两个像素的中性噪点和墨线边缘不再被当成独立的马克笔颜色。
     mask &= ~((sizes[labels] < 8) & ((near_ink <= 3) | neutral))
+    return mask
+
+
+def paint_regions(paint, gray):
+    """按相邻像素的色差分区，渐变共用笔道，输出仍保留原始颜色。"""
+    mask = paint_mask(paint, gray)
     labels, _ = ndimage.label(mask)
-    quantized = paint.astype(np.uint32) // 32
-    codes = quantized[..., 0] * 64 + quantized[..., 1] * 8 + quantized[..., 2]
     regions = []
     for component, box in enumerate(ndimage.find_objects(labels), 1):
         if box is None:
             continue
         inside = labels[box] == component
-        local_codes = codes[box]
+        colors = paint[box].astype(np.int16)
         owners = np.zeros(inside.shape, np.int32)
-        count = 0
-        for code in np.unique(local_codes[inside]):
-            pieces, _ = ndimage.label((local_codes == code) & inside)
-            counts = np.bincount(pieces.ravel())
-            for piece in np.flatnonzero(counts >= 32):
-                if piece == 0:
-                    continue
-                count += 1
-                owners[pieces == piece] = count
-        if count:
-            # 小碎片只归入同一物体内部最近的主色块，不跨墨线寻找其他物体。
+        ids = np.full(inside.shape, -1, np.int32)
+        size = int(inside.sum())
+        ids[inside] = np.arange(size)
+        # 只连接四邻域中颜色接近的像素；不按固定 RGB 档位切开平滑渐变。
+        horizontal = inside[:, :-1] & inside[:, 1:] & (np.abs(colors[:, :-1] - colors[:, 1:]).max(axis=2) <= 32)
+        vertical = inside[:-1] & inside[1:] & (np.abs(colors[:-1] - colors[1:]).max(axis=2) <= 32)
+        starts = np.r_[ids[:, :-1][horizontal], ids[:-1][vertical]]
+        ends = np.r_[ids[:, 1:][horizontal], ids[1:][vertical]]
+        graph = coo_matrix((np.ones(len(starts), np.uint8), (starts, ends)), shape=(size, size)).tocsr()
+        _, assignments = connected_components(graph, directed=False)
+        owners[inside] = assignments + 1
+        counts = np.bincount(owners[inside])
+        # 大物体内的小纹理也归并，但始终限制在同一连通区域内。
+        minimum = max(32, min(128, math.ceil(size * .002)))
+        major = counts >= minimum
+        major[0] = False
+        if not major.any():
+            major[int(np.argmax(counts))] = True
+        owners[~major[owners]] = 0
+        if np.any(inside & (owners == 0)):
             nearest = ndimage.distance_transform_edt(owners == 0, return_distances=False, return_indices=True)
             owners[inside] = owners[nearest[0][inside], nearest[1][inside]]
-        else:
-            owners[inside] = 1
-            count = 1
-        for owner in range(1, count + 1):
+        for owner in np.unique(owners[inside]):
             ys, xs = np.where((owners == owner) & inside)
             if not len(xs):
                 continue
             ys += box[0].start
             xs += box[1].start
-            code = int(np.bincount(codes[ys, xs]).argmax())
+            # 代表色仅用于换笔排序，不参与像素归属，也不重涂原图。
+            representative = np.median(paint[ys, xs], axis=0).astype(int) // 32
+            code = int(representative @ [64, 8, 1])
             regions.append((float(luminance(paint[ys, xs]).mean()), ys, xs, code))
             if len(regions) > 12000:
                 raise ValueError("彩图色块过碎；请使用少量平涂颜色，去掉纹理和渐变")
     return mask, regions
+
+
+def color_layer(paint, gray, edge_margin):
+    """从轮廓同侧的底色修复边缘，再将颜色延伸到墨线下面。"""
+    ink = gray < 245
+    mask = paint_mask(paint, gray)
+    colors = np.where(mask[..., None], paint, 255).astype(np.uint8)
+    depth = ndimage.distance_transform_edt(~ink)
+    paper, _ = ndimage.label(~ink)
+    light_or_color = (luminance(paint) >= 110) | (np.ptp(paint.astype(int), axis=2) >= 70)
+    for component, box in enumerate(ndimage.find_objects(paper), 1):
+        if box is None:
+            continue
+        inside = paper[box] == component
+        local_depth = depth[box]
+        # 狭小闭合区域使用自身深度，避免交通灯、眼睛等小色区被整个抹掉。
+        safe = inside & (local_depth >= min(edge_margin, local_depth[inside].max() * .5))
+        parts, _ = ndimage.label(mask[box] & inside)
+        for part, part_box in enumerate(ndimage.find_objects(parts), 1):
+            if part_box is None:
+                continue
+            piece = parts[part_box] == part
+            if (safe[part_box] & piece).any():
+                continue
+            # 开放轮廓旁的细小彩色笔触也保留锚点，重复黑线不作为底色来源。
+            candidates = piece & light_or_color[box][part_box]
+            if candidates.any():
+                safe[part_box] |= candidates & (local_depth[part_box] >= local_depth[part_box][candidates].max())
+        edge = inside & ~safe
+        if edge.any():
+            nearest = ndimage.distance_transform_edt(~safe, return_distances=False, return_indices=True)
+            local_colors = colors[box]
+            local_colors[edge] = local_colors[nearest[0][edge], nearest[1][edge]]
+    # 墨线覆盖底色；两侧先独立修复，白背景不会被另一侧的颜色扩散污染。
+    if ink.any():
+        nearest = ndimage.distance_transform_edt(ink, return_distances=False, return_indices=True)
+        colors[ink] = colors[nearest[0][ink], nearest[1][ink]]
+    alpha = (colors.min(axis=2) < 247).astype(np.uint8) * 255
+    return np.dstack([colors, alpha])
 
 
 def load_white(file):
@@ -223,21 +276,13 @@ def run(line_path, color_path, output, cache_key):
     if now > 600000 or len(points) > 500000:
         raise ValueError("整图绘制过于复杂；请减少对象、线条和色块")
     duration = math.ceil(now)
-    # 显示层保留高分辨率，时间场按最近邻放大，完成后不另行切换整图。
-    full_gray = np.array(line.convert("L"))
-    full_gray[full_gray >= 245] = 255
-    line_support = np.array(Image.fromarray(((gray < 245) * 255).astype(np.uint8)).resize(line.size, Image.Resampling.NEAREST)) > 0
-    full_gray[~line_support] = 255
+    # 墨线与底色在原始分辨率独立清理，低分辨率规划场只负责时间，不裁切显示边缘。
+    full_gray = clean_line_gray(np.array(line.convert("L")))
     aligned = move(np.array(color), round(dy * line.height / h), round(dx * line.width / w))
     alpha = 255 - full_gray
     line_rgba = np.zeros((line.height, line.width, 4), np.uint8)
     line_rgba[..., 3] = alpha
-    color_rgba = np.dstack([aligned, np.full(alpha.shape, 255, np.uint8)])
-    # 线稿位置先留白，避免上色时把模型带来的重复黑线刷出来。
-    color_rgba[..., 3][alpha > 0] = 0
-    color_rgba[..., 3][aligned.min(axis=2) >= 247] = 0
-    kept = np.array(Image.fromarray((fill_mask * 255).astype(np.uint8)).resize(line.size, Image.Resampling.NEAREST)) > 0
-    color_rgba[..., 3][~kept] = 0
+    color_rgba = color_layer(aligned, full_gray, edge_margin=2 * max(line.width / w, line.height / h))
     if not fill_mask.any():
         color_rgba[..., 3] = 0
     Image.fromarray(line_rgba).save(out / "line.png")

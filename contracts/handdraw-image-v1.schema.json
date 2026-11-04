@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["algorithmVersion", "cacheKey", "width", "height", "minimumDrawMs", "completePath", "lineLayerPath", "colorLayerPath", "lineTimePath", "colorTimePath", "motionPath", "hashes"],
   "properties": {
-    "algorithmVersion": {"enum": ["handdraw-1", "handdraw-2", "handdraw-3"]},
+    "algorithmVersion": {"enum": ["handdraw-1", "handdraw-2", "handdraw-3", "handdraw-4"]},
     "cacheKey": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "width": {"type": "integer", "minimum": 1, "maximum": 1600},
     "height": {"type": "integer", "minimum": 1, "maximum": 1600},

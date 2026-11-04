@@ -18,6 +18,7 @@ import {modelScenePlanSchema} from "@/remotion/templates/model-scene-schema";
 import {ensureCameraBoundaries} from "@/remotion/templates/model-scene-editing";
 import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
 import {handdrawTemplateData, handdrawTiming, handdrawDataSchema} from "@/remotion/templates/handdraw-schema";
+import {textRevealSettingsSchema} from "@/remotion/templates/text-reveal-schema";
 
 const presenterPlanSchema = z.object({rollType: rollTypeSchema, mode: presenterModeSchema, poseId: presenterPoseIdSchema, placement: presenterPlacementSchema, framing: presenterFramingSchema.optional()}).strict();
 
@@ -32,6 +33,8 @@ export const visualPlanSceneSchema = z.object({
   templateId: z.string().min(1),
   visualData: relationGraphDataSchema.optional(),
   modelScene: modelScenePlanSchema.optional(),
+  // 揭示文字的音效设置独立保存，不混入文案或素材资源。
+  textReveal: textRevealSettingsSchema.optional(),
   presenter: presenterPlanSchema,
 }).strict();
 export const visualPlanSchema = z.object({schemaVersion: z.literal("1.0"), revision: z.number().int().positive().default(1), planVersion: z.number().int().positive(), createdAt: z.string().datetime(), feedback: z.string().trim().min(1).optional(), visualStyle: visualStyleSchema.optional(), cover: coverSchema.optional(), scenes: z.array(visualPlanSceneSchema).min(1)}).strict();
@@ -115,6 +118,7 @@ export const readVisualPlan = async (jobId: string, revision?: number) => {
 };
 
 const templateDataForManifest = (scene: VisualPlanScene, resources: VisualResources, allowIncompleteImage = false): Record<string, unknown> | undefined => {
+  if (scene.templateId === "rve/text-reveal") return scene.textReveal;
   if (scene.templateId === "rve/relation-graph") return scene.visualData ? relationGraphDataSchema.parse(scene.visualData) : undefined;
   if (scene.templateId === "rve/handdraw-image") {
     const data = handdrawTemplateData(visualResourceForScene(resources, scene.id, scene.segmentId)?.handdraw, (relative) => `artifact://${relative}`);

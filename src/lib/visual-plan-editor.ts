@@ -11,6 +11,8 @@ const cloneVisualPlanScene = (scene: VisualPlanScene): VisualPlanScene => ({
   content: {...scene.content, keywords: [...scene.content.keywords], ...(scene.content.emphasisBindings ? {emphasisBindings: scene.content.emphasisBindings.map((binding) => ({...binding}))} : {})},
   transition: {...scene.transition},
   presenter: {...scene.presenter},
+  // 拆分后各自维护音效开关。
+  ...(scene.textReveal ? {textReveal: {...scene.textReveal}} : {}),
   ...(scene.modelScene ? {modelScene: structuredClone(scene.modelScene)} : {}),
   ...(scene.visualData ? {
     visualData: {

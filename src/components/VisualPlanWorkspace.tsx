@@ -26,6 +26,7 @@ import {visualResourceForScene} from "@/lib/visual-resource-selection";
 import {VISUAL_STYLE_OPTIONS, type VisualStyleId} from "@/remotion/visual-style";
 import {freshCameraPlan, resetModelPlan} from "@/remotion/templates/model-scene-editing";
 import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
+import {textRevealSoundEnabled} from "@/remotion/templates/text-reveal-schema";
 
 const TemplatePreview = dynamic(() => import("./TemplatePreview").then(({TemplatePreview: Component}) => Component), {ssr: false});
 const RelationGraphEditor = dynamic(() => import("./RelationGraphEditor").then(({RelationGraphEditor: Component}) => Component), {ssr: false});
@@ -149,7 +150,9 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       ? {imagePath, imageWidth: sceneResource.imageWidth, imageHeight: sceneResource.imageHeight, polygons: sceneResource.polygons}
       : scene.templateId === "rve/3d-model-scene" && modelPath && scene.modelScene ? {modelPath, ...scene.modelScene}
       : scene.templateId === "rve/handdraw-image" ? handdrawTemplateData(sceneResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
-      : scene.templateId === "rve/relation-graph" ? scene.visualData : undefined;
+      : scene.templateId === "rve/relation-graph" ? scene.visualData
+      // 与清单构建保持一致，让音效开关即时作用于当前预览。
+      : scene.templateId === "rve/text-reveal" ? scene.textReveal : undefined;
     const speechStartMs = Math.max(scene.startMs, sceneTiming.speechStartMs ?? sceneTiming.startMs);
     const speechEndMs = Math.min(scene.endMs, sceneTiming.speechEndMs ?? sceneTiming.endMs);
     const fullSpokenText = spokenSegments.find((item) => item.id === scene.segmentId)?.spokenText ?? "";
@@ -446,6 +449,8 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image";
           return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingMedia)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingMedia ? "可先选择，待完成素材与编排" : status.reason}</small></span></button>;
         })}</div></div>
+        {/* 音效随当前镜头保存，切换模板后仍保留用户选择。 */}
+        {current.templateId === "rve/text-reveal" ? <label>打字机音效<select value={textRevealSoundEnabled(current.textReveal?.typingSound) ? "on" : "off"} disabled={locked} onChange={(event) => update({textReveal: {...current.textReveal, typingSound: event.target.value === "on"}})}><option value="on">开启</option><option value="off">关闭</option></select></label> : null}
         <div className="visual-plan-spoken"><span>当前口播 · 将光标放在文字中间后点击拆分</span><div className="visual-plan-spoken-editor"><textarea ref={spokenTextRef} value={runtimeScene?.spokenText ?? ""} readOnly rows={3} aria-label="当前镜头口播文字" /><button type="button" className="secondary icon-only" aria-label="按光标拆分镜头" title="按光标拆分镜头" data-tooltip="按光标拆分镜头" disabled={locked} onClick={splitAtSpokenTextCursor}><Icon name="flow" /></button></div></div>
         {/* 场景主标题与封面标题保持一致，支持手动换行并直接传给显式换行渲染。 */}
         <label>主标题<textarea rows={2} value={current.content.title} disabled={locked} onChange={(event) => updateContent({title: event.target.value})} placeholder="可按 Enter 手动换行" /></label>

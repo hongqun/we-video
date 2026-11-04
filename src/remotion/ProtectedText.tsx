@@ -2,7 +2,7 @@ const TOKEN_RE = /([A-Za-z][A-Za-z0-9._+#/-]*)/g;
 const ENGLISH_TOKEN_RE = /^[A-Za-z][A-Za-z0-9._+#/-]*$/;
 const VISUAL_TOKEN_RE = /[A-Za-z][A-Za-z0-9._+#/-]*|[\s\S]/gu;
 
-const protectLineEnd = (value: string, lineIndex: number) => {
+const protectLineEnd = (value: string, lineIndex: number, renderText: (text: string) => React.ReactNode) => {
   const parts = value.split(TOKEN_RE);
   let lastContentIndex = -1;
   for (let index = parts.length - 1; index >= 0; index -= 1) {
@@ -12,13 +12,13 @@ const protectLineEnd = (value: string, lineIndex: number) => {
     }
   }
   return parts.map((part, index) => {
-    if (ENGLISH_TOKEN_RE.test(part)) return <span key={`${part}-${lineIndex}-${index}`} style={{whiteSpace: "nowrap"}}>{part}</span>;
-    if (index !== lastContentIndex) return <span key={`${part}-${lineIndex}-${index}`}>{part}</span>;
+    if (ENGLISH_TOKEN_RE.test(part)) return <span key={`${part}-${lineIndex}-${index}`} style={{whiteSpace: "nowrap"}}>{renderText(part)}</span>;
+    if (index !== lastContentIndex) return <span key={`${part}-${lineIndex}-${index}`}>{renderText(part)}</span>;
     const trailing = part.match(/\s*$/u)?.[0] ?? "";
     const core = trailing ? part.slice(0, -trailing.length) : part;
     const characters = Array.from(core);
-    if (characters.length < 2) return <span key={`${part}-${lineIndex}-${index}`}>{part}</span>;
-    return <span key={`${part}-${lineIndex}-${index}`}>{characters.slice(0, -2).join("")}<span style={{whiteSpace: "nowrap"}}>{characters.slice(-2).join("")}</span>{trailing}</span>;
+    if (characters.length < 2) return <span key={`${part}-${lineIndex}-${index}`}>{renderText(part)}</span>;
+    return <span key={`${part}-${lineIndex}-${index}`}>{renderText(characters.slice(0, -2).join(""))}<span style={{whiteSpace: "nowrap"}}>{renderText(characters.slice(-2).join(""))}</span>{renderText(trailing)}</span>;
   });
 };
 
@@ -46,7 +46,18 @@ export const splitProtectedText = (value: string): [string, string] => {
 };
 
 /** 英文术语保持完整；显式换行真实生效，并把每行末尾两字绑定以避免单字孤行。 */
-export const ProtectedText: React.FC<{children: string}> = ({children}) => {
+export const ProtectedText: React.FC<{children: string; visibleCharacters?: number}> = ({children, visibleCharacters}) => {
   const lines = children.replaceAll("\\n", "\n").split("\n");
-  return <>{lines.map((line, index) => <span key={`${line}-${index}`}>{protectLineEnd(line, index)}{index < lines.length - 1 ? <br /> : null}</span>)}</>;
+  // 隐藏未到时机的字符但保留占位，逐字显示时仍保持英文词组和换行位置稳定。
+  let characterIndex = 0;
+  const renderText = (text: string) => visibleCharacters === undefined ? text : Array.from(text).map((character) => {
+    const index = characterIndex++;
+    return <span key={index} style={{visibility: index < visibleCharacters ? "visible" : "hidden"}}>{character}</span>;
+  });
+  return <>{lines.map((line, index) => {
+    const content = protectLineEnd(line, index, renderText);
+    // 显式换行也计入全文字符索引，避免后续行提前显示。
+    if (index < lines.length - 1) characterIndex++;
+    return <span key={`${line}-${index}`}>{content}{index < lines.length - 1 ? <br /> : null}</span>;
+  })}</>;
 };

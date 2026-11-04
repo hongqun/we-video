@@ -44,7 +44,8 @@ export const TemplateSurface: React.FC<{scene: VideoScene; captions?: Caption[]}
   const items = sceneContent.keywords;
   let rendered: React.ReactNode;
   switch (status.definition?.renderer) {
-    case "text-reveal": rendered = <TextReveal scene={scene} text={text} fontStyle={scene.templateData?.fontStyle} />; break;
+    // 音效和字体均读取当前镜头的运行参数，保证预览与导出一致。
+    case "text-reveal": rendered = <TextReveal scene={scene} text={text} fontStyle={scene.templateData?.fontStyle} typingSound={scene.templateData?.typingSound} />; break;
     case "text-highlight": rendered = <TemplateHighlight scene={scene} captions={captions} text={text} items={items} />; break;
     case "visual-image": rendered = <VisualImage scene={scene} captions={captions} />; break;
     case "handdraw-image": rendered = <HanddrawImage key={`${scene.id}-${scene.templateData?.cacheKey}`} scene={scene} />; break;

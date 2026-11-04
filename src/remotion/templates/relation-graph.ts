@@ -82,6 +82,15 @@ export const relationGraphLabelLayout = (label: string, fontSize: number | undef
   return {lines: safeLines, width: contentWidth + RELATION_GRAPH_LABEL_HORIZONTAL_PADDING * 2, height: safeLines.length * lineHeight + RELATION_GRAPH_LABEL_VERTICAL_PADDING * 2, lineHeight};
 };
 export const normalizeRelationGraphTextFontSize = (value: number | undefined) => Math.min(RELATION_GRAPH_TEXT_FONT_SIZE_MAX, Math.max(RELATION_GRAPH_TEXT_FONT_SIZE_MIN, Number.isFinite(value) ? value! : RELATION_GRAPH_DEFAULT_TEXT_FONT_SIZE));
+// 显式字号独立于节点缩放；未设置时保留历史节点随尺寸缩放的排版。
+export const relationGraphNodeLabelFontSize = (node: RelationGraphNode) => {
+  if (node.data.labelFontSize !== undefined) return normalizeRelationGraphTextFontSize(node.data.labelFontSize);
+  const base = node.data.shape ? 24 : node.data.presentation === "large-icon" ? 15 : 15 * normalizeRelationGraphCardScale(node.data.cardScale);
+  return base * relationGraphNodeContentScale(node, relationGraphNodeGeometry(node));
+};
+export const relationGraphNodeBodyFontSize = (node: RelationGraphNode) => node.data.bodyFontSize !== undefined
+  ? normalizeRelationGraphTextFontSize(node.data.bodyFontSize)
+  : 18 * relationGraphNodeContentScale(node, relationGraphNodeGeometry(node));
 export const normalizeRelationGraphTextAnimation = (value: string | undefined) => relationGraphTextAnimationSchema.safeParse(value).success ? value as "direct" | "typewriter" : "direct";
 export const normalizeRelationGraphTextStyle = (value: string | undefined) => relationGraphTextStyleSchema.safeParse(value).success ? value as "bubble-left" | "bubble-right" | "message" | "plain" : "message";
 export const normalizeRelationGraphTextColor = (value: string | undefined) => /^#[0-9a-f]{6}$/iu.test(value ?? "") ? value! : "#26372F";

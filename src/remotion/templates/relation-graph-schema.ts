@@ -37,7 +37,8 @@ const relationGraphCardScaleSchema = z.number().finite().transform((value) => Ma
 const relationGraphLabelFontSizeSchema = z.number().finite().transform((value) => Math.min(48, Math.max(12, value))).default(12);
 const relationGraphStrokeWidthSchema = z.number().finite().transform((value) => Math.min(12, Math.max(1, value))).default(3);
 const relationGraphTextColorSchema = z.string().regex(/^#[0-9a-f]{6}$/iu, "文字颜色必须是六位十六进制颜色").default("#26372F");
-const relationGraphTextFontSizeSchema = z.number().finite().transform((value) => Math.min(72, Math.max(12, value))).default(24);
+const relationGraphNodeFontSizeSchema = z.number().finite().transform((value) => Math.min(72, Math.max(12, value)));
+const relationGraphTextFontSizeSchema = relationGraphNodeFontSizeSchema.default(24);
 
 export const relationGraphNodeDataSchema = z.object({
   // 新元素显式选择外观；缺失时保留历史节点，不自动换肤。
@@ -55,6 +56,9 @@ export const relationGraphNodeDataSchema = z.object({
   width: z.number().finite().transform((value) => Math.max(1, value)).optional(),
   height: z.number().finite().transform((value) => Math.max(1, value)).optional(),
   cardScale: relationGraphCardScaleSchema,
+  // 卡片字号按需保存，缺失时沿用原有标题、正文大小，兼容历史任务。
+  labelFontSize: relationGraphNodeFontSizeSchema.optional(),
+  bodyFontSize: relationGraphNodeFontSizeSchema.optional(),
   cueText: z.string().trim().min(1).optional(),
   cueOccurrence: z.number().int().positive().optional(),
   // 文本框内容和节点标签分开保存，便于编辑器用短名称识别节点、画面显示完整文案。

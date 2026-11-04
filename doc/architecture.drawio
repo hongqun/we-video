@@ -62,7 +62,7 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="templates" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f8fc;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;align=left;verticalAlign=top;spacingTop=12;spacingLeft=15;" value="&lt;b&gt;镜头模板&lt;/b&gt;" vertex="1">
-          <mxGeometry height="290" width="260" x="820" y="700" as="geometry" />
+          <mxGeometry height="325" width="260" x="820" y="700" as="geometry" />
         </mxCell>
         <mxCell id="template0" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="IP 动态开场舞台&lt;br&gt;启用人物后可选" vertex="1">
           <mxGeometry height="44" width="110" x="10" y="45" as="geometry" />
@@ -88,6 +88,17 @@
         <mxCell id="template7" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="3D Model Scene" vertex="1">
           <mxGeometry height="44" width="110" x="130" y="213" as="geometry" />
         </mxCell>
+        <mxCell id="template8" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="手绘插画" vertex="1">
+          <mxGeometry height="44" width="110" x="10" y="269" as="geometry" />
+        </mxCell>
+        <mxCell id="handdraw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f8fc;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;手绘镜头&lt;/b&gt;&lt;br&gt;提示词 → 外部生成线稿与上色图 → 上传&lt;br&gt;后台预处理生成图层与绘制计划 → 预览 / 渲染逐笔描线、逐区上色" vertex="1">
+          <mxGeometry height="110" width="710" x="40" y="820" as="geometry" />
+        </mxCell>
+        <mxCell id="template-handdraw" edge="1" parent="1" source="template8" target="handdraw" value="素材处理" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="780" y="991" /><mxPoint x="780" y="875" /></Array>
+          </mxGeometry>
+        </mxCell>
         <mxCell id="visual-templates" edge="1" parent="1" source="visual" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=1;entryY=0.2;" target="templates" value="选择 / 编排">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
@@ -96,7 +107,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="assets" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;创作素材&lt;/b&gt;&lt;br&gt;图片 / GLB / 公共静态资源&lt;br&gt;品牌与人物选填，任务内固定副本" vertex="1">
+        <mxCell id="assets" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;创作素材&lt;/b&gt;&lt;br&gt;图片 / 手绘线稿与上色图 / GLB / 公共静态资源&lt;br&gt;品牌与人物选填，任务内固定副本" vertex="1">
           <mxGeometry height="105" width="340" x="40" y="1210" as="geometry" />
         </mxCell>
         <mxCell id="jobs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#d1dce4;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;任务数据 · jobs/&lt;/b&gt;&lt;br&gt;状态、草稿、音频、规划、清单与成片&lt;br&gt;配置 / 提示词快照和任务素材副本" vertex="1">
@@ -114,7 +125,7 @@
         <mxCell id="api" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;应用 API&lt;/b&gt;&lt;br&gt;鉴权、配置与任务管理" vertex="1">
           <mxGeometry height="75" width="300" x="425" y="120" as="geometry" />
         </mxCell>
-        <mxCell id="worker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;后台执行&lt;/b&gt;&lt;br&gt;文稿 / 翻译 / 配音 / 规划 / 渲染 Worker" vertex="1">
+        <mxCell id="worker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ee;strokeColor=#a8c8bd;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;后台执行&lt;/b&gt;&lt;br&gt;文稿 / 翻译 / 配音 / 规划 / 手绘 / 渲染 Worker" vertex="1">
           <mxGeometry height="75" width="300" x="810" y="120" as="geometry" />
         </mxCell>
         <mxCell id="ui-api" edge="1" parent="1" source="workbench" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="api" value="请求 / 轮询">

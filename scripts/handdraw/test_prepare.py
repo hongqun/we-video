@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
+from scipy.spatial import cKDTree
 from prepare import run, clean_line_gray, paint_regions, color_layer
 
 
@@ -122,6 +123,37 @@ class HanddrawPreparationTests(unittest.TestCase):
         Image.new("RGB", (200, 200), "white").save(self.root / "blank.png")
         with self.assertRaisesRegex(ValueError, "线稿为空"):
             run(self.root / "blank.png", self.root / "color.png", self.root / "out", "a" * 64)
+
+    def test_solid_arrowhead_and_eye_mask_have_drawable_ink_coverage(self):
+        # 局部实心箭头与带白色眼孔的眼罩保留原样，所有墨迹都有近处真实落笔。
+        line = Image.new("RGB", (320, 240), "white")
+        draw = ImageDraw.Draw(line)
+        draw.line((20, 65, 115, 65), fill="black", width=8)
+        draw.polygon([(100, 15), (175, 65), (100, 115)], fill="black")
+        draw.ellipse((195, 30, 305, 95), fill="black")
+        draw.ellipse((205, 48, 235, 70), fill="white")
+        draw.ellipse((265, 48, 295, 70), fill="white")
+        line.save(self.root / "solid.png")
+        run(self.root / "solid.png", self.root / "solid.png", self.root / "out", "b" * 64)
+        mask = np.array(line.convert("L")) < 245
+        time = np.array(Image.open(self.root / "out/line-time.png"))
+        self.assertTrue(np.all(time[..., 3][mask] == 255))
+        self.assertTrue(np.all(time[..., 3][~mask] == 0))
+        ticks = time[..., 0].astype(np.uint32) | (time[..., 1].astype(np.uint32) << 8) | (time[..., 2].astype(np.uint32) << 16)
+        self.assertGreater(len(np.unique(ticks[mask])), 20)
+        motion = json.loads((self.root / "out/motion.json").read_text())
+        points = np.array([p[1:3] for p in motion["points"] if p[3] == 1])
+        ys, xs = np.where(mask)
+        self.assertLessEqual(cKDTree(points).query(np.c_[xs, ys])[0].max(), 12)
+        self.assertTrue(np.array_equal(np.array(line), np.array(Image.open(self.root / "out/complete.png"))))
+
+    def test_large_black_fill_is_still_rejected(self):
+        # 放行局部填黑后，大片涂黑仍保留原来的复杂度保护。
+        line = Image.new("RGB", (200, 200), "white")
+        ImageDraw.Draw(line).rectangle((25, 25, 175, 175), fill="black")
+        line.save(self.root / "filled.png")
+        with self.assertRaisesRegex(ValueError, "大片填充"):
+            run(self.root / "filled.png", self.root / "filled.png", self.root / "out", "c" * 64)
 
     def test_redrawn_color_is_rejected(self):
         color = Image.new("RGB", (200, 200), "white")

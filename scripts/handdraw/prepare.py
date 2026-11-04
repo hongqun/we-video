@@ -14,9 +14,10 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 from line_first import register, move, luminance, MIN_KEPT, MAX_ADDED, MAX_SHIFT
-from line_topology import extract_strokes
+from line_topology import extract_strokes, cover_ink_edges
 
-VERSION = "handdraw-4"
+# 补画局部实心墨迹后使用独立缓存，重新处理不会复用旧轨迹。
+VERSION = "handdraw-5"
 
 
 def clean_line_gray(gray):
@@ -155,7 +156,7 @@ def run(line_path, color_path, output, cache_key):
     gray = clean_line_gray(luminance(rgb))
     ink = gray < 150
     if ink.sum() < 30 or ink.mean() > .25:
-        raise ValueError("线稿为空或包含大片填充；请生成纯白底、无填充的简洁黑色线稿")
+        raise ValueError("线稿为空或包含大片填充；请使用纯白底简洁线稿，局部实心箭头等可保留，避免大片涂黑")
     if np.mean(np.ptp(rgb.astype(int), axis=2) > 35) > .01:
         raise ValueError("线稿含有彩色区域；请上传纯黑白线稿")
     moved, _, measures = register(rgb, np.array(color.resize(plan.size).convert("RGBA")))
@@ -165,6 +166,11 @@ def run(line_path, color_path, output, cache_key):
     strokes, _, _, stats = extract_strokes(ink)
     if not strokes or len(strokes) > 1500:
         raise ValueError("线稿无法提取或笔画过多；请减少纹理和细节后重新上传")
+    # 箭头尖、眼罩等局部填黑允许保留；沿墨迹补画，避免远离笔尖的像素整块跳现。
+    # 使用可见墨迹作通路，补画不穿过白纸，增加的路径也参与后续时长预算。
+    stats["ink_coverage_visits"] = cover_ink_edges(strokes, gray < 245, maximum=10.)
+    if len(strokes) > 1500 or sum(len(stroke["points"]) for stroke in strokes) > 500000:
+        raise ValueError("整图绘制过于复杂；请减少对象、线条和色块")
     out = Path(output)
     out.mkdir(parents=True, exist_ok=True)
     now, points, samples, sample_times = 50., [], [], []
@@ -220,7 +226,7 @@ def run(line_path, color_path, output, cache_key):
         if selected.any():
             distance, nearest = cKDTree(sample_array[selected]).query(component_points)
             if distance.max() > 12:
-                raise ValueError("线稿有过粗的黑色区域；请去掉填充，保留轮廓线")
+                raise ValueError("线稿局部墨迹仍无法被绘制路径覆盖；请简化该区域后重试")
             line_times[ys, xs] = sample_time_array[selected][nearest]
         else:
             # 极小连通域用一次点按覆盖，仍参与时长预算。

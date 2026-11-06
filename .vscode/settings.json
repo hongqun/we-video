@@ -1,0 +1,14 @@
+{
+  // 对子调试会话同样禁止自动打开控制台，避免输入框随会话启动争抢焦点。
+  "debug.internalConsoleOptions": "neverOpen",
+  // 调试终端及自动附加会话使用相同规则，保留业务代码的源码映射。
+  "debug.javascript.terminalOptions": {
+    "internalConsoleOptions": "neverOpen",
+    "resolveSourceMapLocations": [
+      "**",
+      "!**/node_modules/**",
+      "!**/turbopack*/**",
+      "!turbopack:/**"
+    ]
+  }
+}

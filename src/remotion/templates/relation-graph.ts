@@ -1,3 +1,4 @@
+import {resolveNarrationCue as resolveRelationGraphCue} from "./narration-cue";
 import {graphElements, graphShapeAnchor, type GraphShape} from "./relation-graph-elements";
 import type {Caption, VideoScene} from "../schema";
 import {relationGraphArrowTypeSchema, relationGraphDataSchema, relationGraphEdgeTypeSchema, relationGraphStrokeColorOptions, relationGraphStrokeStyleSchema, relationGraphTextAnimationSchema, relationGraphTextColorOptions, relationGraphTextStyleSchema, type RelationGraphData, type RelationGraphHandleDirection, type RelationGraphNode} from "./relation-graph-schema";
@@ -7,7 +8,6 @@ export {relationGraphStrokeColorOptions};
 export {relationGraphTextColorOptions};
 export type {RelationGraphData, RelationGraphEdge, RelationGraphHandleDirection, RelationGraphNode} from "./relation-graph-schema";
 
-type TimedCharacter = {character: string; startMs: number; endMs: number};
 export type RelationGraphCue = {startMs: number; endMs: number};
 
 export const RELATION_GRAPH_ICON_SIZE_MIN = 48;
@@ -205,42 +205,8 @@ export const copyRelationGraphSelection = (data: RelationGraphData, selectedNode
 };
 
 // 口播绑定只关心文字内容；英文大小写差异不应导致场景节点或连线校验失败。
-const normalizeCueText = (value: string) => [...value.normalize("NFKC")].filter((character) => !/[\s，。！？、；：,.!?;:]/u.test(character)).join("").toLowerCase();
-
-const sceneCharacters = (scene: Pick<VideoScene, "startMs" | "endMs" | "speechStartMs" | "speechEndMs">, captions: Caption[]): TimedCharacter[] => {
-  const start = scene.speechStartMs ?? scene.startMs;
-  const end = scene.speechEndMs ?? scene.endMs;
-  return captions
-    .filter((caption) => caption.endMs > start && caption.startMs < end)
-    .flatMap((caption) => {
-      const captionStart = Math.max(start, caption.startMs);
-      const captionEnd = Math.min(end, caption.endMs);
-      const characters = [...caption.text.normalize("NFKC")].filter((character) => !/\s/u.test(character));
-      return characters.map((character, index) => ({
-        character,
-        startMs: captionStart + Math.round((captionEnd - captionStart) * index / Math.max(1, characters.length)),
-        endMs: captionStart + Math.round((captionEnd - captionStart) * (index + 1) / Math.max(1, characters.length)),
-      }));
-    });
-};
-
-export const resolveRelationGraphCue = ({scene, captions, text, occurrence = 1}: {scene: Pick<VideoScene, "startMs" | "endMs" | "speechStartMs" | "speechEndMs">; captions: Caption[]; text?: string; occurrence?: number}): RelationGraphCue | null => {
-  if (!text?.trim()) return null;
-  const characters = sceneCharacters(scene, captions);
-  const needle = normalizeCueText(text);
-  if (!needle) return null;
-  const joined = characters.map((item) => normalizeCueText(item.character)).join("");
-  let from = 0;
-  let found = -1;
-  for (let current = 0; current < occurrence; current += 1) {
-    found = joined.indexOf(needle, from);
-    if (found < 0) return null;
-    from = found + needle.length;
-  }
-  const first = characters[found];
-  const last = characters[found + needle.length - 1];
-  return first && last ? {startMs: first.startMs, endMs: Math.max(first.endMs, last.endMs)} : null;
-};
+// 关系图与自动图表共用带原字符时间映射的口播匹配。
+export {resolveNarrationCue as resolveRelationGraphCue} from "./narration-cue";
 
 export const relationGraphNodeCue = (scene: Pick<VideoScene, "startMs" | "endMs" | "speechStartMs" | "speechEndMs">, captions: Caption[], node: RelationGraphNode) => resolveRelationGraphCue({scene, captions, text: node.data.cueText, occurrence: node.data.cueOccurrence});
 

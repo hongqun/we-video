@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "视觉规划镜头的可选自动图表字段",
+  "description": "合并到 visual-plan 的镜头契约；旧任务可缺省。仅保留当前与上一份采用内容。",
+  "type": "object",
+  "properties": {
+    "diagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "svg",
+        "bindings",
+        "contextFingerprint"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "flow",
+            "architecture",
+            "hierarchy",
+            "cycle",
+            "timeline"
+          ]
+        },
+        "svg": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300000
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "groupId",
+              "name",
+              "cueText",
+              "occurrence",
+              "after",
+              "kind"
+            ],
+            "properties": {
+              "groupId": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][\\w-]{0,63}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "cueText": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "occurrence": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "after": {
+                "type": "array",
+                "maxItems": 40,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind": {
+                "enum": [
+                  "node",
+                  "edge"
+                ]
+              }
+            }
+          }
+        },
+        "contextFingerprint": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "previousDiagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "svg",
+        "bindings",
+        "contextFingerprint"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "flow",
+            "architecture",
+            "hierarchy",
+            "cycle",
+            "timeline"
+          ]
+        },
+        "svg": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300000
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "groupId",
+              "name",
+              "cueText",
+              "occurrence",
+              "after",
+              "kind"
+            ],
+            "properties": {
+              "groupId": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][\\w-]{0,63}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "cueText": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "occurrence": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "after": {
+                "type": "array",
+                "maxItems": 40,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind": {
+                "enum": [
+                  "node",
+                  "edge"
+                ]
+              }
+            }
+          }
+        },
+        "contextFingerprint": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

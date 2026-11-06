@@ -9,6 +9,8 @@ const cloneVisualPlanScene = (scene: VisualPlanScene): VisualPlanScene => ({
   ...scene,
   // 拆分镜头时独立复制重点词绑定，避免编辑副本影响原镜头。
   content: {...scene.content, keywords: [...scene.content.keywords], ...(scene.content.emphasisBindings ? {emphasisBindings: scene.content.emphasisBindings.map((binding) => ({...binding}))} : {})},
+  ...(scene.diagram ? {diagram: structuredClone(scene.diagram)} : {}),
+  ...(scene.previousDiagram ? {previousDiagram: structuredClone(scene.previousDiagram)} : {}),
   transition: {...scene.transition},
   presenter: {...scene.presenter},
   // 拆分后各自维护音效开关。

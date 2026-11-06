@@ -1,3 +1,4 @@
+import {diagramDataSchema} from "./auto-diagram-schema";
 import type {VideoScene} from "../schema";
 import type {PresenterFraming, PresenterPlacement} from "../presenter-config";
 import {visualImageDataSchema} from "./visual-image";
@@ -9,7 +10,7 @@ export type TemplateCategory = "presenter" | "text" | "content" | "media";
 export type TemplatePresentationMode = "standard" | "immersive" | "visual-first";
 export type SupportingTextPlacement = "header" | "content" | "hidden";
 export type TitleMotion = "reveal" | "typewriter";
-export type TemplateRenderer = "opening-stage" | "closing-stage" | "text-reveal" | "visual-image" | "handdraw-image" | "text-highlight" | "generic-content" | "relation-graph" | "3d-model-scene";
+export type TemplateRenderer = "opening-stage" | "closing-stage" | "text-reveal" | "visual-image" | "handdraw-image" | "text-highlight" | "generic-content" | "relation-graph" | "3d-model-scene" | "auto-diagram";
 
 export type TemplateDefinition = {
   id: string;
@@ -43,6 +44,8 @@ export const templateRegistry: TemplateDefinition[] = [
   {id: "rve/3d-model-scene", label: "3D Model Scene", description: "按口播编排 GLB 模型环绕、特写与标注。", category: "media", requiresMedia: true, resourceType: "model", renderer: "3d-model-scene", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/text-highlight", label: "文字重点标注", description: "按口播锚点依次高亮关键词。", category: "content", requiresMedia: false, renderer: "text-highlight", minDurationMs: 2200, fields: [], presentationMode: "standard", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/generic-content", label: "通用内容卡", description: "承载主标题、副标题、正文和关键词。", category: "content", requiresMedia: false, renderer: "generic-content", minDurationMs: 1800, fields: [], presentationMode: "standard", supportingTextPlacement: "header", titleMotion: "reveal", ...bRollDefaults},
+  // 自动图表允许先选择模板，再通过独立 Agent 完成编排。
+  {id: "rve/auto-diagram", label: "自动图表", description: "对话制图并按口播逐步显现。", category: "content", requiresMedia: false, renderer: "auto-diagram", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "rve/relation-graph", label: "关系图", description: "拖拽节点并按口播关键词逐步呈现关系。", category: "content", requiresMedia: false, renderer: "relation-graph", minDurationMs: 1800, fields: [], presentationMode: "visual-first", supportingTextPlacement: "hidden", titleMotion: "reveal", ...bRollDefaults},
   {id: "ip/closing-stage", label: "IP 动态结论舞台", description: "默认尾镜头，可按需替换。", category: "presenter", requiresMedia: false, renderer: "closing-stage", minDurationMs: 1800, fields: [], adapted: true, presentationMode: "immersive", supportingTextPlacement: "hidden", titleMotion: "reveal", rollRole: "a-roll", companionPlacements: [], companionFraming: "full"},
 ];
@@ -67,5 +70,6 @@ export const getTemplateStatus = (scene: VideoScene) => {
     catch (error) { return {definition, reason: error instanceof Error ? error.message : "手绘时长不足", usable: false}; }
   }
   if (definition.renderer === "relation-graph" && !relationGraphDataSchema.safeParse(scene.templateData).success) return {definition, reason: "关系图尚未编排", usable: false};
+  if (definition.renderer === "auto-diagram" && !diagramDataSchema.safeParse(scene.templateData).success) return {definition, reason: "自动图表尚未采用", usable: false};
   return {definition, reason: "可用", usable: true};
 };

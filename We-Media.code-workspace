@@ -11,6 +11,8 @@
 		}
 	],
 	"settings": {
+		// 多文件夹工作区统一禁止调试控制台自动弹出，避免抢走输入焦点。
+		"debug.internalConsoleOptions": "neverOpen",
 		"stm32cube-ide-clangd.path": "cube"
 	}
 }

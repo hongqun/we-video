@@ -1,3 +1,4 @@
+import {AutoDiagram} from "./AutoDiagram";
 import type {Caption, VideoScene} from "../schema";
 import {SceneFrame} from "../scenes/SceneFrame";
 import {getTemplateStatus} from "./registry";
@@ -50,6 +51,7 @@ export const TemplateSurface: React.FC<{scene: VideoScene; captions?: Caption[]}
     case "visual-image": rendered = <VisualImage scene={scene} captions={captions} />; break;
     case "handdraw-image": rendered = <HanddrawImage key={`${scene.id}-${scene.templateData?.cacheKey}`} scene={scene} />; break;
     case "generic-content": rendered = <GenericContent scene={scene} />; break;
+    case "auto-diagram": rendered = <AutoDiagram scene={scene} captions={captions} />; break;
     case "relation-graph": rendered = <RelationGraph scene={scene} captions={captions} />; break;
     case "3d-model-scene": rendered = <ModelScene scene={scene} captions={captions} />; break;
     default: return null;

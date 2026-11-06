@@ -4,4 +4,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const {scheduleMediaCleanup} = await import("@/lib/cleanup");
   scheduleMediaCleanup();
+  // 重启后保留图表文件，但不续跑已经消失的执行进程。
+  const {recoverDiagramRequests} = await import("@/lib/diagram/service");
+  await recoverDiagramRequests().catch(() => undefined);
 }

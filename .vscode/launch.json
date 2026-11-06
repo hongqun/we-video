@@ -1,24 +1,29 @@
 {
-  // 使用项目脚本启动开发服务，保留环境变量加载和素材同步步骤。
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Next.js：全栈调试",
+      "name": "启动 We-Video 工作台",
       "type": "node-terminal",
       "request": "launch",
       "command": "npm run dev",
       "cwd": "${workspaceFolder}",
       "serverReadyAction": {
-        "pattern": "Ready in",
-        "uriFormat": "http://localhost:3100",
+        "pattern": "Local:\\s+(https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
       }
     },
     {
-      "name": "Remotion：启动 Studio",
+      "name": "启动 We-Video Remotion Studio",
       "type": "node-terminal",
       "request": "launch",
       "command": "npm run studio",
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "serverReadyAction": {
+        "pattern": "http://localhost:(\\d+)",
+        "uriFormat": "http://localhost:%s",
+        "action": "openExternally"
+      }
     }
   ]
 }

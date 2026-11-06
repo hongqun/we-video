@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "auto-diagram-v1.schema.json",
+  "title": "自动图表自包含渲染数据",
+  "description": "SVG 与绑定还必须通过 XML 白名单、口播、依赖和几何校验。字幕区间推算字符时间，并非逐字音频对齐。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "svg",
+    "bindings"
+  ],
+  "properties": {
+    "type": {
+      "enum": [
+        "flow",
+        "architecture",
+        "hierarchy",
+        "cycle",
+        "timeline"
+      ]
+    },
+    "svg": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300000
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "groupId",
+          "name",
+          "cueText",
+          "occurrence",
+          "after",
+          "kind"
+        ],
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][\\w-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "cueText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "occurrence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "after": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "type": "string"
+            }
+          },
+          "kind": {
+            "enum": [
+              "node",
+              "edge"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

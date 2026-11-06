@@ -1,4 +1,6 @@
 // 纯数据选择逻辑，客户端可以安全复用；文件系统和 sharp 只留在服务端资源模块。
+import type {z} from "zod";
+import type {diagramResourceSchema} from "@/remotion/templates/auto-diagram-schema";
 import type {HanddrawResource} from "@/remotion/templates/handdraw-schema";
 export type SceneVisualResource = {
   segmentId: string;
@@ -8,6 +10,8 @@ export type SceneVisualResource = {
   imageHeight?: number;
   modelPath?: string;
   handdraw?: HanddrawResource;
+  // 编辑器只需要图表状态，正式图形仍来自镜头规划。
+  diagram?: z.infer<typeof diagramResourceSchema>;
   polygons: Array<{text: string; points: Array<{x: number; y: number}>}>;
 };
 

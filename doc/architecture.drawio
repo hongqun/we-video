@@ -1,6 +1,6 @@
-<mxfile host="Electron">
+<mxfile host="Electron" pages="2">
   <diagram id="Asnvu5ib-c35kVvcOV9C" name="Page-1">
-    <mxGraphModel dx="1846" dy="1031" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1160" pageHeight="1540" math="0" shadow="0" adaptiveColors="auto">
+    <mxGraphModel dx="1131" dy="788" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1160" pageHeight="1540" math="0" shadow="0" adaptiveColors="auto">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -91,12 +91,18 @@
         <mxCell id="template8" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c3d3e3;fontColor=#203247;fontSize=12;spacing=3;" value="手绘插画" vertex="1">
           <mxGeometry height="44" width="110" x="10" y="269" as="geometry" />
         </mxCell>
+        <mxCell id="template9" parent="templates" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=12;spacing=3;fillColor=#ffffff;strokeColor=#c3d3e3;fontSize=11;spacing=3;align=center;verticalAlign=middle;fontFamily=Helvetica;" value="自动图表" vertex="1">
+          <mxGeometry height="44" width="110" x="130" y="269" as="geometry" />
+        </mxCell>
         <mxCell id="handdraw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f8fc;strokeColor=#b5c9df;fontColor=#203247;fontSize=15;spacing=8;" value="&lt;b&gt;手绘镜头&lt;/b&gt;&lt;br&gt;提示词 → 外部生成线稿与上色图 → 上传&lt;br&gt;后台预处理生成图层与绘制计划 → 预览 / 渲染逐笔描线、逐区上色" vertex="1">
           <mxGeometry height="110" width="710" x="40" y="820" as="geometry" />
         </mxCell>
-        <mxCell id="template-handdraw" edge="1" parent="1" source="template8" target="handdraw" value="素材处理" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.5;">
+        <mxCell id="template-handdraw" edge="1" parent="1" source="template8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="handdraw" value="素材处理">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points"><mxPoint x="780" y="991" /><mxPoint x="780" y="875" /></Array>
+            <Array as="points">
+              <mxPoint x="780" y="991" />
+              <mxPoint x="780" y="875" />
+            </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="visual-templates" edge="1" parent="1" source="visual" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=1;entryY=0.2;" target="templates" value="选择 / 编排">
@@ -141,19 +147,129 @@
           <mxGeometry height="75" width="340" x="410" y="1350" as="geometry" />
         </mxCell>
         <mxCell id="profiles-ui" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=13;spacing=8;fillColor=#e7f1ee;strokeColor=#a8c8bd;" value="&lt;b&gt;专栏设置&lt;/b&gt;&lt;br&gt;可视化管理内容风格与声音&lt;br&gt;Logo、人物等品牌素材选填" vertex="1">
-          <mxGeometry x="40" y="1050" width="300" height="100" as="geometry" />
+          <mxGeometry height="100" width="300" x="40" y="1050" as="geometry" />
         </mxCell>
         <mxCell id="profiles-store" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=13;spacing=8;fillColor=#ffffff;strokeColor=#c3d3e3;" value="&lt;b&gt;配置存储&lt;/b&gt;&lt;br&gt;内置默认值与本地专栏配置&lt;br&gt;服务连接由部署文件维护" vertex="1">
-          <mxGeometry x="425" y="1050" width="300" height="100" as="geometry" />
+          <mxGeometry height="100" width="300" x="425" y="1050" as="geometry" />
         </mxCell>
         <mxCell id="profile-snapshot" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=13;spacing=8;fillColor=#fff4e5;strokeColor=#e7c496;" value="&lt;b&gt;任务配置快照&lt;/b&gt;&lt;br&gt;创建时固定配置、提示词和素材&lt;br&gt;供后续创作阶段使用" vertex="1">
-          <mxGeometry x="810" y="1050" width="300" height="100" as="geometry" />
+          <mxGeometry height="100" width="300" x="810" y="1050" as="geometry" />
         </mxCell>
-        <mxCell id="profiles-save" parent="1" source="profiles-ui" target="profiles-store" value="保存" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" edge="1">
+        <mxCell id="profiles-save" edge="1" parent="1" source="profiles-ui" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="profiles-store" value="保存">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="profiles-freeze" parent="1" source="profiles-store" target="profile-snapshot" value="创建时固定" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" edge="1">
+        <mxCell id="profiles-freeze" edge="1" parent="1" source="profiles-store" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#708498;strokeWidth=1.5;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="profile-snapshot" value="创建时固定">
           <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="diagram-plan-note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;fontSize=12;align=left;" value="&lt;b&gt;虚线：已接入，待运行验收&lt;/b&gt;&lt;br&gt;视觉规划 → 自动图表 → 对话编辑&lt;br&gt;详见「自动图表 Agent〔待运行验收〕」页" vertex="1">
+          <mxGeometry height="90" width="290" x="820" y="1350" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="auto-diagram-agent-planned" name="自动图表 Agent〔待运行验收〕">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="1320" pageHeight="1120" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="da-title" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f6f8fa;strokeColor=#d1dce4;fontSize=20;align=left;" value="&lt;b&gt;自动图表 Agent〔待运行验收〕&lt;/b&gt;&lt;br&gt;独立 TypeScript Deep Agents Worker；完整复用 diagram-design Skill" vertex="1">
+          <mxGeometry height="70" width="1240" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="da-ui" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;图表编辑弹窗〔新增〕&lt;/b&gt;&lt;br&gt;多轮对话 / 口播播放 / 完整图&lt;br&gt;修改绑定 / 取消 / 采用 / 撤回" vertex="1">
+          <mxGeometry height="100" width="240" x="40" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="da-api" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;镜头 API〔新增〕&lt;/b&gt;&lt;br&gt;鉴权、请求 ID 与状态轮询&lt;br&gt;会话读取、取消和上下文检查" vertex="1">
+          <mxGeometry height="100" width="240" x="360" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="da-worker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;独立 Deep Agent Worker&lt;/b&gt;&lt;br&gt;TypeScript SDK / 独立依赖&lt;br&gt;选图型、制图、绑定与修复" vertex="1">
+          <mxGeometry height="100" width="240" x="680" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="da-skill" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;diagram-design Skill〔只读〕&lt;/b&gt;&lt;br&gt;原始 SKILL.md / references / assets&lt;br&gt;按需加载；内置原始 Skill 与许可证" vertex="1">
+          <mxGeometry height="100" width="280" x="1000" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="da-candidate" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;候选 SVG / 口播绑定&lt;/b&gt;&lt;br&gt;加载规范后由 Agent 生成&lt;br&gt;稳定分组 ID、触发词与依赖" vertex="1">
+          <mxGeometry height="100" width="280" x="1000" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="da-validator" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;校验与有限次数修复&lt;/b&gt;&lt;br&gt;SVG 白名单 / 布局 / 分组引用&lt;br&gt;字幕锚点、依赖与真实时间" vertex="1">
+          <mxGeometry height="100" width="240" x="680" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="da-adopt" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;用户采用 → 应用正式写入&lt;/b&gt;&lt;br&gt;校验 SVG、口播绑定与上下文&lt;br&gt;保存到规划；仅保留上一采用内容" vertex="1">
+          <mxGeometry height="100" width="240" x="360" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="da-manifest" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#fff4e5;strokeColor=#e7c496;" value="&lt;b&gt;渲染清单〔现有入口〕&lt;/b&gt;&lt;br&gt;新增图表 templateData 装配&lt;br&gt;确认后冻结 SVG 与绑定数据" vertex="1">
+          <mxGeometry height="100" width="240" x="40" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="da-render" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#fff4e5;strokeColor=#e7c496;" value="&lt;b&gt;Remotion〔现有入口〕&lt;/b&gt;&lt;br&gt;新增自动图表组件&lt;br&gt;按字幕逐步出现并保留&lt;br&gt;预览与成片共用帧计算" vertex="1">
+          <mxGeometry height="120" width="240" x="40" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="da-session" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;独立会话与候选工作区&lt;/b&gt;&lt;br&gt;jobs/&amp;lt;jobId&amp;gt;/diagrams/&amp;lt;sceneId&amp;gt;/&lt;br&gt;对话、状态、当前 SVG 与绑定&lt;br&gt;SQLite 检查点；Agent 仅可保存本镜头" vertex="1">
+          <mxGeometry height="120" width="320" x="360" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="da-context" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f6f8fa;strokeColor=#d1dce4;" value="&lt;b&gt;镜头上下文〔只读输入〕&lt;/b&gt;&lt;br&gt;当前范围口播 / 字幕 / 通用文案&lt;br&gt;画布 / 视频风格 / 人物安全区" vertex="1">
+          <mxGeometry height="110" width="280" x="700" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="da-config" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f6f8fa;strokeColor=#d1dce4;" value="&lt;b&gt;统一配置与 Skill 安装&lt;/b&gt;&lt;br&gt;根目录 .env / pipeline.config.json&lt;br&gt;部署安装固定版本，不引用原仓库&lt;br&gt;Skill 更新不改变已有会话版本" vertex="1">
+          <mxGeometry height="120" width="280" x="1000" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="da-boundary" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;align=left;" value="&lt;b&gt;正式写入边界&lt;/b&gt;&lt;br&gt;Agent 只提交候选；应用在用户采用后更新规划与资源引用。&lt;br&gt;已采用图表进入现有确认流程，并使旧 Manifest / 成片失效。" vertex="1">
+          <mxGeometry height="110" width="610" x="40" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="da-legend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f6f8fa;strokeColor=#d1dce4;fontSize=13;align=left;" value="&lt;b&gt;图例与范围&lt;/b&gt;&lt;br&gt;紫色虚线框 / 线：已实现但待运行验收的模块、接入或数据流；实线框：现有入口与事实源。&lt;br&gt;现有口播、文案提取、关系图流程继续沿用；新 Agent 故障仅影响图表生成。&lt;br&gt;第一版：流程 / 架构 / 层级 / 循环 / 时间线；完整计划见 todo/auto-diagram-agent.md。" vertex="1">
+          <mxGeometry height="90" width="1240" x="40" y="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-ui-api" edge="1" parent="1" source="da-ui" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-api" value="指令 / 进度">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-api-worker" edge="1" parent="1" source="da-api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-worker" value="按需调度">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-worker-skill" edge="1" parent="1" source="da-worker" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-skill" value="只读加载">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-skill-candidate" edge="1" parent="1" source="da-skill" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-candidate" value="规范 → Agent 制图">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-candidate-validator" edge="1" parent="1" source="da-candidate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-validator" value="提交检查">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-validator-adopt" edge="1" parent="1" source="da-validator" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-adopt" value="预览采用">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-adopt-manifest" edge="1" parent="1" source="da-adopt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-manifest" value="确认装配">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-manifest-render" edge="1" parent="1" source="da-manifest" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;" target="da-render" value="自包含产物，无需模型">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-repair" edge="1" parent="1" source="da-validator" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="da-worker" value="失败报告；最多修复两次">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="da-e-workspace" edge="1" parent="1" source="da-worker" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=0;exitY=0.8;entryX=0.5;entryY=0;" target="da-session" value="候选与会话持久化">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="640" y="240" />
+              <mxPoint x="640" y="600" />
+              <mxPoint x="520" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="da-e-context" edge="1" parent="1" source="da-context" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=1;entryY=0.8;" target="da-worker" value="镜头上下文">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="980" y="905" />
+              <mxPoint x="980" y="290" />
+              <mxPoint x="950" y="290" />
+              <mxPoint x="950" y="240" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="da-e-config" edge="1" parent="1" source="da-config" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9c88ba;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;fontSize=12;fontColor=#52677b;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" target="da-skill" value="版本解析 / 只读挂载">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="710" />
+              <mxPoint x="1300" y="210" />
+            </Array>
+          </mxGeometry>
         </mxCell>
       </root>
     </mxGraphModel>

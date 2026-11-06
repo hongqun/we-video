@@ -1,3 +1,4 @@
+import {diagramResourceSchema} from "@/remotion/templates/auto-diagram-schema";
 import {promises as fs} from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
@@ -19,6 +20,8 @@ export const visualResourceSchema = z.object({
   imageHeight: z.number().int().positive().optional(),
   modelPath: z.string().trim().min(1).optional(),
   handdraw: handdrawResourceSchema.optional(),
+  // 图表执行状态与已采用内容分开保存。
+  diagram: diagramResourceSchema.optional(),
   polygons: z.array(visualImagePolygonSchema).default([]),
 }).strict().superRefine((resource, context) => {
   const imageFields = [resource.imagePath, resource.imageWidth, resource.imageHeight].filter((value) => value !== undefined).length;

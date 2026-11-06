@@ -26,9 +26,11 @@ import {visualResourceForScene} from "@/lib/visual-resource-selection";
 import {VISUAL_STYLE_OPTIONS, type VisualStyleId} from "@/remotion/visual-style";
 import {freshCameraPlan, resetModelPlan} from "@/remotion/templates/model-scene-editing";
 import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
+import {validateDiagram} from "@/remotion/templates/auto-diagram-schema";
 import {textRevealSoundEnabled} from "@/remotion/templates/text-reveal-schema";
 
 const TemplatePreview = dynamic(() => import("./TemplatePreview").then(({TemplatePreview: Component}) => Component), {ssr: false});
+const AutoDiagramEditor = dynamic(() => import("./AutoDiagramEditor").then((module) => module.AutoDiagramEditor), {ssr: false});
 const RelationGraphEditor = dynamic(() => import("./RelationGraphEditor").then(({RelationGraphEditor: Component}) => Component), {ssr: false});
 const ModelSceneEditor = dynamic(() => import("./ModelSceneEditor").then(({ModelSceneEditor: Component}) => Component), {ssr: false});
 type SpokenSegment = {id: string; spokenText: string};
@@ -60,6 +62,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   const [saved, setSaved] = useState(plan);
   const incomingPlan = useRef(JSON.stringify(plan));
   const [selected, setSelected] = useState(0);
+  const [diagramEditorOpen, setDiagramEditorOpen] = useState(false);
   const [relationEditorOpen, setRelationEditorOpen] = useState(false);
   const [relationEditorMaximized, setRelationEditorMaximized] = useState(false);
   const [time, setTime] = useState(0);
@@ -151,6 +154,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       ? {imagePath, imageWidth: sceneResource.imageWidth, imageHeight: sceneResource.imageHeight, polygons: sceneResource.polygons}
       : scene.templateId === "rve/3d-model-scene" && modelPath && scene.modelScene ? {modelPath, ...scene.modelScene}
       : scene.templateId === "rve/handdraw-image" ? handdrawTemplateData(sceneResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
+      : scene.templateId === "rve/auto-diagram" && scene.diagram ? {type: scene.diagram.type, svg: scene.diagram.svg, bindings: scene.diagram.bindings}
       : scene.templateId === "rve/relation-graph" ? scene.visualData
       // 与清单构建保持一致，让音效开关即时作用于当前预览。
       : scene.templateId === "rve/text-reveal" ? scene.textReveal : undefined;
@@ -187,14 +191,24 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   useEffect(() => {
     setResourcePolygons(currentResource?.polygons ?? []);
   }, [current?.id, currentResource?.polygons]);
-  const currentStatus = runtimeScene ? getTemplateStatus(runtimeScene) : {usable: false, reason: "缺少口播时间轴"};
+  // 过期图表或拆分后的旧绑定不能直接进入 Player，草稿编辑仍可继续。
+  const previewStatus = (scene: VideoScene) => {
+    const status = getTemplateStatus(scene);
+    if (status.usable && scene.templateId === "rve/auto-diagram") {
+      try {validateDiagram(scene, captions, scene.templateData);}
+      catch (error) {return {...status, usable: false, reason: error instanceof Error ? error.message : "图表需要重新校验"};}
+    }
+    return status;
+  };
+  const currentStatus = runtimeScene ? previewStatus(runtimeScene) : {usable: false, reason: "缺少口播时间轴"};
   const planIssue = runtimeScenes.map((scene, index) => {
     if (!scene) return `第 ${index + 1} 个镜头缺少口播时间轴`;
     // 新增行未填写完整时给出明确提示，避免严格契约保存失败。
     if (scene.templateId === "ip/opening-stage" && scene.content.emphasisBindings?.some((binding) => !binding.text.trim() || !binding.cueText.trim())) return `第 ${index + 1} 个镜头：请填写重点词及其口播绑定，或删除空行`;
     const definition = templateById.get(scene.templateId);
     if (definition && !isTemplateAvailableForProfile(definition, profile)) return `第 ${index + 1} 个镜头：当前账号或专题不可用`;
-    const status = getTemplateStatus(scene);
+    const status = previewStatus(scene);
+    if (scene.templateId === "rve/auto-diagram" && visualResourceForScene(visualResources, value.scenes[index]!.id, scene.segmentId)?.diagram?.status === "stale") return `第 ${index + 1} 个镜头：图表上下文已过期，请重新制图并采用`;
     if (status.usable && scene.templateId === "rve/3d-model-scene") {
       try { resolveModelSceneSchedule(scene, captions, scene.templateData); }
       catch (error) { return `第 ${index + 1} 个镜头：${error instanceof Error ? error.message : "口播绑定无效"}`; }
@@ -445,6 +459,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
             ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
             : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
             : definition.id === "rve/handdraw-image" ? handdrawTemplateData(candidateResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
+            : definition.id === "rve/auto-diagram" && current.diagram ? {type: current.diagram.type, svg: current.diagram.svg, bindings: current.diagram.bindings}
             : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
           const candidatePresenter = definition.rollRole === "a-roll"
             ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
@@ -452,7 +467,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
           const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
           const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
-          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image";
+          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image" || definition.id === "rve/auto-diagram";
           return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingMedia)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingMedia ? "可先选择，待完成素材与编排" : status.reason}</small></span></button>;
         })}</div></div>
         {/* 音效随当前镜头保存，切换模板后仍保留用户选择。 */}
@@ -478,6 +493,9 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           <label>到下一个镜头的转场<select value={current.transition.kind} disabled={locked} onChange={(event) => { const kind = event.target.value as TransitionKind; update({transition: kind === "none" ? {kind, durationMs: 0} : {kind, durationMs: current.transition.kind === "none" ? 315 : current.transition.durationMs}}); }}>{TRANSITION_KINDS.map((kind) => <option key={kind} value={kind}>{kind === "none" ? "无转场" : kind}</option>)}</select></label>
           <label>转场时长（毫秒）<input type="number" min={240} max={360} step={1} value={current.transition.kind === "none" ? 0 : current.transition.durationMs} disabled={locked || current.transition.kind === "none"} onChange={(event) => update({transition: {kind: current.transition.kind === "none" ? "fade" : current.transition.kind, durationMs: Math.max(240, Math.min(360, Number(event.target.value) || 315))}})} /></label>
         </div>
+        {/* 打开 Agent 前保存本地规划，服务端上下文以已保存镜头为准。 */}
+        {current.templateId === "rve/auto-diagram" ? <div className="relation-graph-editor-trigger"><span>自动图表与口播绑定{currentResource?.diagram?.status === "stale" ? " · 已过期，需重新制图" : current.diagram ? " · 已采用" : " · 待生成采用"}</span><button className="secondary" type="button" disabled={locked} onClick={async () => {const latest = dirty ? await save() : saved; if (latest) {audio.current?.pause(); setDiagramEditorOpen(true);}}}>打开图表 Agent</button></div> : null}
+        {diagramEditorOpen && runtimeScene && current.templateId === "rve/auto-diagram" ? <AutoDiagramEditor key={current.id} jobId={jobId} sceneId={current.id} scene={runtimeScene} captions={captions} audioSrc={audioSrc} brand={brand} presenter={profile.presenter} visualStyle={value.visualStyle} hasPrevious={Boolean(current.previousDiagram)} onClose={() => setDiagramEditorOpen(false)} onPlan={(next) => {setValue(next); setSaved(next); setMessage("图表采用内容已更新。"); void onHanddrawChange();}} /> : null}
         {current.templateId === "rve/relation-graph" && current.visualData ? <div className="relation-graph-editor-trigger"><span>关系图节点与连线</span><button className="secondary" type="button" disabled={locked} onClick={() => { setRelationEditorMaximized(false); setRelationEditorOpen(true); }}>打开编辑器</button></div> : null}
         {profile.presenter.poses.length > 0 ? <details className="visual-plan-presenter-settings"><summary><span>人物设置</span><small>{current.presenter.mode === "hero" ? "全屏主讲" : current.presenter.mode === "companion" ? "陪伴讲解" : "隐藏人物"}</small></summary><div className="visual-plan-presenter-settings-body">
           <label>人物模式<select value={current.presenter.mode} disabled={locked || current.presenter.rollType === "a-roll"} onChange={(event) => update({presenter: {...current.presenter, mode: event.target.value as "companion" | "hidden"}})}>{current.presenter.rollType === "a-roll" ? <option value="hero">全屏主讲</option> : <><option value="hidden">隐藏人物</option><option value="companion">陪伴讲解</option></>}</select></label>

@@ -4229,3 +4229,123 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .profile-manager-error{background:#fff0ed;color:#9d2929}
 .profile-manager-notice{background:#edf6ec;color:#24442a}
 @media(max-width:760px){.profile-manager-grid{grid-template-columns:1fr}.profile-manager-fields{grid-template-columns:1fr}.profile-manager-header{align-items:flex-start}.profile-manager{padding:24px 16px}.profile-manager-form,.profile-manager-list{padding:18px}}
+
+/* 图表编辑弹窗隔离本地会话操作，窄屏按顺序展示对话与预览。 */
+/* 编辑窗固定在视口内，只有对话、口播和绑定内容允许内部滚动。 */
+.auto-diagram-modal {position: fixed; inset: 0; z-index: 1000; background: #10231b99; display: grid; place-items: center; padding: 8px; overscroll-behavior: contain;}
+.auto-diagram-window {width: min(1680px, 100%); height: calc(100dvh - 16px); min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--panel, #fffdf8); color: var(--ink, #20352a); border: 1px solid var(--line, #dde6df); border-radius: 18px; box-shadow: 0 24px 80px #0004;}
+.auto-diagram-header, .auto-diagram-footer {display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 14px;}
+.auto-diagram-header {border-bottom: 1px solid var(--line, #dde6df);}
+.auto-diagram-header h3 {margin: 0; font-size: 16px; white-space: nowrap;}
+.auto-diagram-header p {margin: 5px 0 0; font-size: 12px; color: var(--muted, #627168);}
+.auto-diagram-columns {display: grid; grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) minmax(250px, 290px); flex: 1 1 0; min-height: 0; overflow: hidden;}
+.auto-diagram-chat, .auto-diagram-preview, .auto-diagram-binding-panel {display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; padding: 16px; gap: 12px;}
+.auto-diagram-chat {border-right: 1px solid var(--line, #dde6df);}
+.auto-diagram-binding-panel {border-left: 1px solid var(--line, #dde6df);}
+.auto-diagram-section-heading {display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px;}
+.auto-diagram-section-heading h4 {margin: 0; font-size: 14px; font-weight: 650;}
+.auto-diagram-section-heading > span {font-size: 11px; color: var(--muted, #627168);}
+.auto-diagram-status {border-radius: 20px; padding: 4px 8px; background: var(--paper, #f0f6ee);}
+.auto-diagram-status[data-running="true"] {color: #26744b; background: #e4f3e8;}
+.auto-diagram-messages {flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 5px;}
+.auto-diagram-messages article {padding: 12px; margin: 0 0 10px; border-radius: 10px; background: var(--paper, #f4f6f2); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere;}
+.auto-diagram-messages article strong {font-size: 11px; color: var(--muted, #627168); font-weight: 500;}
+.auto-diagram-messages article p {margin: 6px 0 0; white-space: pre-wrap;}
+.auto-diagram-messages article[data-role="user"] {background: #eaf2e8; color: #294733;}
+.auto-diagram-messages article[data-role="tool"] {background: transparent; border: 1px dashed var(--line, #dde6df); font-size: 12px; color: var(--muted, #627168);}
+.auto-diagram-progress {flex: 0 0 auto; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted, #627168);}
+.auto-diagram-notice {flex: 0 1 auto; min-height: 0; max-height: 88px; margin: 0; overflow: auto; font-size: 12px; line-height: 1.5;}
+.auto-diagram-composer {flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px;}
+.auto-diagram-chat textarea {display: block; box-sizing: border-box; width: 100%; min-height: 0; height: 84px; resize: none; margin: 0; padding: 10px; border: 1px solid var(--line, #dde6df); border-radius: 10px; font: inherit; font-size: 13px; line-height: 1.55; background: var(--panel, #fffdf8); color: inherit;}
+.auto-diagram-actions {display: flex; align-items: center; justify-content: flex-end; gap: 8px;}
+.auto-diagram-window button {flex-shrink: 0; min-height: 34px; padding: 8px 12px; white-space: nowrap; font-size: 12px;}
+.auto-diagram-chat .auto-diagram-actions {justify-content: space-between;}
+.auto-diagram-preview {background: var(--paper, #f5f7f3); padding: 8px; gap: 0;}
+.auto-diagram-tabs {display: flex; padding: 3px; border: 1px solid var(--line, #dde6df); border-radius: 9px; gap: 2px;}
+.auto-diagram-tabs button {min-height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--muted, #627168); padding: 6px 10px; cursor: pointer;}
+.auto-diagram-tabs button[aria-pressed="true"] {background: var(--panel, #fffdf8); color: var(--ink, #20352a); box-shadow: 0 1px 4px #0001;}
+/* 默认直接容纳图表；缩放后只滚动画布，弹窗和工具栏保持固定。 */
+.auto-diagram-stage {position: relative; flex: 1 1 0; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; container-type: size; border-radius: 10px; background: #e9ede6; border: 1px solid var(--line, #dde6df);}
+.auto-diagram-preview-heading {flex-wrap: wrap;}
+.auto-diagram-preview-tools {display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;}
+.auto-diagram-preview-viewport {display: flex; width: 100%; height: 100%; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin;}
+.auto-diagram-preview-canvas {flex: 0 0 auto; margin: auto;}
+.auto-diagram-preview .template-preview-player {width: 100%; max-width: none; margin: 0;}
+.auto-diagram-zoom {position: absolute; z-index: 2; right: 10px; bottom: 10px; display: flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); box-shadow: 0 2px 12px #0001;}
+.auto-diagram-zoom button.secondary {min-width: 30px; min-height: 28px; padding: 4px 7px; background: transparent; font-variant-numeric: tabular-nums;}
+.auto-diagram-zoom button:hover {background: var(--soft);}
+.auto-diagram-preview-viewport > .auto-diagram-empty {margin: auto; padding: 24px; text-align: center;}
+.auto-diagram-full {width: 100%; aspect-ratio: 960 / 800; flex-shrink: 0; background: #f7f7f2;}
+.auto-diagram-full > svg {display: block; width: 100%; height: 100%;}
+.auto-diagram-footer audio {width: 100%; min-width: 100px; height: 32px; flex: 1 1 0; margin: 0;}
+.auto-diagram-hint {flex: 0 0 auto; margin: 0; font-size: 11px; color: var(--muted, #627168); text-align: center;}
+.auto-diagram-empty {margin: 0; padding: 16px 8px; font-size: 13px; line-height: 1.7; color: var(--muted, #627168);}
+.auto-diagram-stage > .auto-diagram-empty {padding: 24px; text-align: center;}
+.auto-diagram-spoken {flex: 0 1 auto; min-height: 0; max-height: 84px; overflow-y: auto; margin: 0; background: var(--paper, #f0f6ee); padding: 10px; border-radius: 8px; font-size: 12px; line-height: 1.7; scrollbar-width: thin;}
+.auto-diagram-binding-columns {display: flex; flex: 0 0 auto; justify-content: space-between; font-size: 11px; color: var(--muted, #627168); padding-right: 8px;}
+.auto-diagram-bindings {flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 5px;}
+.auto-diagram-bindings label {display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 8px; align-items: center; padding: 10px 0 12px; border-bottom: 1px solid var(--line, #dde6df);}
+.auto-diagram-binding-name {grid-column: 1 / -1; font-size: 12px; overflow-wrap: anywhere;}
+.auto-diagram-bindings input {box-sizing: border-box; width: 100%; min-width: 0; padding: 8px; font-size: 12px;}
+.auto-diagram-binding-state {flex: 0 1 auto; min-height: 0; max-height: 88px; overflow-y: auto; margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted, #627168);}
+.auto-diagram-binding-state[data-invalid="true"], .auto-diagram-window [role="alert"] {color: #9b3029;}
+.auto-diagram-save {width: 100%; flex: 0 0 auto;}
+.auto-diagram-footer {border-top: 1px solid var(--line, #dde6df);}
+.auto-diagram-footer > span {flex: 0 1 220px; font-size: 11px; color: var(--muted, #627168);}
+@media (max-width: 1100px) {
+  .auto-diagram-modal {padding: 10px;}
+  .auto-diagram-window {height: calc(100dvh - 20px);}
+  .auto-diagram-columns {grid-template-columns: 220px minmax(0, 1fr) 250px;}
+  .auto-diagram-chat, .auto-diagram-preview, .auto-diagram-binding-panel {padding: 12px; gap: 10px;}
+  .auto-diagram-tabs button {padding: 5px 7px;}
+}
+/* 小屏仍固定窗口；对话置于下方，列表在各自区域内滚动。 */
+@media (max-width: 800px) {
+  .auto-diagram-columns {grid-template-columns: minmax(0, 1fr) minmax(220px, .8fr); grid-template-rows: minmax(0, 1fr) 190px;}
+  .auto-diagram-preview {grid-column: 1; grid-row: 1;}
+  .auto-diagram-binding-panel {grid-column: 2; grid-row: 1 / -1;}
+  .auto-diagram-chat {grid-column: 1; grid-row: 2; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 24px minmax(0, 1fr); border-right: 0; border-top: 1px solid var(--line, #dde6df); gap: 8px;}
+  .auto-diagram-chat .auto-diagram-section-heading {grid-column: 1; grid-row: 1; min-height: 0;}
+  .auto-diagram-messages {grid-column: 1; grid-row: 2;}
+  .auto-diagram-composer {grid-column: 2; grid-row: 1 / -1; justify-content: flex-end;}
+  .auto-diagram-chat .auto-diagram-progress {display: none;}
+  .auto-diagram-chat .auto-diagram-notice {grid-column: 1 / -1; grid-row: 3; max-height: 44px;}
+  .auto-diagram-chat .auto-diagram-actions {gap: 4px;}
+  .auto-diagram-chat .auto-diagram-actions button {padding: 6px; font-size: 11px;}
+  .auto-diagram-header, .auto-diagram-footer {padding: 7px 10px;}
+  .auto-diagram-footer > span {max-width: 35%;}
+}
+@media (max-width: 540px) {
+  .auto-diagram-modal {padding: 4px;}
+  .auto-diagram-window {height: calc(100dvh - 8px); border-radius: 12px;}
+  .auto-diagram-columns {grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(150px, .65fr);}
+  .auto-diagram-preview {grid-column: 1 / -1; grid-row: 1;}
+  .auto-diagram-chat {grid-column: 1; grid-row: 2; display: flex; border-right: 1px solid var(--line, #dde6df);}
+  .auto-diagram-binding-panel {grid-column: 2; grid-row: 2; border-left: 0; border-top: 1px solid var(--line, #dde6df);}
+  .auto-diagram-chat, .auto-diagram-binding-panel {padding: 8px; gap: 6px;}
+  .auto-diagram-footer > span, .auto-diagram-hint, .auto-diagram-binding-columns, .auto-diagram-spoken {display: none;}
+  .auto-diagram-chat textarea {height: 58px; padding: 7px;}
+  .auto-diagram-chat .auto-diagram-section-heading > span {display: none;}
+  .auto-diagram-section-heading h4 {font-size: 12px;}
+  .auto-diagram-binding-state {max-height: 40px; font-size: 11px;}
+  .auto-diagram-footer {justify-content: flex-end; padding: 8px;}
+}
+
+/* 放大预览临时收起侧栏，返回时保留对话、绑定草稿和播放进度。 */
+.auto-diagram-columns[data-expanded="true"] {grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);}
+.auto-diagram-columns[data-expanded="true"] > .auto-diagram-chat, .auto-diagram-columns[data-expanded="true"] > .auto-diagram-binding-panel {display: none;}
+.auto-diagram-columns[data-expanded="true"] > .auto-diagram-preview {grid-column: 1; grid-row: 1;}
+
+/* 顶栏承载所有预览切换，舞台不再重复占用一行标题。 */
+.auto-diagram-header > .auto-diagram-preview-tools {margin-left: auto;}
+@media (max-width: 1100px) {.auto-diagram-columns > .auto-diagram-preview {padding: 6px; gap: 0;}}
+@media (max-width: 800px) {.auto-diagram-footer > span {display: none;}}
+@media (max-width: 540px) {
+  .auto-diagram-header {flex-wrap: wrap; gap: 5px;}
+  .auto-diagram-header > h3 {flex: 1;}
+  .auto-diagram-header > .auto-diagram-preview-tools {order: 3; width: 100%; justify-content: space-between;}
+  .auto-diagram-header .auto-diagram-tabs button {padding: 4px 6px; font-size: 11px;}
+  .auto-diagram-footer {gap: 6px;}
+  .auto-diagram-footer .auto-diagram-actions {gap: 5px;}
+  .auto-diagram-footer .auto-diagram-actions button {padding: 6px; font-size: 11px;}
+}

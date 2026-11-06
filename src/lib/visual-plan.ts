@@ -18,6 +18,7 @@ import {modelScenePlanSchema} from "@/remotion/templates/model-scene-schema";
 import {ensureCameraBoundaries} from "@/remotion/templates/model-scene-editing";
 import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
 import {handdrawTemplateData, handdrawTiming, handdrawDataSchema} from "@/remotion/templates/handdraw-schema";
+import {adoptedDiagramSchema, diagramDataSchema, validateDiagram} from "@/remotion/templates/auto-diagram-schema";
 import {textRevealSettingsSchema} from "@/remotion/templates/text-reveal-schema";
 
 const presenterPlanSchema = z.object({rollType: rollTypeSchema, mode: presenterModeSchema, poseId: presenterPoseIdSchema, placement: presenterPlacementSchema, framing: presenterFramingSchema.optional()}).strict();
@@ -33,6 +34,9 @@ export const visualPlanSceneSchema = z.object({
   templateId: z.string().min(1),
   visualData: relationGraphDataSchema.optional(),
   modelScene: modelScenePlanSchema.optional(),
+  // 采用内容是渲染事实源，工作区后续改动不影响它。
+  diagram: adoptedDiagramSchema.optional(),
+  previousDiagram: adoptedDiagramSchema.optional(),
   // 揭示文字的音效设置独立保存，不混入文案或素材资源。
   textReveal: textRevealSettingsSchema.optional(),
   presenter: presenterPlanSchema,
@@ -118,6 +122,10 @@ export const readVisualPlan = async (jobId: string, revision?: number) => {
 };
 
 const templateDataForManifest = (scene: VisualPlanScene, resources: VisualResources, allowIncompleteImage = false): Record<string, unknown> | undefined => {
+  if (scene.templateId === "rve/auto-diagram") {
+    if (!scene.diagram && !allowIncompleteImage) throw new Error(`镜头 ${scene.id} 的自动图表尚未采用`);
+    return scene.diagram ? diagramDataSchema.parse({type: scene.diagram.type, svg: scene.diagram.svg, bindings: scene.diagram.bindings}) : undefined;
+  }
   if (scene.templateId === "rve/text-reveal") return scene.textReveal;
   if (scene.templateId === "rve/relation-graph") return scene.visualData ? relationGraphDataSchema.parse(scene.visualData) : undefined;
   if (scene.templateId === "rve/handdraw-image") {
@@ -223,6 +231,7 @@ export const validateVisualPlan = (plan: VisualPlan, draft: Draft, narration: Na
     if (scene.templateId === "rve/visual-image" && runtimeScenes[index]!.templateData) buildVisualImageSchedule({scene: runtimeScenes[index]!, captions: narration.captions, data: runtimeScenes[index]!.templateData});
     // 草稿允许保留尚待简化的手绘镜头；确认和渲染必须满足真实绘制预算。
     if (scene.templateId === "rve/handdraw-image" && !allowIncompleteImage) handdrawTiming(runtimeScenes[index]!, handdrawDataSchema.parse(runtimeScenes[index]!.templateData));
+    if (scene.templateId === "rve/auto-diagram" && !allowIncompleteImage) validateDiagram(runtimeScenes[index]!, narration.captions, runtimeScenes[index]!.templateData);
     if (scene.templateId === "rve/relation-graph") {
       const graph = relationGraphDataSchema.parse(scene.visualData);
       graph.nodes.forEach((node) => {
@@ -243,6 +252,8 @@ export const saveVisualPlan = async (jobId: string, input: VisualPlanSaveInput, 
   await fs.rm(path.join(jobDir(jobId), "visual-plans"), {recursive: true, force: true});
   await copySplitModelResources(jobId, plan.scenes, resources);
   await atomicWriteJson(currentPlanPath(jobId), plan);
+  // 删除、切换或改变上下文后终止旧请求，保留当前图形供后续修订。
+  if (current?.scenes.some((scene) => scene.templateId === "rve/auto-diagram") || plan.scenes.some((scene) => scene.templateId === "rve/auto-diagram")) await (await import("./diagram/service")).reconcileDiagramRequests(jobId, current ?? {...plan, scenes: []}, plan);
   // 未完成的拆分手绘镜头拥有自己的请求，不能依赖父镜头 worker 回写。
   const splitResources = await readVisualResources(jobId);
   for (const scene of plan.scenes) {
@@ -270,7 +281,8 @@ export const retimeCopiedVisualPlan = async (jobId: string) => {
     const duration = next.endMs - next.startMs;
     const startRatio = (scene.startMs - oldStart) / (oldEnd - oldStart);
     const endRatio = (scene.endMs - oldStart) / (oldEnd - oldStart);
-    const retimed = {...scene, startMs: Math.round(next.startMs + duration * startRatio), endMs: Math.round(next.startMs + duration * endRatio)};
+    // 英文派生必须以译文重新制图，不能沿用中文采用内容。
+    const retimed = {...scene, diagram: undefined, previousDiagram: undefined, startMs: Math.round(next.startMs + duration * startRatio), endMs: Math.round(next.startMs + duration * endRatio)};
     if (retimed.templateId === "rve/3d-model-scene" && retimed.modelScene) retimed.modelScene = ensureCameraBoundaries(retimed.modelScene, retimed, narration.captions);
     return retimed;
   });
@@ -282,6 +294,11 @@ export const retimeCopiedVisualPlan = async (jobId: string) => {
 export const writeVisualPreviewManifest = async (jobId: string, profile: PlatformProfile): Promise<RenderManifest> => {
   const [plan, draft, narration, resources] = await Promise.all([readVisualPlan(jobId), readDraft(jobId), readNarration(jobId), readVisualResources(jobId)]);
   validateVisualPlan(plan, draft, narration, profile, resources);
+  // 确认重新校验上下文；已采用渲染不依赖 worker 或 Skill。
+  for (const scene of plan.scenes.filter((item) => item.templateId === "rve/auto-diagram")) {
+    const {context} = await (await import("./diagram/context")).loadDiagramContext(jobId, scene.id, plan);
+    if (scene.diagram?.contextFingerprint !== context.fingerprint) throw new Error(`镜头 ${scene.id} 的图表上下文已变化，请重新生成并采用`);
+  }
   for (const scene of deriveScenes(plan, draft, narration, resources)) {
     if (scene.templateId === "rve/handdraw-image") await (await import("./handdraw")).verifyHanddrawArtifacts(jobId, scene.templateData);
   }

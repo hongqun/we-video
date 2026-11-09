@@ -11,7 +11,7 @@ import {diagramSettings} from "./settings";
 import {validateDiagramMeaning} from "./meaning";
 import {inspectDiagramGeometry} from "./geometry";
 import {diagramBindingSchema, diagramDataSchema, validateDiagram} from "../../remotion/templates/auto-diagram-schema";
-import {diagramDirectory, readDiagramSession, writeDiagramSession, readDiagramCandidate, writeDiagramCandidate, type DiagramSession} from "./store";
+import {diagramDirectory, readDiagramSession, writeDiagramSession, readDiagramCandidate, writeDiagramCandidate, withDiagramRequestLock, type DiagramSession} from "./store";
 
 export const syncDiagramResource = async (jobId: string, sceneId: string, session: DiagramSession) => {
   const plan = await readVisualPlan(jobId);
@@ -49,7 +49,8 @@ export const readDiagramSnapshot = async (jobId: string, sceneId: string) => {
   return {session, candidate, stale, validationErrors, canAdopt: Boolean(candidate?.valid && !stale && !validationErrors.length && session.status !== "running" && candidate.requestId === session.requestId && session.status === "ready"), unavailable};
 };
 
-export const submitDiagram = async (jobId: string, sceneId: string, message: string) => {
+// 状态必须在锁内重新读取，并持锁到 PID 落盘；后来的提交只能看到已占用的请求。
+export const submitDiagram = async (jobId: string, sceneId: string, message: string) => withDiagramRequestLock(jobId, sceneId, async () => {
   const {context, job, profile} = await loadDiagramContext(jobId, sceneId);
   assertVisualPlanEditableState(job.state);
   if (job.state === "planning_visuals") throw new Error("镜头规划正在生成，请完成后再制图");
@@ -73,16 +74,17 @@ export const submitDiagram = async (jobId: string, sceneId: string, message: str
     await writeDiagramSession(jobId, sceneId, {...session, status: "failed", progress: "worker 启动失败", error: "请检查独立依赖与 Node.js 运行环境后重试"});
   } finally {closeSync(log);}
   return readDiagramSnapshot(jobId, sceneId);
-};
+});
 
-export const cancelDiagram = async (jobId: string, sceneId: string, reason = "用户取消了请求") => {
+// 取消等待启动完成，确保拿到实际 PID，且不会被启动阶段的旧会话回写覆盖。
+export const cancelDiagram = async (jobId: string, sceneId: string, reason = "用户取消了请求") => withDiagramRequestLock(jobId, sceneId, async () => {
   const session = await readDiagramSession(jobId, sceneId);
   if (session.status !== "running") return;
   // 先使请求无效，再终止进程，迟到的工具写入无法被采用。
   const next: DiagramSession = {...session, status: "cancelled", progress: reason, error: undefined};
   await writeDiagramSession(jobId, sceneId, next); await syncDiagramResource(jobId, sceneId, next);
   if (alive(session.pid)) {try {process.kill(session.pid!, "SIGTERM");} catch { /* 进程可能已自行退出。 */ }}
-};
+});
 
 export const changeDiagramBindings = async (jobId: string, sceneId: string, input: unknown) => {
   const {context, job} = await loadDiagramContext(jobId, sceneId); assertVisualPlanEditableState(job.state);
@@ -128,7 +130,8 @@ export const reconcileDiagramRequests = async (jobId: string, previous: VisualPl
   for (const before of previous.scenes) {
     if (before.templateId !== "rve/auto-diagram") continue;
     const after = next.scenes.find((scene) => scene.id === before.id);
-    const changed = !after || after.templateId !== "rve/auto-diagram" || JSON.stringify({...before, diagram: undefined, previousDiagram: undefined}) !== JSON.stringify({...after, diagram: undefined, previousDiagram: undefined}) || previous.visualStyle !== next.visualStyle;
+    // 转场只影响镜头切换，不改变图表上下文；调整类型或时长时保留当前图表和运行请求。
+    const changed = !after || after.templateId !== "rve/auto-diagram" || JSON.stringify({...before, diagram: undefined, previousDiagram: undefined, transition: undefined}) !== JSON.stringify({...after, diagram: undefined, previousDiagram: undefined, transition: undefined}) || previous.visualStyle !== next.visualStyle;
     if (changed) {
       await cancelDiagram(jobId, before.id, "镜头或上下文已变化，请重新制图");
       if (after?.templateId === "rve/auto-diagram") {

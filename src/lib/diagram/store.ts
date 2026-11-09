@@ -14,6 +14,34 @@ export const diagramDirectory = (jobId: string, sceneId: string) => {
   if (!/^[a-zA-Z0-9-]+$/u.test(sceneId)) throw new Error("镜头 ID 无效");
   return path.join(jobDir(jobId), "diagrams", sceneId);
 };
+
+// 请求占位、启动及取消共用跨进程锁，避免多个标签页同时启动同一镜头的 worker。
+export const withDiagramRequestLock = async <T>(jobId: string, sceneId: string, action: () => Promise<T>): Promise<T> => {
+  const directory = diagramDirectory(jobId, sceneId);
+  await fs.mkdir(directory, {recursive: true});
+  const lock = path.join(directory, ".request.lock");
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {handle = await fs.open(lock, "wx"); break;}
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      // 为刚创建但尚未写入 PID 的锁留出时间，只回收已退出进程遗留的锁。
+      const stat = await fs.stat(lock).catch(() => null);
+      if (stat && Date.now() - stat.mtimeMs > 30000) {
+        const pid = Number(await fs.readFile(lock, "utf8").catch(() => "0"));
+        if (!pid) await fs.unlink(lock).catch(() => undefined);
+        else {
+          try {process.kill(pid, 0);}
+          catch (cause) {if ((cause as NodeJS.ErrnoException).code === "ESRCH") await fs.unlink(lock).catch(() => undefined);}
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  if (!handle) throw new Error("图表请求正在更新，请稍后重试");
+  try {await handle.writeFile(String(process.pid)); return await action();}
+  finally {try {await handle.close();} finally {await fs.unlink(lock);}}
+};
 export const readDiagramSession = async (jobId: string, sceneId: string): Promise<DiagramSession> => {
   try {return await readJson<DiagramSession>(path.join(diagramDirectory(jobId, sceneId), "session.json"));}
   catch (error) {

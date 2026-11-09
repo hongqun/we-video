@@ -3259,16 +3259,30 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-plan-scenes-heading { border-top: 1px solid #e8e1f3; display: grid; gap: 3px; grid-column: 1 / -1; padding-top: 16px; }
 .visual-plan-scenes-heading p { margin: 0; }
 .visual-plan-editor { display: grid; gap: 9px; }
-/* 压缩镜头字段与模板卡片的纵向空间，保留多行输入和手动调整高度。 */
-.visual-plan-editor > .template-field .compatible-template-picker { gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 200px; }
-.visual-plan-editor > .template-field .template-option { min-height: 46px; padding: 5px 9px; }
-.visual-plan-editor > .template-field .template-option > span { gap: 1px; }
-.visual-plan-editor > label { gap: 3px; }
-.visual-plan-editor > label > input, .visual-plan-two-columns input, .visual-plan-two-columns select { min-height: 36px; padding: 6px 9px; }
-.visual-plan-editor > label > textarea { min-height: 52px; padding: 6px 9px; line-height: 1.45; }
-.visual-plan-editor > label > textarea[rows="3"] { min-height: 66px; }
-/* 覆盖通用模板字段的排序，让镜头规划先显示模板选择。 */
-.visual-plan-editor > .template-field { order: 0; }
+/* Step4 主编辑区紧凑展示；样式不进入封面、预览及素材编辑器。 */
+.visual-plan-workspace .visual-plan-scenes-heading { gap: 2px; padding-top: 10px; }
+.visual-plan-workspace .visual-plan-editor { min-width: 0; gap: 8px; }
+.visual-plan-editor > label, .visual-plan-template-field > label, .visual-plan-title-fields > label, .visual-plan-more-settings-body label { gap: 3px; min-width: 0; font-size: 12px; }
+.visual-plan-template-field { display: grid; gap: 3px; min-width: 0; }
+.visual-plan-template-field .field-hint { font-size: 11px; margin: 0; overflow-wrap: anywhere; }
+.visual-plan-template-field select, .visual-plan-title-fields input, .visual-plan-title-fields textarea, .visual-plan-editor > label > input, .visual-plan-editor > label > select, .visual-plan-editor > label > textarea, .visual-plan-more-settings-body input, .visual-plan-more-settings-body select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 34px; padding: 6px 9px; font-size: 13px; line-height: 1.45; }
+.visual-plan-title-fields { align-items: start; display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.visual-plan-title-fields textarea, .visual-plan-editor > .visual-plan-content-field > textarea { min-height: 34px; resize: vertical; }
+.visual-plan-editor > .visual-plan-content-field > textarea { min-height: 53px; }
+/* 原生 details 保留键盘操作，摘要始终显示当前转场。 */
+.visual-plan-more-settings { border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.visual-plan-more-settings > summary { align-items: center; cursor: pointer; display: flex; gap: 8px; list-style: none; padding: 7px 9px; font-size: 12px; }
+.visual-plan-more-settings > summary::-webkit-details-marker { display: none; }
+.visual-plan-more-settings > summary::after { content: "＋"; flex: 0 0 auto; }
+.visual-plan-more-settings[open] > summary::after { content: "−"; }
+.visual-plan-more-settings > summary small { color: var(--muted); margin-left: auto; text-align: right; overflow-wrap: anywhere; }
+.visual-plan-more-settings > summary:focus-visible { outline: 3px solid rgba(46, 125, 91, .34); outline-offset: 2px; border-radius: 8px; }
+.visual-plan-more-settings-body { border-top: 1px solid var(--line); display: grid; gap: 8px; padding: 8px 9px; }
+/* 图表状态与操作合并为工具行，长状态或窄屏时自然换行。 */
+.visual-plan-editor > .visual-plan-diagram-toolbar { background: transparent; border: 0; border-radius: 0; flex-wrap: wrap; gap: 6px 10px; padding: 4px 0; }
+.visual-plan-diagram-toolbar > span { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.visual-plan-diagram-toolbar > button { min-height: 32px; padding: 5px 10px; font-size: 12px; }
+@media (max-width: 760px) { .visual-plan-title-fields { grid-template-columns: 1fr; } }
 .visual-plan-editor .actions { grid-column: 1 / -1; }
 .visual-plan-structure-actions { align-items: center; border-bottom: 1px solid #e8e1f3; padding-bottom: 12px; }
 .visual-plan-spoken { background: #faf8ff; border-left: 3px solid #8b66cb; border-radius: 0 9px 9px 0; padding: 12px 14px; }
@@ -3340,6 +3354,64 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 @media (max-width: 980px) { .visual-plan-body { grid-template-columns: 1fr; } .visual-plan-cover-editor { grid-template-columns: 1fr; } .visual-plan-preview { position: static; } }
 @media (max-width: 760px) { .visual-style-options { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .visual-plan-two-columns, .visual-plan-actions { grid-template-columns: 1fr; } .visual-asset-picker-head { align-items: stretch; flex-direction: column; } .visual-asset-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .visual-asset-external > div { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+
+/* Step4 双栏工作区：编辑栏约占 45%，预览栏约占 55%，优先展示画面。 */
+.visual-plan-workspace .visual-plan-body { column-gap: 18px; row-gap: 14px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); }
+.visual-plan-workspace .visual-plan-editor, .visual-plan-workspace .visual-plan-preview { background: #fffefb; border: 1px solid var(--line); border-radius: 12px; box-sizing: border-box; padding: 16px; min-width: 0; }
+.visual-plan-workspace .visual-plan-editor { align-content: start; gap: 12px; }
+.visual-plan-editor-heading, .visual-plan-preview > div:first-child { align-items: center; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: space-between; padding-bottom: 10px; min-width: 0; }
+.visual-plan-editor-heading > strong, .visual-plan-preview > div:first-child > strong { font-size: 14px; }
+.visual-plan-editor-heading .metadata { font-size: 11px; }
+.visual-plan-preview > div:first-child .review-section-label { color: #7650b2; font-size: 11px; letter-spacing: .04em; margin: 0; }
+.visual-plan-template-field .visual-plan-template-ready { display: none; }
+.visual-plan-workspace .visual-plan-spoken { background: #f8f6fc; border-left-width: 2px; padding: 10px 12px; }
+.visual-plan-spoken-heading { align-items: center; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+.visual-plan-spoken-heading > label { color: #7650b2; font-size: 12px; font-weight: 750; }
+.visual-plan-spoken-heading > button { align-items: center; display: inline-flex; gap: 5px; min-height: 28px; padding: 3px 8px; font-size: 11px; }
+.visual-plan-spoken .visual-plan-spoken-hint { color: #847a94; font-size: 11px; margin: 3px 0 7px; line-height: 1.5; }
+.visual-plan-spoken-editor > textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 66px; font-size: 13px; line-height: 1.65; }
+/* 固定画布最大宽度而非拉伸高度；小屏依旧保留完整画面。 */
+.visual-plan-workspace .visual-plan-preview { align-content: start; gap: 12px; top: 16px; }
+.visual-plan-preview-stage { background: #f3f4f0; border: 1px solid #e5e7df; border-radius: 8px; display: grid; justify-items: center; overflow: hidden; padding: 8px; min-width: 0; }
+.visual-plan-preview-stage > .template-preview-player { width: min(100%, 520px); min-width: 0; }
+.visual-plan-preview-stage > .template-preview-empty { align-items: center; background: transparent; display: flex; justify-content: center; padding: 16px; text-align: center; width: 100%; box-sizing: border-box; }
+.visual-plan-preview-controls { display: grid; gap: 10px; min-width: 0; }
+.visual-plan-preview-controls .visual-plan-playback-mode { display: flex; flex-wrap: wrap; justify-self: stretch; gap: 2px; }
+.visual-plan-preview-controls .visual-plan-playback-mode button { flex: 1 1 auto; font-size: 11px; padding: 5px 7px; }
+.visual-plan-preview-controls .visual-plan-scene-counter { font-size: 10px; margin-left: auto; padding: 5px 7px; }
+.visual-plan-preview-controls .visual-plan-audio-controls { flex-wrap: wrap; gap: 8px; }
+.visual-plan-preview-controls .visual-plan-audio-controls > button { align-items: center; display: inline-flex; gap: 5px; min-height: 32px; padding: 5px 8px; font-size: 11px; }
+.visual-plan-preview-controls .visual-plan-audio-controls > .metadata { font-size: 11px; font-variant-numeric: tabular-nums; }
+.visual-plan-preview-controls .visual-plan-next-step { margin-left: auto; }
+.visual-plan-editor-controls .visual-plan-rail { border-top: 1px solid var(--line); padding-top: 10px; min-width: 0; scrollbar-width: thin; }
+.visual-plan-editor-controls .visual-plan-rail > button { flex-basis: 136px; min-width: 0; min-height: 76px; padding: 8px 10px; gap: 3px; border-radius: 8px; font-size: 12px; }
+.visual-plan-editor-controls .visual-plan-rail > button > span { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-plan-editor-controls .visual-plan-rail small { font-size: 10px; }
+/* 左栏依次放置播放、镜头导航和提交操作，建议输入独占一行。 */
+.visual-plan-editor-controls { display: grid; gap: 12px; min-width: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+.visual-plan-editor-controls > .visual-plan-actions { border-top: 1px solid var(--line); padding-top: 12px; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.visual-plan-editor-controls .visual-plan-feedback { grid-column: 1 / -1; grid-row: 1; }
+.visual-plan-actions > .visual-plan-feedback { color: var(--muted); display: grid; gap: 4px; min-width: 0; font-size: 11px; }
+.visual-plan-feedback > textarea { box-sizing: border-box; width: 100%; min-height: 54px; padding: 7px 9px; font-size: 12px; resize: vertical; }
+.visual-plan-actions > button { min-height: 36px; padding: 7px 12px; font-size: 12px; }
+@media (max-width: 1100px) and (min-width: 981px) {
+  .visual-plan-workspace .visual-plan-body { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 12px; }
+  .visual-plan-workspace .visual-plan-editor, .visual-plan-workspace .visual-plan-preview { padding: 12px; }
+  .visual-plan-workspace .visual-plan-title-fields { grid-template-columns: 1fr; }
+}
+@media (max-width: 980px) {
+  .visual-plan-workspace .visual-plan-body { grid-template-columns: minmax(0, 1fr); }
+  .visual-plan-workspace .visual-plan-preview { position: static; }
+  .visual-plan-preview-stage > .template-preview-player { width: min(100%, 420px); }
+  .visual-plan-editor-controls > .visual-plan-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .visual-plan-actions > .visual-plan-feedback { grid-column: 1 / -1; grid-row: 1; }
+}
+@media (max-width: 560px) {
+  .visual-plan-workspace .visual-plan-editor, .visual-plan-workspace .visual-plan-preview { padding: 12px; }
+  .visual-plan-editor-controls > .visual-plan-actions { grid-template-columns: minmax(0, 1fr); }
+  .visual-plan-editor-controls .visual-plan-feedback { grid-column: auto; grid-row: auto; }
+}
 
 @media (max-width: 860px) {
   .review-meta-grid { grid-template-columns: 1fr; }

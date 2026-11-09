@@ -53,6 +53,34 @@ const saveInput = (plan: VisualPlan, title: string): VisualPlanSaveInput => {
   return {schemaVersion: "1.0", revision: plan.revision, ...(plan.feedback ? {feedback: plan.feedback} : {}), ...(plan.visualStyle ? {visualStyle: plan.visualStyle} : {}), cover: {...cover, keywords: cover.keywords.map((keyword) => keyword.trim()).filter(Boolean).slice(0, 8)}, scenes: plan.scenes};
 };
 
+// 中文名称只用于编辑器展示，不改变转场契约值。
+const transitionLabels: Record<TransitionKind, string> = {none: "无转场", fade: "淡入淡出", "slide-left": "向左滑动", "slide-up": "向上滑动", "zoom-in": "放大", "wipe-right": "向右擦除"};
+
+// 短文案按行数起步；已有长文案、换行及容器宽度变化时自动撑开。
+const AutoSizeTextarea = (props: React.ComponentProps<"textarea">) => {
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const element = field.current;
+    if (!element) return;
+    const resize = () => {
+      element.style.height = "auto";
+      const style = getComputedStyle(element);
+      element.style.height = `${element.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)}px`;
+    };
+    resize();
+    let width = element.getBoundingClientRect().width;
+    const observer = new ResizeObserver(() => {
+      const nextWidth = element.getBoundingClientRect().width;
+      if (nextWidth === width) return;
+      width = nextWidth;
+      resize();
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [props.value]);
+  return <textarea {...props} ref={field} />;
+};
+
 export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: VisualPlan; audioSrc: string; segments: TimedNarrationSegment[]; captions: Caption[]; visualResources: {revision?: number; resources: Resource[]}; previewArtifactToken?: string; spokenSegments: SpokenSegment[]; profile: ProfileContext; brand: RenderManifest["brand"]; busy: boolean; canFinalize: boolean; coverImageBusy: boolean; onHanddrawChange: () => Promise<void>; onUploadCoverImage: (file: File) => Promise<void>; onDeleteCoverImage: () => Promise<void>; onGenerateCoverImageRequirement: (title: string) => Promise<void>; onGenerateVisualRequirement: (segmentId: string, spokenText: string, transparentBackground: boolean) => Promise<string>; onUploadImage: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteImage: (sceneId: string, segmentId: string) => Promise<void>; onUploadModel: (sceneId: string, segmentId: string, file: File) => Promise<void>; onDeleteModel: (sceneId: string, segmentId: string) => Promise<void>; onSavePolygons: (sceneId: string, segmentId: string, polygons: Polygon[]) => Promise<void>; onSave: (plan: VisualPlanSaveInput) => Promise<VisualPlan>; onReplan: (feedback: string) => Promise<void>; onFinalize: (planVersion: number) => Promise<void>}> = ({jobId, title, plan, audioSrc, segments, captions, visualResources: incomingResources, previewArtifactToken, spokenSegments, profile, brand, busy, canFinalize, coverImageBusy, onHanddrawChange, onUploadCoverImage, onDeleteCoverImage, onGenerateCoverImageRequirement, onGenerateVisualRequirement, onUploadImage, onDeleteImage, onUploadModel, onDeleteModel, onSavePolygons, onSave, onReplan, onFinalize}) => {
   // 手绘处理独立于主任务轮询，按资源版本防止旧快照覆盖新结果。
   const [handdrawSnapshot, setHanddrawSnapshot] = useState<HanddrawResourcesSnapshot | null>(null);
@@ -412,6 +440,27 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       setMessage(error instanceof Error ? error.message : "按口播文字拆分视觉镜头失败");
     }
   };
+  // 下拉框复用原卡片的候选场景与可选规则，状态提示跟随当前模板。
+  const templateOptions = current ? availableTemplates.map((definition) => {
+    const candidateResource = visualResourceForScene(visualResources, current.id, current.segmentId);
+    const candidateImagePath = candidateResource?.imagePath ? sceneImageUrl(jobId, candidateResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
+    const candidateModelPath = candidateResource?.modelPath ? sceneImageUrl(jobId, candidateResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
+    const candidateTemplateData = definition.id === "rve/visual-image" && candidateImagePath && candidateResource?.imageWidth && candidateResource.imageHeight
+      ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
+      : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
+      : definition.id === "rve/handdraw-image" ? handdrawTemplateData(candidateResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
+      : definition.id === "rve/auto-diagram" && current.diagram ? {type: current.diagram.type, svg: current.diagram.svg, bindings: current.diagram.bindings}
+      : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
+    const candidatePresenter = definition.rollRole === "a-roll"
+      ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
+      : {...current.presenter, rollType: "b-roll" as const, mode: "hidden" as const, placement: "right-lower" as const, framing: definition.companionFraming};
+    // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
+    const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
+    const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
+    const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image" || definition.id === "rve/auto-diagram";
+    return {definition, candidatePresenter, status, canSelectPendingMedia};
+  }) : [];
+  const selectedTemplateOption = templateOptions.find((option) => option.definition.id === current?.templateId);
   return <section className="panel visual-plan-workspace" aria-labelledby="visual-plan-title">
     <div className="panel-heading"><div><p className="review-section-label">第 4 步 · 镜头规划</p><h2 id="visual-plan-title" className="icon-label"><Icon name="timeline" />跟着声音排镜头</h2></div><span className="metadata">{dirty ? "有未保存修改" : "已保存"}</span></div>
     {current ? <div className="visual-plan-body">
@@ -450,34 +499,31 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       </details>
       <div className="visual-plan-scenes-heading"><p className="review-section-label">镜头规划</p><strong>跟着声音排镜头</strong></div>
       <div className="visual-plan-editor">
-        {/* 先选择模板，再编辑该镜头的内容和素材。 */}
-        <div className="template-field"><label>可用模板</label><div className="compatible-template-picker">{availableTemplates.map((definition) => {
-          const candidateResource = visualResourceForScene(visualResources, current.id, current.segmentId);
-          const candidateImagePath = candidateResource?.imagePath ? sceneImageUrl(jobId, candidateResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
-          const candidateModelPath = candidateResource?.modelPath ? sceneImageUrl(jobId, candidateResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
-          const candidateTemplateData = definition.id === "rve/visual-image" && candidateImagePath && candidateResource?.imageWidth && candidateResource.imageHeight
-            ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
-            : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
-            : definition.id === "rve/handdraw-image" ? handdrawTemplateData(candidateResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
-            : definition.id === "rve/auto-diagram" && current.diagram ? {type: current.diagram.type, svg: current.diagram.svg, bindings: current.diagram.bindings}
-            : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
-          const candidatePresenter = definition.rollRole === "a-roll"
-            ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
-            : {...current.presenter, rollType: "b-roll" as const, mode: "hidden" as const, placement: "right-lower" as const, framing: definition.companionFraming};
-          // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
-          const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
-          const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
-          const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image" || definition.id === "rve/auto-diagram";
-          return <button className={`template-option ${current.templateId === definition.id ? "is-selected" : ""}`} type="button" key={definition.id} disabled={locked || (!status.usable && !canSelectPendingMedia)} onClick={() => update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})})}><span><strong>{definition.label}</strong><small>{status.usable ? "当前镜头可用" : canSelectPendingMedia ? "可先选择，待完成素材与编排" : status.reason}</small></span></button>;
-        })}</div></div>
+        {/* 编辑与预览使用一致的栏标题，切换镜头时保留当前位置提示。 */}
+        <div className="visual-plan-editor-heading"><strong>镜头内容</strong><span className="metadata">镜头 {String(selected + 1).padStart(2, "0")} · {clock(current.startMs)}–{clock(current.endMs)}</span></div>
+        {/* 模板收为原生下拉框，保留键盘选择及素材未完成时的选择能力。 */}
+        <div className="visual-plan-template-field">
+          <label>模板<select value={current.templateId} disabled={locked} aria-describedby="visual-plan-template-hint" onChange={(event) => {
+            const option = templateOptions.find(({definition}) => definition.id === event.target.value);
+            if (!option || (!option.status.usable && !option.canSelectPendingMedia)) return;
+            const {definition, candidatePresenter} = option;
+            update({templateId: definition.id, presenter: candidatePresenter, ...(definition.id === "rve/relation-graph" && !current.visualData ? {visualData: buildRelationGraphFromKeywords(current.content.keywords)} : {}), ...(definition.id === "rve/3d-model-scene" && !current.modelScene ? {modelScene: freshCameraPlan(current)} : {})});
+          }}>
+            {!selectedTemplateOption ? <option value={current.templateId} disabled>{templateById.get(current.templateId)?.label ?? current.templateId} · 不可用</option> : null}
+            {templateOptions.map(({definition, status, canSelectPendingMedia}) => <option key={definition.id} value={definition.id} disabled={!status.usable && !canSelectPendingMedia}>{definition.label} · {status.usable ? "可用" : canSelectPendingMedia ? "待完善" : status.reason}</option>)}
+          </select></label>
+          <p id="visual-plan-template-hint" className={`field-hint${selectedTemplateOption?.status.usable ? " visual-plan-template-ready" : ""}`} role="status">{!selectedTemplateOption ? "当前模板不适用于此镜头，请选择其他模板。" : selectedTemplateOption.status.usable ? "当前镜头可用" : `${selectedTemplateOption.status.reason}。${selectedTemplateOption.canSelectPendingMedia ? "可先选择，待完成素材与编排。" : "请选择其他模板。"}`}</p>
+        </div>
         {/* 音效随当前镜头保存，切换模板后仍保留用户选择。 */}
         {current.templateId === "rve/text-reveal" ? <label>打字机音效<select value={textRevealSoundEnabled(current.textReveal?.typingSound) ? "on" : "off"} disabled={locked} onChange={(event) => update({textReveal: {...current.textReveal, typingSound: event.target.value === "on"}})}><option value="on">开启</option><option value="off">关闭</option></select></label> : null}
-        <div className="visual-plan-spoken"><span>当前口播 · 将光标放在文字中间后点击拆分</span><div className="visual-plan-spoken-editor"><textarea ref={spokenTextRef} value={runtimeScene?.spokenText ?? ""} readOnly rows={3} aria-label="当前镜头口播文字" /><button type="button" className="secondary icon-only" aria-label="按光标拆分镜头" title="按光标拆分镜头" data-tooltip="按光标拆分镜头" disabled={locked} onClick={splitAtSpokenTextCursor}><Icon name="flow" /></button></div></div>
+        {/* 拆分操作放入口播标题行，文字区可使用完整栏宽。 */}
+        <div className="visual-plan-spoken"><div className="visual-plan-spoken-heading"><label htmlFor="visual-plan-spoken-text">当前口播</label><button type="button" className="secondary" title="将光标放在口播文字中间后拆分" disabled={locked} onClick={splitAtSpokenTextCursor}><Icon name="flow" />拆分镜头</button></div><p className="visual-plan-spoken-hint">将光标放在文字中间，再点击拆分镜头</p><div className="visual-plan-spoken-editor"><textarea id="visual-plan-spoken-text" ref={spokenTextRef} value={runtimeScene?.spokenText ?? ""} readOnly rows={3} aria-label="当前镜头口播文字" /></div></div>
         {/* 场景主标题与封面标题保持一致，支持手动换行并直接传给显式换行渲染。 */}
-        <label>主标题<textarea rows={2} value={current.content.title} disabled={locked} onChange={(event) => updateContent({title: event.target.value})} placeholder="可按 Enter 手动换行" /></label>
-        <label>副标题<input value={current.content.subtitle} disabled={locked} onChange={(event) => updateContent({subtitle: event.target.value})} /></label>
-        <label>内容<textarea rows={3} value={current.content.text} disabled={locked} onChange={(event) => updateContent({text: event.target.value})} /></label>
-        <label>关键词<input value={current.content.keywords.join("、")} disabled={locked} onChange={(event) => updateContent({keywords: event.target.value.split(/[,，、]/).map((item) => item.trim()).filter(Boolean)})} /></label>
+        <div className="visual-plan-title-fields">
+          <label>主标题<AutoSizeTextarea key={`${current.id}-title`} rows={1} value={current.content.title} disabled={locked} onChange={(event) => updateContent({title: event.target.value})} placeholder="可按 Enter 手动换行" /></label>
+          <label>副标题<input value={current.content.subtitle} disabled={locked} onChange={(event) => updateContent({subtitle: event.target.value})} /></label>
+        </div>
+        <label className="visual-plan-content-field">内容<AutoSizeTextarea key={`${current.id}-content`} rows={2} value={current.content.text} disabled={locked} onChange={(event) => updateContent({text: event.target.value})} /></label>
         {/* 标签与特效分开配置；每个重点词显式指定触发它的口播文字。 */}
         {current.templateId === "ip/opening-stage" ? <section className="visual-plan-emphasis" aria-label="内容区重点词特效">
           <strong>内容区重点词特效</strong>
@@ -489,12 +535,19 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           </div>)}
           <button type="button" className="secondary" disabled={locked} onClick={() => updateContent({emphasisBindings: [...(current.content.emphasisBindings ?? []), {text: "", cueText: ""}]})}>添加重点词</button>
         </section> : null}
-        <div className="visual-plan-two-columns">
-          <label>到下一个镜头的转场<select value={current.transition.kind} disabled={locked} onChange={(event) => { const kind = event.target.value as TransitionKind; update({transition: kind === "none" ? {kind, durationMs: 0} : {kind, durationMs: current.transition.kind === "none" ? 315 : current.transition.durationMs}}); }}>{TRANSITION_KINDS.map((kind) => <option key={kind} value={kind}>{kind === "none" ? "无转场" : kind}</option>)}</select></label>
-          <label>转场时长（毫秒）<input type="number" min={240} max={360} step={1} value={current.transition.kind === "none" ? 0 : current.transition.durationMs} disabled={locked || current.transition.kind === "none"} onChange={(event) => update({transition: {kind: current.transition.kind === "none" ? "fade" : current.transition.kind, durationMs: Math.max(240, Math.min(360, Number(event.target.value) || 315))}})} /></label>
-        </div>
+        {/* 次要字段默认收起；折叠只影响展示，不卸载或清空字段。 */}
+        <details className="visual-plan-more-settings">
+          <summary><span>更多设置</span><small>{transitionLabels[current.transition.kind]}{current.transition.kind !== "none" ? ` · ${current.transition.durationMs} ms` : ""}</small></summary>
+          <div className="visual-plan-more-settings-body">
+            <label>关键词<input value={current.content.keywords.join("、")} disabled={locked} onChange={(event) => updateContent({keywords: event.target.value.split(/[,，、]/).map((item) => item.trim()).filter(Boolean)})} /></label>
+            <div className="visual-plan-two-columns">
+              <label>到下一个镜头的转场<select value={current.transition.kind} disabled={locked} onChange={(event) => { const kind = event.target.value as TransitionKind; update({transition: kind === "none" ? {kind, durationMs: 0} : {kind, durationMs: current.transition.kind === "none" ? 315 : current.transition.durationMs}}); }}>{TRANSITION_KINDS.map((kind) => <option key={kind} value={kind}>{transitionLabels[kind]}</option>)}</select></label>
+              <label>转场时长（毫秒）<input type="number" min={240} max={360} step={1} value={current.transition.kind === "none" ? 0 : current.transition.durationMs} disabled={locked || current.transition.kind === "none"} onChange={(event) => update({transition: {kind: current.transition.kind === "none" ? "fade" : current.transition.kind, durationMs: Math.max(240, Math.min(360, Number(event.target.value) || 315))}})} /></label>
+            </div>
+          </div>
+        </details>
         {/* 打开 Agent 前保存本地规划，服务端上下文以已保存镜头为准。 */}
-        {current.templateId === "rve/auto-diagram" ? <div className="relation-graph-editor-trigger"><span>自动图表与口播绑定{currentResource?.diagram?.status === "stale" ? " · 已过期，需重新制图" : current.diagram ? " · 已采用" : " · 待生成采用"}</span><button className="secondary" type="button" disabled={locked} onClick={async () => {const latest = dirty ? await save() : saved; if (latest) {audio.current?.pause(); setDiagramEditorOpen(true);}}}>打开图表 Agent</button></div> : null}
+        {current.templateId === "rve/auto-diagram" ? <div className="relation-graph-editor-trigger visual-plan-diagram-toolbar"><span>自动图表与口播绑定{currentResource?.diagram?.status === "stale" ? " · 已过期，需重新制图" : current.diagram ? " · 已采用" : " · 待生成采用"}</span><button className="secondary" type="button" disabled={locked} onClick={async () => {const latest = dirty ? await save() : saved; if (latest) {audio.current?.pause(); setDiagramEditorOpen(true);}}}>自动图表Agent</button></div> : null}
         {diagramEditorOpen && runtimeScene && current.templateId === "rve/auto-diagram" ? <AutoDiagramEditor key={current.id} jobId={jobId} sceneId={current.id} scene={runtimeScene} captions={captions} audioSrc={audioSrc} brand={brand} presenter={profile.presenter} visualStyle={value.visualStyle} hasPrevious={Boolean(current.previousDiagram)} onClose={() => setDiagramEditorOpen(false)} onPlan={(next) => {setValue(next); setSaved(next); setMessage("图表采用内容已更新。"); void onHanddrawChange();}} /> : null}
         {current.templateId === "rve/relation-graph" && current.visualData ? <div className="relation-graph-editor-trigger"><span>关系图节点与连线</span><button className="secondary" type="button" disabled={locked} onClick={() => { setRelationEditorMaximized(false); setRelationEditorOpen(true); }}>打开编辑器</button></div> : null}
         {profile.presenter.poses.length > 0 ? <details className="visual-plan-presenter-settings"><summary><span>人物设置</span><small>{current.presenter.mode === "hero" ? "全屏主讲" : current.presenter.mode === "companion" ? "陪伴讲解" : "隐藏人物"}</small></summary><div className="visual-plan-presenter-settings-body">
@@ -563,9 +616,9 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
             {polygonTextEditor.error ? <p className="error-text">{polygonTextEditor.error}</p> : null}
           </section>
         </div> : null}
-      </div>
-      <aside className="visual-plan-preview"><div><p className="review-section-label">当前镜头预览</p><strong>{templateById.get(current.templateId)?.label}</strong></div>
-        {runtimeScene && currentStatus.usable ? <TemplatePreview brand={brand} scene={runtimeScene} presenter={previewPresenter} visualStyle={value.visualStyle} playing={playing} audioRef={audio} playerRef={previewPlayer} sceneStartMs={current.startMs} sceneEndMs={current.endMs} captions={captions} /> : <div className="template-preview-empty">{currentStatus.reason}</div>}
+        {/* 播放、镜头导航与规划操作集中到左栏，利用编辑表单下方空间。 */}
+        <div className="visual-plan-editor-controls">
+        <div className="visual-plan-preview-controls">
         <div className="visual-plan-playback-mode" aria-label="预览播放模式">
           <button type="button" className={playbackMode === "step" ? "is-active" : ""} aria-pressed={playbackMode === "step"} onClick={() => changePlaybackMode("step")}>逐步播放</button>
           <button type="button" className={playbackMode === "full" ? "is-active" : ""} aria-pressed={playbackMode === "full"} onClick={() => changePlaybackMode("full")}>全部播放</button>
@@ -577,13 +630,23 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           <audio ref={audio} src={audioSrc} preload="metadata" onLoadedMetadata={handleAudioLoadedMetadata} onSeeked={handleAudioSeeked} onTimeUpdate={handleAudioTimeUpdate} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEmptied={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={() => {setPlaying(false); setPlaybackError("口播音频加载失败，请刷新页面后重试。");}} />
           <button type="button" className="secondary" onClick={() => playing ? audio.current?.pause() : playSelectedScene()}><Icon name="play" />{playing ? "暂停" : "播放当前镜头"}</button>
           <span className="metadata">{clock(time)} / {clock(current.endMs)}</span>
+        {playbackMode === "step" && selected < value.scenes.length - 1 ? <button type="button" className="visual-plan-next-step" onClick={continueStepPlayback}><Icon name="arrow-right" />下一步</button> : null}
         </div>
         {playbackError ? <p className="error-text" role="alert">{playbackError}</p> : null}
-        {playbackMode === "step" && selected < value.scenes.length - 1 ? <button type="button" className="visual-plan-next-step" onClick={continueStepPlayback}><Icon name="arrow-right" />下一步</button> : null}
-        <div className="visual-plan-rail">{value.scenes.map((scene, index) => <button type="button" className={`${index === selected ? "is-selected" : ""} ${index === playingIndex ? "is-playing" : ""}`} key={scene.id} onClick={() => seek(index)}><b>{String(index + 1).padStart(2, "0")}</b><span>{scene.content.title}</span><small>{`${clock(scene.startMs)}–${clock(scene.endMs)}`}</small></button>)}</div>
+
+        </div>
+        <div className="visual-plan-rail" aria-label="镜头列表">{value.scenes.map((scene, index) => <button type="button" className={`${index === selected ? "is-selected" : ""} ${index === playingIndex ? "is-playing" : ""}`} key={scene.id} aria-current={index === selected ? "true" : undefined} title={scene.content.title} onClick={() => seek(index)}><b>{String(index + 1).padStart(2, "0")}</b><span>{scene.content.title}</span><small>{`${clock(scene.startMs)}–${clock(scene.endMs)}`}</small></button>)}</div>
+    {message ? <p className="visual-plan-message" role="status">{message}</p> : null}
+    <div className="visual-plan-actions"><button type="button" disabled={locked || !dirty} onClick={() => void save()}><Icon name="save" />保存规划</button><label className="visual-plan-feedback">重新提取建议<textarea rows={2} value={feedback} disabled={locked} onChange={(event) => setFeedback(event.target.value)} placeholder="描述希望 AI 如何重新提取镜头文字" /></label><button type="button" disabled={locked} onClick={() => { setOperation("replanning"); setMessage(null); void onReplan(feedback.trim()).catch((error) => setMessage(error instanceof Error ? error.message : "重新提取失败")).finally(() => setOperation("idle")); }}>重新提取</button><button type="button" disabled={locked || !canFinalize || Boolean(planIssue)} title={planIssue} onClick={() => void finalize()}>确认镜头规划</button></div>
+        </div>
+      </div>
+      <aside className="visual-plan-preview"><div><p className="review-section-label">当前镜头预览</p><strong>{templateById.get(current.templateId)?.label}</strong></div>
+        {/* 限制预览画布的显示尺寸，保持原始比例与时间轴逻辑。 */}
+        <div className="visual-plan-preview-stage">
+        {runtimeScene && currentStatus.usable ? <TemplatePreview brand={brand} scene={runtimeScene} presenter={previewPresenter} visualStyle={value.visualStyle} playing={playing} audioRef={audio} playerRef={previewPlayer} sceneStartMs={current.startMs} sceneEndMs={current.endMs} captions={captions} /> : <div className="template-preview-empty">{currentStatus.reason}</div>}
+        </div>
       </aside>
     </div> : null}
-    {message ? <p className="visual-plan-message" role="status">{message}</p> : null}
-    <div className="visual-plan-actions"><button type="button" disabled={locked || !dirty} onClick={() => void save()}><Icon name="save" />保存规划</button><textarea rows={2} value={feedback} disabled={locked} onChange={(event) => setFeedback(event.target.value)} placeholder="描述希望 AI 如何重新提取镜头文字" /><button type="button" disabled={locked} onClick={() => { setOperation("replanning"); setMessage(null); void onReplan(feedback.trim()).catch((error) => setMessage(error instanceof Error ? error.message : "重新提取失败")).finally(() => setOperation("idle")); }}>重新提取</button><button type="button" disabled={locked || !canFinalize || Boolean(planIssue)} title={planIssue} onClick={() => void finalize()}>确认镜头规划</button></div>
+
   </section>;
 };

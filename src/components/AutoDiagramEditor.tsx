@@ -8,6 +8,7 @@ import type {VisualPlan} from "@/lib/visual-plan";
 import type {readDiagramSnapshot} from "@/lib/diagram/service";
 import {diagramDataSchema, diagramSchedule, diagramSvgAtFrame} from "@/remotion/templates/auto-diagram-schema";
 import {sceneFrameSpan} from "@/remotion/timeline";
+import {DiagramManualEditor} from "./DiagramManualEditor";
 
 const TemplatePreview = dynamic(() => import("./TemplatePreview").then((module) => module.TemplatePreview), {ssr: false});
 type Snapshot = Awaited<ReturnType<typeof readDiagramSnapshot>>;
@@ -23,6 +24,9 @@ export const AutoDiagramEditor: React.FC<{jobId: string; sceneId: string; scene:
   const [previewMode, setPreviewMode] = useState<"diagram" | "complete" | "scene">("diagram");
   const [previewZoom, setPreviewZoom] = useState(1);
   const [expandedPreview, setExpandedPreview] = useState(false);
+  // 手工草稿留在本地，显式保存后才更新候选并允许采用。
+  const [manual, setManual] = useState(false);
+  const [manualDirty, setManualDirty] = useState(false);
   const previewViewport = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const viewport = previewViewport.current;
@@ -70,15 +74,17 @@ export const AutoDiagramEditor: React.FC<{jobId: string; sceneId: string; scene:
   }, [snapshot?.session.messages]);
   const running = snapshot?.session.status === "running";
   const bindingDirty = JSON.stringify(bindings) !== JSON.stringify(snapshot?.candidate?.data.bindings ?? []);
-  const send = async (action: string) => {
+  const send = async (action: string, payload: Record<string, unknown> = {}): Promise<Snapshot | null> => {
     setBusy(true); setError("");
     try {
-      const response = await fetch(endpoint, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({action, ...(action === "send" ? {message: instruction} : {}), ...(action === "bindings" ? {bindings} : {})})});
+      const response = await fetch(endpoint, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({action, ...payload, ...(action === "send" ? {message: instruction} : {}), ...(action === "bindings" ? {bindings} : {})})});
       const data = await response.json(); if (!response.ok) throw new Error(data.error ?? "图表操作失败");
       if (data.plan) onPlan(data.plan); else receive(data);
       if (action === "send") {setInstruction(""); followLatest.current = true;}
+      return data.plan ? null : data as Snapshot;
     } catch (cause) {setError(cause instanceof Error ? cause.message : "图表操作失败");}
     finally {setBusy(false);}
+    return null;
   };
   const preview = useMemo(() => {
     if (!snapshot?.candidate) return null;
@@ -99,9 +105,17 @@ export const AutoDiagramEditor: React.FC<{jobId: string; sceneId: string; scene:
   };
   return <div className="auto-diagram-modal" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="auto-diagram-title" className="auto-diagram-window">
     <header className="auto-diagram-header"><h3 id="auto-diagram-title">图表编辑</h3><div className="auto-diagram-preview-tools">
-          <div className="auto-diagram-tabs"><button type="button" aria-pressed={previewMode === "diagram"} onClick={() => {setPreviewMode("diagram"); setPreviewZoom(1);}}>口播同步</button><button type="button" aria-pressed={previewMode === "complete"} onClick={() => {setPreviewMode("complete"); setPreviewZoom(1);}}>完整图</button><button type="button" aria-pressed={previewMode === "scene"} onClick={() => {setPreviewMode("scene"); setPreviewZoom(1);}}>成片画面</button></div>
-          <button type="button" className="secondary" aria-pressed={expandedPreview} onClick={() => setExpandedPreview((value) => !value)}>{expandedPreview ? "返回编辑" : "放大预览"}</button>
-        </div><button type="button" className="secondary" title="关闭后生成会继续" onClick={onClose}>关闭</button></header>
+          <div className="auto-diagram-tabs"><button type="button" disabled={manual} aria-pressed={previewMode === "diagram"} onClick={() => {setPreviewMode("diagram"); setPreviewZoom(1);}}>口播同步</button><button type="button" disabled={manual} aria-pressed={previewMode === "complete"} onClick={() => {setPreviewMode("complete"); setPreviewZoom(1);}}>完整图</button><button type="button" disabled={manual} aria-pressed={previewMode === "scene"} onClick={() => {setPreviewMode("scene"); setPreviewZoom(1);}}>成片画面</button></div>
+          <button type="button" className="secondary" aria-pressed={manual} disabled={busy || (!manual && (running || !preview || Boolean(snapshot?.stale) || bindingDirty))} title={bindingDirty ? "请先保存口播绑定" : "拖动分组，修改文字、字号和颜色"} onClick={() => {
+            if (manualDirty && !window.confirm("放弃未保存的手工调整并返回？")) return;
+            audio.current?.pause(); setPlaying(false); setManualDirty(false); setManual((value) => !value);
+          }}>{manual ? "返回对话编辑" : "手工调整"}</button>
+          <button type="button" className="secondary" disabled={manual} aria-pressed={expandedPreview} onClick={() => setExpandedPreview((value) => !value)}>{expandedPreview ? "返回编辑" : "放大预览"}</button>
+        </div><button type="button" className="secondary" disabled={busy} title="关闭后生成会继续" onClick={() => {if (!manualDirty || window.confirm("放弃未保存的手工调整并关闭？")) onClose();}}>关闭</button></header>
+    {manual && snapshot?.candidate ? <>
+      {error ? <p className="auto-diagram-notice diagram-manual-error" role="alert">{error}</p> : null}
+      <DiagramManualEditor data={snapshot.candidate.data} busy={busy} disabled={Boolean(running || snapshot.stale)} errors={snapshot.validationErrors} onDirty={setManualDirty} onSave={async (data, baseData) => (await send("drawing", {drawing: {data, baseData}}))?.candidate?.data ?? null} />
+    </> : <>
     {/* 三个区域独立排版，主预览保持居中，对话只占窄侧栏。 */}
     <div className="auto-diagram-columns" data-expanded={expandedPreview}>
       <aside className="auto-diagram-chat" aria-label="图表对话">
@@ -147,7 +161,8 @@ export const AutoDiagramEditor: React.FC<{jobId: string; sceneId: string; scene:
         <button type="button" className="secondary auto-diagram-save" disabled={busy || running || (!bindingDirty && !snapshot?.validationErrors.length) || snapshot?.stale} onClick={() => void send("bindings")}>保存并校验绑定</button>
       </section>
     </div>
+    </>}
     {/* 播放和采用共用单行底栏，释放预览上下的可用高度。 */}
-    <footer className="auto-diagram-footer"><span>{bindingDirty ? "绑定有未保存的修改" : snapshot?.canAdopt ? "图表已通过校验，可以采用" : "预览并完成绑定校验后采用"}</span><audio ref={audio} src={audioSrc} controls onLoadedMetadata={() => {if (audio.current) audio.current.currentTime = scene.startMs / 1000;}} onPlay={() => {if (audio.current && (audio.current.currentTime * 1000 < scene.startMs || audio.current.currentTime * 1000 >= scene.endMs)) audio.current.currentTime = scene.startMs / 1000; setPlaying(true);}} onPause={() => setPlaying(false)} onTimeUpdate={seekAudio} onSeeked={seekAudio} /><div className="auto-diagram-actions"><button type="button" className="secondary" disabled={busy || running || !hasPrevious} onClick={() => void send("withdraw")}>撤回上次采用</button><button type="button" className="primary" disabled={busy || running || bindingDirty || !snapshot?.canAdopt} onClick={() => void send("adopt")}>采用到镜头</button></div></footer>
+    <footer className="auto-diagram-footer"><span>{manualDirty ? "图表有未保存的手工调整" : bindingDirty ? "绑定有未保存的修改" : snapshot?.canAdopt ? "图表已通过校验，可以采用" : "预览并完成绑定校验后采用"}</span><audio ref={audio} src={audioSrc} controls onLoadedMetadata={() => {if (audio.current) audio.current.currentTime = scene.startMs / 1000;}} onPlay={() => {if (audio.current && (audio.current.currentTime * 1000 < scene.startMs || audio.current.currentTime * 1000 >= scene.endMs)) audio.current.currentTime = scene.startMs / 1000; setPlaying(true);}} onPause={() => setPlaying(false)} onTimeUpdate={seekAudio} onSeeked={seekAudio} /><div className="auto-diagram-actions"><button type="button" className="secondary" disabled={busy || running || manualDirty || !hasPrevious} onClick={() => void send("withdraw")}>撤回上次采用</button><button type="button" className="primary" disabled={busy || running || manualDirty || bindingDirty || !snapshot?.canAdopt} onClick={() => void send("adopt")}>采用到镜头</button></div></footer>
   </section></div>;
 };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import {AIMessage, HumanMessage, ToolMessage} from "@langchain/core/messages";
-import {currentDiagramTurn, diagramUserRequest} from "./model-context";
+import {AIMessage, AIMessageChunk, HumanMessage, ToolMessage} from "@langchain/core/messages";
+import {currentDiagramTurn, diagramAssistantText, diagramUserRequest} from "./model-context";
 
 // 裁剪必须保留本轮工具调用与结果配对，同时隔离旧 SVG 和失败反馈。
 const latest = new HumanMessage("箭头看不出来");
@@ -11,4 +11,9 @@ const request = diagramUserRequest({threadId: "test", status: "running", progres
 assert.match(request, /所有步骤着色/);
 assert.match(request, /本次要求：箭头看不出来/);
 assert(!request.includes("old svg"));
+// 工具正文和用户输入不能伪装为助手消息；模型流只保留公开 text 块。
+assert.equal(diagramAssistantText(result), "");
+assert.equal(diagramAssistantText(latest), "");
+assert.equal(diagramAssistantText(new AIMessageChunk({content: "选择嵌套图"})), "选择嵌套图");
+assert.equal(diagramAssistantText(new AIMessage({content: [{type: "reasoning", text: "内部分析"}, {type: "text", text: "开始绘制"}]})), "开始绘制");
 console.log("图表模型上下文裁剪契约通过");

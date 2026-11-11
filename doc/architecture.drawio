@@ -184,7 +184,7 @@
         <mxCell id="da-worker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;独立 Deep Agent Worker&lt;/b&gt;&lt;br&gt;TypeScript SDK / 独立依赖&lt;br&gt;选图型、制图、绑定与修复" vertex="1">
           <mxGeometry height="100" width="240" x="680" y="160" as="geometry" />
         </mxCell>
-        <mxCell id="da-skill" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;diagram-design Skill〔只读〕&lt;/b&gt;&lt;br&gt;原始 SKILL.md / references / assets&lt;br&gt;按需加载；内置原始 Skill 与许可证" vertex="1">
+        <mxCell id="da-skill" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;diagram-design Skill〔只读〕&lt;/b&gt;&lt;br&gt;原始 SKILL.md / references / assets&lt;br&gt;按需加载；独立安装到 .agents/skills/diagram-design/" vertex="1">
           <mxGeometry height="100" width="280" x="1000" y="160" as="geometry" />
         </mxCell>
         <mxCell id="da-candidate" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#203247;fontSize=14;spacing=10;fillColor=#f1eef8;strokeColor=#9c88ba;dashed=1;" value="&lt;b&gt;候选 SVG / 口播绑定&lt;/b&gt;&lt;br&gt;加载规范后由 Agent 生成&lt;br&gt;稳定分组 ID、触发词与依赖" vertex="1">

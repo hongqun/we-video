@@ -62,7 +62,7 @@ https://github.com/user-attachments/assets/63047ef0-d178-4486-9c87-7bf7db18ae30
 
 准备好你的文章或资料，开启第一条视频的创作。
 
-[安装与配置](./docs/SETUP.md) · [手绘插画使用说明](./docs/HANDDRAW.md) · [成片交付使用说明](./docs/DELIVERY.md) · [部署指南](./DEPLOYMENT_UBUNTU.md)
+[安装与配置](./docs/SETUP.md) · [自动图表 Agent 安装](./docs/SETUP.md#安装自动图表-agent-运行技能) · [手绘插画使用说明](./docs/HANDDRAW.md) · [成片交付使用说明](./docs/DELIVERY.md) · [部署指南](./DEPLOYMENT_UBUNTU.md)
 
 ## 许可
 

@@ -35,9 +35,34 @@ npm run dev
 - 本地配置与数据不会提交到 We-Video 仓库，请勿提交 API Key。
 - 账号与专题配置参见[账号配置说明](../content/README.md)；`.env` 格式参见[配置示例](../config_examples/.env.example)。
 
+## 安装自动图表 Agent 运行技能
+
+Step 4 的“自动图表Agent”使用独立安装的 [diagram-design](https://github.com/cathrynlavery/diagram-design)。每台开发或部署机器都需从项目根目录安装；当前 Skills CLI 需要 Node.js 22.20 或更高版本：
+
+```bash
+npm ci --prefix packages/diagram-agent
+npx skills add cathrynlavery/diagram-design --skill diagram-design --agent deepagents --copy --yes
+```
+
+在根目录 `pipeline.config.json` 设置 `diagramAgent.enabled=true`，并配置文本模型连接。安装目录为 `.agents/skills/diagram-design/`，已被 Git 忽略，不随代码拉取或发布自动安装。部署时执行上述命令，或将完整安装目录随运行资源一并部署；不得只复制 `SKILL.md`，还需保留 `references/`、`assets/` 等技能文件及适用的上游许可声明。
+
+`diagramAgent.maxSaves` 控制每轮内容修改次数（含首次提交），默认 5，范围 1–10；全量保存与局部补丁共用预算，规范化后相同的内容复用上次报告且不扣保存次数。安全检查通过后，一次返回时间、语义和几何问题，修复项带稳定代码、分组 ID、文字实测边界或障碍节点坐标；连续未修复的错误会单独标出。`maxSteps` 仍限制模型与工具调用总次数，`timeoutMs` 限制整轮耗时；提高保存次数不会延长这两项预算。失败提示同时保留停止原因和当前图表的校验问题。
+
+修复优先调用 `patch_diagram({baseHash, operations})`，支持 `replace_group`（相同 ID 的完整 `<g>`）、`update_binding`（只改指定字段）和 `remove_group`（清理绑定、依赖及无障碍引用）。过期指纹或不安全替换不会覆盖候选；`read_current_diagram({groupIds})` 可只取相关分组。候选仍须通过完整校验及 `inspect_diagram`，再由用户预览采用。
+
+模型通过 LangChain `wrapModelCall` 在尚未收到任何流片段时，对连接、限流或服务错误最多重试一次；重试占用步数及原始超时预算，不重放已完成的工具。中断流单独报告。`session.json` 的 `diagnostics` 仅保存请求 ID、错误类别、候选指纹及预算计数，不保存凭据或 SDK 请求对象。
+
+需显式运行回归检查时，在项目根目录执行 `npm run test:diagram-reliability`。该命令覆盖示例中的时间冲突、文字溢出、穿越箭头、包含关系清理与补丁预算，并运行本地模型替身的连接恢复、取消及复查门槛测试；几何检查使用本地浏览器和字体，不调用模型。
+
+首次安装获取上游最新版本。需要更新时显式重跑技能安装命令，并在没有图表生成请求运行时更新；服务运行期间不会下载或更新技能。上游指导更新可能影响布局，本项目支持已安装技能文档中的 45 种主图型，并保留视频品牌、口播绑定及 SVG 安全规则。类型、中文名称、参考与静态示例统一维护在 `src/remotion/diagram-types.ts`；上游新增类型需显式加入目录，不会自动开放。
+
+Step 4 的首次生成与对话修改均由独立 worker 只读加载此技能。技能未安装或必需资料不完整时，编辑器显示安装提示并阻止生成；现有预览与采用流程保持不变。
+
+类型标识直接使用上游名称，例如 `flowchart`、`tree`、`loop`；不兼容旧的 `flow`、`hierarchy`、`cycle` 标识，旧图需重新生成，不自动迁移或删除数据。图表可使用区域、数据标记、独立标签和无向连接；定量图必须有上下文或用户提供的必要数值。
+
 ## 安装 Remotion Agent Skills
 
-Agent Skills 可供多种编码助手使用，是开发指南而非 We-Video 的运行依赖。需要 Remotion 开发指导时，在项目根目录运行：
+Remotion Agent Skills 可供多种编码助手使用，是开发指南而非 We-Video 的运行依赖。需要 Remotion 开发指导时，在项目根目录运行：
 
 ```bash
 npx skills add remotion-dev/skills

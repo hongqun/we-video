@@ -2,14 +2,18 @@ import {promises as fs} from "node:fs";
 import path from "node:path";
 import {atomicWriteJson, jobDir, readJson} from "../jobs";
 import type {DiagramData} from "../../remotion/templates/auto-diagram-schema";
+import type {DiagramValidationReport} from "./validation";
 
 export type DiagramStatus = "idle" | "running" | "ready" | "failed" | "cancelled" | "interrupted" | "stale";
 export type DiagramSession = {
   threadId: string; fingerprint?: string; requestId?: string; status: DiagramStatus;
   pid?: number; startedAt?: number; timeoutMs?: number; traceId?: string; progress: string; error?: string;
+  // 诊断只保留业务类别与计数，不持久化 SDK 异常、请求头或凭据。
+  diagnostics?: {requestId: string; category: string; candidateHash?: string; saves: number; calls: number; modelRetries: number};
   messages: Array<{id: string; role: "user" | "assistant" | "tool"; text: string}>;
 };
-export type DiagramCandidate = {data: DiagramData; fingerprint: string; requestId: string; valid: boolean; errors: string[]; geometry?: string[]; cycleEvidence?: string};
+// loop 使用当前命名保存回边证据，不读取或迁移旧候选的 cycleEvidence。
+export type DiagramCandidate = {data: DiagramData; fingerprint: string; requestId: string; valid: boolean; errors: string[]; geometry?: string[]; loopEvidence?: string; hash?: string; validation?: DiagramValidationReport};
 export const diagramDirectory = (jobId: string, sceneId: string) => {
   if (!/^[a-zA-Z0-9-]+$/u.test(sceneId)) throw new Error("镜头 ID 无效");
   return path.join(jobDir(jobId), "diagrams", sceneId);

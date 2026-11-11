@@ -1,9 +1,10 @@
-# 内置运行资源
+# 外部设计技能与视频适配
 
-`resources/skills/diagram-design/` 完整复制上游 `skills/diagram-design/`，另外保留仓库根目录的 MIT LICENSE 与 THIRD_PARTY_LICENSES.md。原始入口、references、assets 和 scripts 未改写。
+diagram-design 单独安装到项目根目录的 `.agents/skills/diagram-design/`，不随本项目源码分发。安装时获取上游最新版本，后续更新由部署者显式执行；运行时不联网安装或更新。安装与部署步骤见 [安装与配置](../../docs/SETUP.md#安装自动图表-agent-运行技能)。
 
 - 来源：https://github.com/cathrynlavery/diagram-design
-- 提交：`f24d98b05e2d7a5e68c2dedfe46e5b7173f50118`
-- 许可：MIT，见内置 LICENSE；第三方内容见 THIRD_PARTY_LICENSES.md。
+- 许可：MIT；上游版权及第三方许可声明见上游仓库的 LICENSE 与 THIRD_PARTY_LICENSES.md，部署分发时应保留适用声明。
 
-运行时只读映射到 `/skills/diagram-design/`。本项目新增的 `resources/video-diagram-contract.md` 负责视频适配与参考路由，上游资源保持原样，按需读取原始类型参考、示例与入口。应用的视频品牌指南优先；不执行上游 HTML 动画、任意 Python、联网、CLI 或子 Agent。SVG 的导出和检查由专用保存、XML 白名单与浏览器几何工具适配，不直接运行上游依赖浏览器或 shell 的脚本。
+独立 worker 只将该技能只读映射到 `/skills/diagram-design/`，不加载同目录其他技能。本项目保留的 `resources/video-diagram-contract.md` 负责视频适配与参考路由，上游资源保持原样，首次生成与后续修改均读取技能入口、匹配的类型参考和静态示例。应用的视频品牌指南优先；不执行上游 HTML 动画、任意 Python、联网、CLI 或子 Agent。SVG 的导出和检查由专用保存、XML 白名单与浏览器几何工具适配，不直接运行上游依赖浏览器或 shell 的脚本。
+
+支持类型与资料路由由 `src/remotion/diagram-types.ts` 的 45 项目录统一生成，主类型使用上游名称；上游更新不会自动扩大支持范围。

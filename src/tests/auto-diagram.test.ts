@@ -3,6 +3,8 @@ import {resolveNarrationCue} from "../remotion/templates/narration-cue";
 import {diagramDataSchema, diagramSchedule, diagramSvgAtFrame, parseDiagramSvg, validateDiagram, type DiagramData} from "../remotion/templates/auto-diagram-schema";
 import type {Caption} from "../remotion/schema";
 import {SANS_FONT_FAMILY, SERIF_FONT_FAMILY} from "../remotion/typography";
+import {diagramTypeCatalog, diagramTypeIds} from "../remotion/diagram-types";
+import {validateDiagramMeaning} from "../lib/diagram/meaning";
 
 // 仅测试安全和时间契约，不调用模型、浏览器、服务或渲染器。
 const caption = (text: string, startMs: number, endMs: number): Caption => ({text, startMs, endMs, timestampMs: null, confidence: null});
@@ -17,8 +19,13 @@ assert.equal(resolveNarrationCue({scene, captions, text: "不存在"}), null);
 assert.equal(resolveNarrationCue({scene, captions, text: "甲", occurrence: 0}), null);
 assert.deepEqual(resolveNarrationCue({scene, captions: [caption("ﬃ，e\u0301 Ａ", 0, 1400)], text: "ffiéa"}), {startMs: 0, endMs: 1400});
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 800"><defs><linearGradient id="paint"><stop offset="0" stop-color="#fff"/></linearGradient></defs><g id="opening"><text x="24" y="40">标题</text></g><g id="first"><rect x="24" y="80" width="100" height="100" fill="url(#paint)"/></g><g id="second"><text x="200" y="100">第二步</text></g><g id="link"><path d="M124 100L200 100"/></g></svg>';
-const data: DiagramData = diagramDataSchema.parse({type: "flow", svg, bindings: [{groupId: "first", name: "第一步", cueText: "甲"}, {groupId: "second", name: "第二步", cueText: "甲", occurrence: 2, after: ["first"]}, {groupId: "link", name: "连线", cueText: "乙", occurrence: 2, after: ["first", "second"], kind: "edge"}]});
-for (const type of ["flow", "architecture", "hierarchy", "cycle", "timeline"] as const) assert.equal(validateDiagram(scene, captions, {...data, type}).type, type);
+const data: DiagramData = diagramDataSchema.parse({type: "flowchart", svg, bindings: [{groupId: "first", name: "第一步", cueText: "甲"}, {groupId: "second", name: "第二步", cueText: "甲", occurrence: 2, after: ["first"]}, {groupId: "link", name: "连线", cueText: "乙", occurrence: 2, after: ["first", "second"], kind: "edge"}]});
+// 所有主类型共用 SVG 和时间契约，不为已退役标识提供兼容别名。
+assert.equal(diagramTypeCatalog.length, 45);
+assert.equal(new Set(diagramTypeIds).size, 45);
+for (const type of diagramTypeIds) assert.equal(validateDiagram(scene, captions, {...data, type}).type, type);
+for (const type of ["flow", "hierarchy", "cycle", "unknown", "bubble", "flowchart "]) assert.equal(diagramDataSchema.safeParse({...data, type}).success, false);
+assert.equal(diagramDataSchema.safeParse({...data, bindings: Array.from({length: 41}, (_, index) => ({...data.bindings[0]!, groupId: `item-${index}`}))}).success, false);
 // 字体允许本地名称、CSS 引号及项目回退栈；系统字体不能成为首选字体。
 const withFont = (font: string) => ({...data, svg: svg.replace('<g id="first">', `<g id="first" font-family="${font.replaceAll('"', "&quot;")}">`)});
 for (const font of ["Studio Sans", "Studio Serif", '"Studio Sans"', "'Studio Serif'", " Studio Sans ", SANS_FONT_FAMILY, SERIF_FONT_FAMILY]) assert.doesNotThrow(() => parseDiagramSvg(withFont(font)));
@@ -45,6 +52,35 @@ assert.throws(() => diagramSchedule(scene, captions, {...data, bindings: data.bi
 assert.throws(() => diagramSchedule(scene, captions, {...data, bindings: [{...data.bindings[0]!, after: ["missing"]}]}));
 assert.throws(() => diagramSchedule(scene, captions, {...data, bindings: [{...data.bindings[0]!, cueText: "丙"}]}));
 assert.throws(() => diagramSchedule(scene, captions, {...data, bindings: [{...data.bindings[2]!, after: ["first"]}]}));
+
+// 新动画角色保留同一套触发、显现与依赖约束；无向连接不需要 SVG 箭头。
+const chart = diagramDataSchema.parse({...data, type: "bar", bindings: data.bindings.map((binding, index) => ({...binding, kind: index < 2 ? "mark" : "connector"}))});
+assert.doesNotThrow(() => validateDiagram(scene, captions, chart));
+assert.equal(diagramSchedule(scene, captions, chart)[2]!.startMs, schedule[2]!.startMs);
+assert.match(diagramSvgAtFrame(chart, diagramSchedule(scene, captions, chart), 0), /id="link" opacity="0"/);
+assert.match(diagramSvgAtFrame(chart, diagramSchedule(scene, captions, chart), 59), /id="link" opacity="1"/);
+for (const kind of ["region", "mark", "label"] as const) {
+  const single = {...data, bindings: [{...data.bindings[0]!, kind, after: []}]};
+  assert.equal(diagramSchedule(scene, captions, single)[0]!.startMs, 0);
+  assert.throws(() => diagramSchedule(scene, captions, {...single, bindings: [{...single.bindings[0]!, cueText: "不存在"}]}));
+  assert.throws(() => diagramSchedule(scene, captions, {...single, bindings: [{...single.bindings[0]!, after: ["first"]}]}));
+}
+assert.throws(() => diagramSchedule(scene, captions, {...chart, bindings: chart.bindings.map((binding, index) => index === 1 ? {...binding, kind: "label" as const} : binding)}));
+assert.throws(() => diagramSchedule(scene, captions, {...chart, bindings: chart.bindings.map((binding, index) => index === 2 ? {...binding, after: ["first", "first"]} : binding)}));
+assert.doesNotThrow(() => diagramSchedule(scene, captions, {...chart, bindings: chart.bindings.map((binding, index) => index === 2 ? {...binding, kind: "edge" as const} : binding)}));
+// 回归：节点指向语义区域的有向边是有效关系，但出现时间仍不能早于目标区域。
+const regionEdge = {...data, bindings: data.bindings.map((binding, index) => index === 1 ? {...binding, kind: "region" as const} : binding)};
+assert.doesNotThrow(() => diagramSchedule(scene, captions, regionEdge));
+assert.throws(() => diagramSchedule(scene, captions, {...regionEdge, bindings: regionEdge.bindings.map((binding, index) => index === 2 ? {...binding, cueText: "甲", occurrence: 1} : binding)}), /触发早于前置元素 second/);
+assert.throws(() => diagramSchedule(scene, captions, {...chart, bindings: chart.bindings.map((binding, index) => index === 0 ? {...binding, after: ["link"]} : binding)}));
+
+// loop 必须引用本镜头的明确回边原文，持续时间或“环环相扣”不能证明循环。
+const loop = {...data, type: "loop" as const};
+assert.throws(() => validateDiagramMeaning(loop, "整条攻击链环环相扣。", "环环相扣"));
+assert.throws(() => validateDiagramMeaning(loop, "先投毒，再进入系统。", "结果反馈回到输入"));
+assert.throws(() => validateDiagramMeaning(loop, "结果反馈回到输入，开始下一轮。"));
+assert.doesNotThrow(() => validateDiagramMeaning(loop, "结果反馈回到输入，开始下一轮。", "结果反馈回到输入"));
+assert.doesNotThrow(() => validateDiagramMeaning(data, "先投毒，再进入系统。"));
 
 // diagram-design 的无障碍引用应通过白名单，并随同页预览实例隔离。
 const accessible = {...data, svg: svg.replace('<defs>', '<title id="diagram-title">流程</title><desc id="diagram-desc">两个步骤</desc><defs>').replace('viewBox="0 0 960 800"', 'viewBox="0 0 960 800" role="img" aria-labelledby="diagram-title diagram-desc"')};

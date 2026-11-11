@@ -61,7 +61,7 @@ Prepare your article or reference material and start creating your first video.
 
 The following guides are currently in Chinese:
 
-[Installation and configuration](./docs/SETUP.md) · [Hand-drawn illustrations](./docs/HANDDRAW.md) · [Final video delivery](./docs/DELIVERY.md) · [Deployment guide](./DEPLOYMENT_UBUNTU.md)
+[Installation and configuration](./docs/SETUP.md) · [Diagram Agent setup](./docs/SETUP.md#安装自动图表-agent-运行技能) · [Hand-drawn illustrations](./docs/HANDDRAW.md) · [Final video delivery](./docs/DELIVERY.md) · [Deployment guide](./DEPLOYMENT_UBUNTU.md)
 
 ## License
 

@@ -3,6 +3,10 @@ import {DOMParser, XMLSerializer, type Element} from "@xmldom/xmldom";
 import type {Caption, VideoScene} from "../schema";
 import {sceneFrameSpan} from "../timeline";
 import {resolveNarrationCue} from "./narration-cue";
+import {diagramTypeIds} from "../diagram-types";
+
+// 有向/无向关系都可以连接实体、区域或数据标记；标签和其他连线不能作为端点。
+export const diagramEndpointKinds = ["node", "region", "mark"] as const;
 
 // 图表只保存语义触发词，时间由当前字幕重新计算，不接受模型编造的毫秒值。
 export const diagramBindingSchema = z.object({
@@ -11,11 +15,11 @@ export const diagramBindingSchema = z.object({
   cueText: z.string().trim().min(1).max(200),
   occurrence: z.number().int().min(1).max(100).default(1),
   after: z.array(z.string()).max(40).default([]),
-  // 连线必须同时依赖两端节点；业务循环与出现依赖相互独立。
-  kind: z.enum(["node", "edge"]).default("node"),
+  // 区域与数据标记允许有意重叠；有向边和无向连接仍受端点依赖约束。
+  kind: z.enum(["node", "edge", "region", "mark", "label", "connector"]).default("node"),
 }).strict();
 export const diagramDataSchema = z.object({
-  type: z.enum(["flow", "architecture", "hierarchy", "cycle", "timeline"]),
+  type: z.enum(diagramTypeIds),
   svg: z.string().min(1).max(300000),
   bindings: z.array(diagramBindingSchema).min(1).max(40),
 }).strict();
@@ -101,27 +105,51 @@ export const parseDiagramSvg = (data: DiagramData) => {
   return {doc, root};
 };
 
-export const diagramSchedule = (scene: Pick<VideoScene, "startMs" | "endMs" | "speechStartMs" | "speechEndMs">, captions: Caption[], data: DiagramData, fps = 30) => {
+export type DiagramTimingRepair = {
+  groupId: string; code: "cue_missing" | "dependency_missing" | "dependency_cycle" | "invalid_endpoints" | "cue_before_dependency";
+  instruction: string; dependencyId?: string; cueText?: string; dependencyCueText?: string; cueStartMs?: number; dependencyStartMs?: number;
+};
+
+// 一次收集全部绑定问题，时间错误不能阻止后续独立几何检查。
+export const diagramTimingReport = (scene: Pick<VideoScene, "startMs" | "endMs" | "speechStartMs" | "speechEndMs">, captions: Caption[], data: DiagramData) => {
   const byId = new Map(data.bindings.map((binding) => [binding.groupId, binding]));
+  const errors: string[] = [], repairs: DiagramTimingRepair[] = [];
   const times = new Map<string, number>();
-  const visiting = new Set<string>();
-  const lastFrame = Math.max(0, sceneFrameSpan(scene, fps).durationInFrames - 1);
-  const visit = (id: string): number => {
-    if (times.has(id)) return times.get(id)!;
-    const binding = byId.get(id);
-    if (!binding) throw new Error(`前置元素不存在：${id}`);
-    if (visiting.has(id)) throw new Error(`显现依赖成环：${id}`);
-    visiting.add(id);
+  const issue = (message: string, repair: DiagramTimingRepair) => {errors.push(message); repairs.push(repair);};
+  for (const binding of data.bindings) {
     const cue = resolveNarrationCue({scene, captions, text: binding.cueText, occurrence: binding.occurrence});
-    if (!cue) throw new Error(`“${binding.name}”的触发词“${binding.cueText}”第 ${binding.occurrence} 次未在本镜头匹配`);
-    if (binding.kind === "edge" && new Set(binding.after).size < 2) throw new Error(`连线“${binding.name}”必须依赖两端节点`);
-    for (const dependency of binding.after) {
-      if (visit(dependency) > cue.startMs) throw new Error(`“${binding.name}”触发早于前置元素 ${dependency}`);
+    if (cue) times.set(binding.groupId, cue.startMs);
+    else issue(`“${binding.name}”的触发词“${binding.cueText}”第 ${binding.occurrence} 次未在本镜头匹配`, {groupId: binding.groupId, code: "cue_missing", cueText: binding.cueText, instruction: "使用本镜头原文中的触发词，并核对 occurrence。"});
+    if (binding.kind === "edge" || binding.kind === "connector") {
+      const endpoints = [...new Set(binding.after)].filter((id) => diagramEndpointKinds.some((kind) => kind === byId.get(id)?.kind));
+      if (endpoints.length < 2) issue(`连线“${binding.name}”必须依赖两个不同的 node/region/mark 端点元素；当前依赖：${binding.after.map((id) => `${id}（${byId.get(id)?.kind ?? "不存在"}）`).join("、") || "无"}`, {groupId: binding.groupId, code: "invalid_endpoints", instruction: "保留两个真实端点的依赖，不要用标签或其他连线替代端点。"});
     }
-    visiting.delete(id); times.set(id, cue.startMs); return cue.startMs;
+  }
+  for (const binding of data.bindings) for (const dependencyId of binding.after) {
+    const dependency = byId.get(dependencyId);
+    if (!dependency) {issue(`前置元素不存在：${dependencyId}`, {groupId: binding.groupId, code: "dependency_missing", dependencyId, instruction: "修正不存在的依赖 ID。"}); continue;}
+    const cueStartMs = times.get(binding.groupId), dependencyStartMs = times.get(dependencyId);
+    if (cueStartMs !== undefined && dependencyStartMs !== undefined && dependencyStartMs > cueStartMs) issue(`“${binding.name}”触发早于前置元素 ${dependencyId}`, {groupId: binding.groupId, code: "cue_before_dependency", dependencyId, cueText: binding.cueText, dependencyCueText: dependency.cueText, cueStartMs, dependencyStartMs, instruction: "通过 update_binding 将本组触发词改为依赖出现时或更后的原文；不要删除真实依赖或编造时间。"});
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string) => {
+    if (visited.has(id) || !byId.has(id)) return;
+    if (visiting.has(id)) {issue(`显现依赖成环：${id}`, {groupId: id, code: "dependency_cycle", instruction: "显现依赖必须无环；业务回边也不能形成显现依赖环。"}); return;}
+    visiting.add(id);
+    for (const dependency of byId.get(id)!.after) visit(dependency);
+    visiting.delete(id); visited.add(id);
   };
+  for (const binding of data.bindings) visit(binding.groupId);
+  return {errors, repairs, times};
+};
+
+export const diagramSchedule = (scene: Pick<VideoScene, "startMs" | "endMs" | "speechStartMs" | "speechEndMs">, captions: Caption[], data: DiagramData, fps = 30) => {
+  const {errors, times} = diagramTimingReport(scene, captions, data);
+  if (errors.length) throw new Error(errors.join("；"));
+  const lastFrame = Math.max(0, sceneFrameSpan(scene, fps).durationInFrames - 1);
   return data.bindings.map((binding) => {
-    const startMs = visit(binding.groupId);
+    const startMs = times.get(binding.groupId)!;
     const startFrame = Math.min(lastFrame, Math.max(0, Math.round(startMs * fps / 1000) - sceneFrameSpan(scene, fps).from));
     return {...binding, startMs, startFrame, fadeFrames: Math.min(Math.round(fps * 0.24), lastFrame - startFrame)};
   });

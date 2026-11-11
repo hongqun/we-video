@@ -8,9 +8,12 @@ import {assertVisualPlanEditableState, readVisualPlan, saveVisualPlan, type Visu
 import {mutateVisualResources} from "../visual-resources";
 import {loadDiagramContext} from "./context";
 import {diagramSettings} from "./settings";
+import {resolveDiagramResources} from "./resources";
 import {validateDiagramMeaning} from "./meaning";
 import {inspectDiagramGeometry} from "./geometry";
-import {diagramBindingSchema, diagramDataSchema, validateDiagram} from "../../remotion/templates/auto-diagram-schema";
+import {diagramCandidateHash} from "./candidate";
+import {validateDiagramCandidate} from "./validation";
+import {diagramBindingSchema, diagramDataSchema, parseDiagramSvg, validateDiagram} from "../../remotion/templates/auto-diagram-schema";
 import {diagramDirectory, readDiagramSession, writeDiagramSession, readDiagramCandidate, writeDiagramCandidate, withDiagramRequestLock, type DiagramSession} from "./store";
 
 export const syncDiagramResource = async (jobId: string, sceneId: string, session: DiagramSession) => {
@@ -39,13 +42,14 @@ export const readDiagramSnapshot = async (jobId: string, sceneId: string) => {
   }
   let validationErrors = candidate?.errors ?? [];
   if (candidate && !stale) {
-    try {validateDiagram(context.scene, context.captions, candidate.data); validateDiagramMeaning(candidate.data, context.scene.spokenText, candidate.cycleEvidence);}
+    try {validateDiagram(context.scene, context.captions, candidate.data); validateDiagramMeaning(candidate.data, context.scene.spokenText, candidate.loopEvidence);}
     catch (error) {validationErrors = [error instanceof Error ? error.message : "图表校验失败"];}
   }
   const settings = await diagramSettings().catch(() => null);
   const runtimePresent = await fs.access(path.join(process.cwd(), "packages/diagram-agent/node_modules/tsx/dist/cli.mjs")).then(() => true, () => false);
-  const skillPresent = await fs.access(path.join(process.cwd(), "packages/diagram-agent/resources/skills/diagram-design/SKILL.md")).then(() => true, () => false);
-  const unavailable = !settings?.enabled ? "请在根目录 pipeline.config.json 设置 diagramAgent.enabled=true" : !runtimePresent ? "请执行 npm install --prefix packages/diagram-agent 安装独立依赖" : !skillPresent ? "内置 diagram-design 资源缺失，请重新部署完整 packages/diagram-agent/resources" : undefined;
+  // Step 4 与独立 worker 使用同一份外部 Skill 资料检查。
+  const resources = await resolveDiagramResources();
+  const unavailable = !settings?.enabled ? "请在根目录 pipeline.config.json 设置 diagramAgent.enabled=true" : !runtimePresent ? "请执行 npm install --prefix packages/diagram-agent 安装独立依赖" : resources.unavailable;
   return {session, candidate, stale, validationErrors, canAdopt: Boolean(candidate?.valid && !stale && !validationErrors.length && session.status !== "running" && candidate.requestId === session.requestId && session.status === "ready"), unavailable};
 };
 
@@ -60,7 +64,7 @@ export const submitDiagram = async (jobId: string, sceneId: string, message: str
   const text = z.string().trim().min(1).max(8000).parse(message);
   const settings = await diagramSettings(profile);
   const requestId = randomUUID();
-  const session: DiagramSession = {...snapshot.session, requestId, status: "running", fingerprint: context.fingerprint, startedAt: Date.now(), timeoutMs: settings.timeoutMs, pid: undefined, traceId: undefined, error: undefined, progress: "启动独立 Agent", messages: [...snapshot.session.messages, {id: requestId, role: "user", text}]};
+  const session: DiagramSession = {...snapshot.session, requestId, status: "running", fingerprint: context.fingerprint, startedAt: Date.now(), timeoutMs: settings.timeoutMs, pid: undefined, traceId: undefined, diagnostics: {requestId, category: "starting", saves: 0, calls: 0, modelRetries: 0}, error: undefined, progress: "启动独立 Agent", messages: [...snapshot.session.messages, {id: requestId, role: "user", text}]};
   await writeDiagramSession(jobId, sceneId, session);
   await syncDiagramResource(jobId, sceneId, session);
   const log = openSync(path.join(diagramDirectory(jobId, sceneId), "worker.log"), "a");
@@ -86,24 +90,36 @@ export const cancelDiagram = async (jobId: string, sceneId: string, reason = "�
   if (alive(session.pid)) {try {process.kill(session.pid!, "SIGTERM");} catch { /* 进程可能已自行退出。 */ }}
 });
 
-export const changeDiagramBindings = async (jobId: string, sceneId: string, input: unknown) => {
+// 手工图形与绑定更新共用请求锁，避免保存期间启动 Agent 覆盖候选。
+const changeDiagramManually = async (jobId: string, sceneId: string, input: unknown, editSvg: boolean) => withDiagramRequestLock(jobId, sceneId, async () => {
   const {context, job} = await loadDiagramContext(jobId, sceneId); assertVisualPlanEditableState(job.state);
   const session = await readDiagramSession(jobId, sceneId);
-  if (session.status === "running") throw new Error("生成期间不能修改绑定");
+  if (job.state === "planning_visuals") throw new Error("镜头规划正在生成，请完成后再调整图表");
+  if (session.status === "running") throw new Error("生成期间不能手工调整图表");
   const candidate = await readDiagramCandidate(jobId, sceneId);
   if (!candidate) throw new Error("尚无图表，请先发送生成指令");
   if (candidate.fingerprint !== context.fingerprint) throw new Error("口播、风格或布局已改变，请发送指令重新制图");
-  const bindings = z.array(diagramBindingSchema).min(1).max(40).parse(input);
-  const data = diagramDataSchema.parse({...candidate.data, bindings});
-  const errors: string[] = [];
+  let data;
+  if (editSvg) {
+    const edit = z.object({data: diagramDataSchema, baseData: diagramDataSchema}).strict().parse(input);
+    if (diagramCandidateHash(edit.baseData, candidate.loopEvidence) !== diagramCandidateHash(candidate.data, candidate.loopEvidence)) throw new Error("图表已在其他窗口更新，请返回编辑后重新进入手工调整");
+    data = edit.data;
+  } else {
+    const bindings = z.array(diagramBindingSchema).min(1).max(40).parse(input);
+    data = diagramDataSchema.parse({...candidate.data, bindings});
+  }
+  // 不安全的 SVG 不写入候选；几何失败则保留修改，允许继续手工修正。
+  parseDiagramSvg(data);
   // 手动调整绑定不能绕过循环证据与几何门槛。
-  try {validateDiagram(context.scene, context.captions, data); validateDiagramMeaning(data, context.scene.spokenText, candidate.cycleEvidence); errors.push(...await inspectDiagramGeometry(data, context.canvas.safeArea));}
-  catch (error) {errors.push(error instanceof Error ? error.message : "校验失败");}
-  await writeDiagramCandidate(jobId, sceneId, {...candidate, data, valid: !errors.length, errors});
-  const next: DiagramSession = {...session, requestId: candidate.requestId, status: errors.length ? "failed" : "ready", progress: errors.length ? "绑定待修正" : "绑定已重新校验", error: errors.join("；") || undefined};
+  const report = await validateDiagramCandidate(data, {scene: context.scene, captions: context.captions, spokenText: context.scene.spokenText, safeArea: context.canvas.safeArea, loopEvidence: candidate.loopEvidence});
+  const errors = report.errors;
+  await writeDiagramCandidate(jobId, sceneId, {...candidate, data, hash: diagramCandidateHash(data, candidate.loopEvidence), valid: report.valid, errors, geometry: undefined, validation: report});
+  const next: DiagramSession = {...session, requestId: candidate.requestId, status: errors.length ? "failed" : "ready", progress: errors.length ? "手工调整待修正" : "手工调整已重新校验", error: errors.join("；") || undefined};
   await writeDiagramSession(jobId, sceneId, next); await syncDiagramResource(jobId, sceneId, next);
   return readDiagramSnapshot(jobId, sceneId);
-};
+});
+export const changeDiagramBindings = (jobId: string, sceneId: string, input: unknown) => changeDiagramManually(jobId, sceneId, input, false);
+export const changeDiagramDrawing = (jobId: string, sceneId: string, input: unknown) => changeDiagramManually(jobId, sceneId, input, true);
 
 export const adoptDiagram = async (jobId: string, sceneId: string, withdraw = false) => {
   const {context, plan, scene, profile, job} = await loadDiagramContext(jobId, sceneId); assertVisualPlanEditableState(job.state);

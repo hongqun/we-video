@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "worker": "tsx src/worker.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test:reliability": "node --import tsx --test src/model-retry.test.ts src/candidate-review.test.ts"
   },
   "dependencies": {
     "deepagents": "1.16.2",

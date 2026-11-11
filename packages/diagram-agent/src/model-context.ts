@@ -1,6 +1,15 @@
 import type {BaseMessage} from "@langchain/core/messages";
 import type {DiagramSession} from "../../../src/lib/diagram/store";
 
+// 一次业务调用还会经过多个中间件节点；图执行上限不能直接复用模型/工具调用预算。
+export const diagramGraphRecursionLimit = (maxSteps: number) => maxSteps * 6 + 12;
+
+// messages 流也包含工具结果，只将模型公开文字写入助手对话，避免资料正文占满界面。
+export const diagramAssistantText = (message: BaseMessage) => {
+  if (message.getType() !== "ai") return "";
+  return typeof message.content === "string" ? message.content : message.content.filter((block) => block.type === "text" && typeof block.text === "string").map((block) => block.text).join("");
+};
+
 // 检查点保留审计历史；模型只看本轮完整工具链，避免重复发送旧 SVG 和设计资料。
 export const currentDiagramTurn = (messages: BaseMessage[]) => {
   const start = messages.map((message) => message.getType()).lastIndexOf("human");

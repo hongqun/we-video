@@ -24,7 +24,8 @@
     "test:handdraw": "node --import tsx src/tests/handdraw.test.ts && npm run test:handdraw:resources",
     "test:handdraw:python": "set -a; . ./.env; set +a; \"${HANDDRAW_PYTHON:-python3}\" scripts/handdraw/test_prepare.py",
     "test:handdraw:resources": "esbuild src/tests/handdraw-resources.test.ts --bundle --format=esm --platform=node --packages=external --outfile=node_modules/.cache/talk-video/handdraw-resources.test.mjs --log-level=error && node node_modules/.cache/talk-video/handdraw-resources.test.mjs",
-    "test:auto-diagram": "node --import tsx src/tests/auto-diagram.test.ts"
+    "test:auto-diagram": "node --import tsx src/tests/auto-diagram.test.ts",
+    "test:diagram-reliability": "node --import tsx src/tests/diagram-reliability.test.ts && npm run test:reliability --prefix packages/diagram-agent"
   },
   "dependencies": {
     "@iconify-json/logos": "^1.2.14",

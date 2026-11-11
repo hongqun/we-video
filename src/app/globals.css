@@ -4410,6 +4410,33 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 
 /* 顶栏承载所有预览切换，舞台不再重复占用一行标题。 */
 .auto-diagram-header > .auto-diagram-preview-tools {margin-left: auto;}
+/* 手工画布与属性面板独立滚动，窄屏仍保留可操作的画布。 */
+.diagram-manual-editor {display: grid; grid-template-columns: minmax(0, 1fr) 280px; flex: 1 1 0; min-height: 0; overflow: hidden;}
+.diagram-manual-workspace {display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 12px; padding: 16px; background: var(--paper, #f5f7f3);}
+.diagram-manual-viewport {flex: 1 1 0; min-height: 0; overflow: auto; display: flex; container-type: size;}
+.diagram-manual-canvas {width: max(420px, min(100cqw, calc(100cqh * 1.2))); margin: auto; touch-action: none; user-select: none;}
+.diagram-manual-canvas g[id] {cursor: grab;}
+.diagram-manual-canvas g[id]:active {cursor: grabbing;}
+.diagram-manual-selected {outline: 2px dashed #278459; outline-offset: 5px;}
+.diagram-manual-properties {display: flex; flex-direction: column; gap: 14px; padding: 20px; min-height: 0; overflow-y: auto; border-left: 1px solid var(--line, #dde6df);}
+.diagram-manual-properties h4 {margin: 0; font-size: 14px;}
+.diagram-manual-properties label {display: grid; gap: 6px; font-size: 12px;}
+.diagram-manual-properties input, .diagram-manual-properties select {width: 100%; min-width: 0; box-sizing: border-box; padding: 8px; font-size: 12px;}
+.diagram-manual-nudge {display: flex; justify-content: center; gap: 6px;}
+.diagram-manual-error {padding: 8px 16px;}
+/* 编辑辅助线和控制点仅用于画布交互，不进入最终图表。 */
+.diagram-manual-point {fill: #fff; stroke: #278459; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: crosshair; pointer-events: all;}
+.diagram-manual-color {display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px;}
+.diagram-manual-properties input[type="color"] {height: 36px; padding: 3px; cursor: pointer;}
+.diagram-manual-color .auto-diagram-actions {gap: 4px;}
+.diagram-manual-color button.secondary {padding: 6px;}
+.diagram-manual-route {display: grid; gap: 8px; margin: 0; padding: 10px; border: 1px solid var(--line, #dde6df); border-radius: 8px; font-size: 12px;}
+.diagram-manual-route > div {display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 6px;}
+@media (max-width: 650px) {
+  .diagram-manual-editor {grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(180px, 1fr) minmax(160px, .8fr);}
+  .diagram-manual-properties {border-left: 0; border-top: 1px solid var(--line, #dde6df); padding: 12px; gap: 10px;}
+  .diagram-manual-workspace {padding: 8px;}
+}
 @media (max-width: 1100px) {.auto-diagram-columns > .auto-diagram-preview {padding: 6px; gap: 0;}}
 @media (max-width: 800px) {.auto-diagram-footer > span {display: none;}}
 @media (max-width: 540px) {

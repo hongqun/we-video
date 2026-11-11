@@ -1,7 +1,7 @@
 import {NextResponse} from "next/server";
 import {z} from "zod";
 import {requireAuth} from "@/lib/auth";
-import {adoptDiagram, cancelDiagram, changeDiagramBindings, readDiagramSnapshot, submitDiagram} from "@/lib/diagram/service";
+import {adoptDiagram, cancelDiagram, changeDiagramBindings, changeDiagramDrawing, readDiagramSnapshot, submitDiagram} from "@/lib/diagram/service";
 import {readDiagramSession} from "@/lib/diagram/store";
 
 export const runtime = "nodejs";
@@ -59,7 +59,8 @@ export async function POST(request: Request, context: Context) {
   const unauthorized = await requireAuth(); if (unauthorized) return unauthorized;
   try {
     const {id, sceneId} = await context.params;
-    const body = z.object({action: z.enum(["send", "retry", "cancel", "bindings", "adopt", "withdraw"]), message: z.string().optional(), bindings: z.unknown().optional()}).strict().parse(await request.json());
+    // 手工保存携带原候选，服务端检查并发修改后再执行完整校验。
+    const body = z.object({action: z.enum(["send", "retry", "cancel", "bindings", "drawing", "adopt", "withdraw"]), message: z.string().optional(), bindings: z.unknown().optional(), drawing: z.unknown().optional()}).strict().parse(await request.json());
     if (body.action === "send") return NextResponse.json(await submitDiagram(id, sceneId, body.message ?? ""), {status: 202});
     if (body.action === "retry") {
       const snapshot = await readDiagramSnapshot(id, sceneId);
@@ -69,6 +70,7 @@ export async function POST(request: Request, context: Context) {
     }
     if (body.action === "cancel") {await cancelDiagram(id, sceneId); return NextResponse.json(await readDiagramSnapshot(id, sceneId));}
     if (body.action === "bindings") return NextResponse.json(await changeDiagramBindings(id, sceneId, body.bindings));
+    if (body.action === "drawing") return NextResponse.json(await changeDiagramDrawing(id, sceneId, body.drawing));
     return NextResponse.json({plan: await adoptDiagram(id, sceneId, body.action === "withdraw")});
   } catch (error) {return failure(error);}
 }

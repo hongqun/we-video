@@ -124,7 +124,8 @@ export const readVisualPlan = async (jobId: string, revision?: number) => {
 const templateDataForManifest = (scene: VisualPlanScene, resources: VisualResources, allowIncompleteImage = false): Record<string, unknown> | undefined => {
   if (scene.templateId === "rve/auto-diagram") {
     if (!scene.diagram && !allowIncompleteImage) throw new Error(`镜头 ${scene.id} 的自动图表尚未采用`);
-    return scene.diagram ? diagramDataSchema.parse({type: scene.diagram.type, svg: scene.diagram.svg, bindings: scene.diagram.bindings}) : undefined;
+    // 成片渲染保留编辑器保存的总览选项。
+    return scene.diagram ? diagramDataSchema.parse({type: scene.diagram.type, svg: scene.diagram.svg, bindings: scene.diagram.bindings, showFullDiagramFirst: scene.diagram.showFullDiagramFirst}) : undefined;
   }
   if (scene.templateId === "rve/text-reveal") return scene.textReveal;
   if (scene.templateId === "rve/relation-graph") return scene.visualData ? relationGraphDataSchema.parse(scene.visualData) : undefined;

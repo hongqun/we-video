@@ -134,8 +134,10 @@ const main = async () => {
   };
   const saveCandidate = async (data: DiagramData, loopEvidence?: string) => {
     // 安全检查和补丁解析失败不覆盖已有候选，也不会占用保存次数。
-    const hash = candidateKey(data, loopEvidence);
     const current = await readDiagramCandidate(jobId, sceneId);
+    // 总览由编辑器控制，Agent 重绘或修复时沿用用户已保存的选择。
+    data = {...data, showFullDiagramFirst: current?.data.showFullDiagramFirst ?? false};
+    const hash = candidateKey(data, loopEvidence);
     let currentHash: string | undefined;
     try {currentHash = current ? candidateKey(current.data, current.loopEvidence) : undefined;}
     catch { /* 旧候选不安全时不复用校验，也不阻止提交新的安全内容。 */ }

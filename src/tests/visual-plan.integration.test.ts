@@ -56,6 +56,15 @@ try {
   await assert.rejects(() => fs.access(path.join(directory, "uploaded-images/cover.png")));
   // 单数据任务不再以 revision 拒绝保存；并发控制只由 planVersion 负责。
   await assert.doesNotReject(() => visualPlan.saveVisualPlan(jobId, {...input, revision: 2}, profile));
+  // 候选原子保存后重新读取，开关不依赖浏览器状态，也不会随再次保存丢失。
+  const diagramStore = await import("../lib/diagram/store");
+  const {diagramDataSchema} = await import("../remotion/templates/auto-diagram-schema");
+  const candidate = {data: diagramDataSchema.parse({type: "flowchart", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 800"><g id="step"><text x="40" y="80">模型</text></g></svg>', bindings: [{groupId: "step", name: "模型", cueText: "模型"}], showFullDiagramFirst: true}), fingerprint: "test", requestId: "request-1", valid: true, errors: []};
+  await diagramStore.writeDiagramCandidate(jobId, "plan-01", candidate);
+  const reopenedCandidate = await diagramStore.readDiagramCandidate(jobId, "plan-01");
+  assert.equal(reopenedCandidate?.data.showFullDiagramFirst, true);
+  await diagramStore.writeDiagramCandidate(jobId, "plan-01", {...candidate, data: {...candidate.data, showFullDiagramFirst: false}});
+  assert.equal((await diagramStore.readDiagramCandidate(jobId, "plan-01"))?.data.showFullDiagramFirst, false);
   console.info("visual-plan.integration.test 通过：规划保存与确认后 Manifest 生成边界有效");
 } finally {
   await fs.rm(testDataRoot, {recursive: true, force: true});

@@ -22,6 +22,8 @@ export const diagramDataSchema = z.object({
   type: z.enum(diagramTypeIds),
   svg: z.string().min(1).max(300000),
   bindings: z.array(diagramBindingSchema).min(1).max(40),
+  // 缺省保持旧图表行为；开场总览不改变口播触发时间。
+  showFullDiagramFirst: z.boolean().optional(),
 }).strict();
 export const adoptedDiagramSchema = diagramDataSchema.extend({contextFingerprint: z.string().min(1)}).strict();
 export type DiagramData = z.infer<typeof diagramDataSchema>;
@@ -151,7 +153,8 @@ export const diagramSchedule = (scene: Pick<VideoScene, "startMs" | "endMs" | "s
   return data.bindings.map((binding) => {
     const startMs = times.get(binding.groupId)!;
     const startFrame = Math.min(lastFrame, Math.max(0, Math.round(startMs * fps / 1000) - sceneFrameSpan(scene, fps).from));
-    return {...binding, startMs, startFrame, fadeFrames: Math.min(Math.round(fps * 0.24), lastFrame - startFrame)};
+    // 总览淡出长度独立保存，避免被镜头末尾截短的单组淡入影响。
+    return {...binding, startMs, startFrame, overviewFadeFrames: Math.max(1, Math.round(fps * 0.24)), fadeFrames: Math.min(Math.round(fps * 0.24), lastFrame - startFrame)};
   });
 };
 
@@ -165,8 +168,13 @@ export const validateDiagram = (scene: Pick<VideoScene, "startMs" | "endMs" | "s
 export const diagramSvgAtFrame = (data: DiagramData, schedule: ReturnType<typeof diagramSchedule>, frame: number, complete = false, namespace = "") => {
   const {doc, root} = parseDiagramSvg(data);
   if (complete) for (const binding of data.bindings) doc.getElementById(binding.groupId)?.setAttribute("opacity", "1");
+  // 总览在首个触发前淡出，之后沿用逐组淡入；所有状态只由当前帧决定。
+  const firstFrame = Math.min(...schedule.map((item) => item.startFrame));
+  const overviewFadeFrames = Math.min(firstFrame, schedule[0]?.overviewFadeFrames ?? 0);
+  const overviewOpacity = data.showFullDiagramFirst && firstFrame > 0 && frame < firstFrame && overviewFadeFrames > 0
+    ? Math.min(1, (firstFrame - frame) / overviewFadeFrames) : null;
   for (const item of schedule) {
-    const opacity = complete ? 1 : frame < item.startFrame ? 0 : item.fadeFrames === 0 ? 1 : Math.min(1, (frame - item.startFrame) / item.fadeFrames);
+    const opacity = complete ? 1 : overviewOpacity !== null ? overviewOpacity : frame < item.startFrame ? 0 : item.fadeFrames === 0 ? 1 : Math.min(1, (frame - item.startFrame) / item.fadeFrames);
     doc.getElementById(item.groupId)?.setAttribute("opacity", String(opacity));
   }
   // 同页可能同时显示已采用图与候选图，引用加实例前缀，避免渐变和箭头串图。

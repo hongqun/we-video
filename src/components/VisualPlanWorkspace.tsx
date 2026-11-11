@@ -27,6 +27,7 @@ import {VISUAL_STYLE_OPTIONS, type VisualStyleId} from "@/remotion/visual-style"
 import {freshCameraPlan, resetModelPlan} from "@/remotion/templates/model-scene-editing";
 import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing";
 import {validateDiagram} from "@/remotion/templates/auto-diagram-schema";
+import {sceneFrameSpan} from "@/remotion/timeline";
 import {textRevealSoundEnabled} from "@/remotion/templates/text-reveal-schema";
 
 const TemplatePreview = dynamic(() => import("./TemplatePreview").then(({TemplatePreview: Component}) => Component), {ssr: false});
@@ -133,8 +134,8 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     const target = value.scenes[selected];
     if (!target || !audio.current || audio.current.readyState < 1) return;
     // 等选中态提交且音频元数据就绪后再定位，避免 currentTime 写入被浏览器丢弃。
-    audio.current.currentTime = target.startMs / 1000;
-    setTime(target.startMs);
+    audio.current.currentTime = pendingSeekRef.current / 1000;
+    setTime(pendingSeekRef.current);
   }, [playbackMode, selected, value.scenes]);
   useEffect(() => {
     // 切换镜头时关闭抽屉，避免继续编辑上一镜头的关系图。
@@ -176,13 +177,13 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     if (!sceneTiming) return null;
     const sceneResource = visualResourceForScene(visualResources, scene.id, scene.segmentId);
     const imagePath = sceneResource?.imagePath ? sceneImageUrl(jobId, sceneResource.imagePath, previewArtifactToken, visualResources.revision) : undefined;
-    // 图片运行参数只在预览时由 scene.id 展开，不写回 visual-plan。
+    // 图片运行参数只在预览时由 scene.id 展开，不写回 visual-plan；图表保留总览播放设置。
     const modelPath = sceneResource?.modelPath ? sceneImageUrl(jobId, sceneResource.modelPath, previewArtifactToken, visualResources.revision) : undefined;
     const templateData = scene.templateId === "rve/visual-image" && imagePath && sceneResource?.imageWidth && sceneResource.imageHeight
       ? {imagePath, imageWidth: sceneResource.imageWidth, imageHeight: sceneResource.imageHeight, polygons: sceneResource.polygons}
       : scene.templateId === "rve/3d-model-scene" && modelPath && scene.modelScene ? {modelPath, ...scene.modelScene}
       : scene.templateId === "rve/handdraw-image" ? handdrawTemplateData(sceneResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
-      : scene.templateId === "rve/auto-diagram" && scene.diagram ? {type: scene.diagram.type, svg: scene.diagram.svg, bindings: scene.diagram.bindings}
+      : scene.templateId === "rve/auto-diagram" && scene.diagram ? {type: scene.diagram.type, svg: scene.diagram.svg, bindings: scene.diagram.bindings, showFullDiagramFirst: scene.diagram.showFullDiagramFirst}
       : scene.templateId === "rve/relation-graph" ? scene.visualData
       // 与清单构建保持一致，让音效开关即时作用于当前预览。
       : scene.templateId === "rve/text-reveal" ? scene.textReveal : undefined;
@@ -372,23 +373,47 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       setPlaybackError("口播音频暂时无法播放，请重试；若仍无声音，请刷新页面。");
     });
   };
+  // 进度条直接驱动同一口播音频；暂停拖动时也同步定位预览画面。
+  const syncPreviewFrame = (timeMs: number) => {
+    const target = value.scenes[selectedRef.current];
+    if (!target) return;
+    const span = sceneFrameSpan(target, 30);
+    const frame = target.templateId === "rve/auto-diagram" || target.templateId === "rve/3d-model-scene"
+      ? Math.round(timeMs * 30 / 1000) - span.from
+      : Math.ceil((timeMs - target.startMs) * 30 / 1000);
+    previewPlayer.current?.seekTo(Math.max(0, Math.min(span.durationInFrames - 1, frame)));
+  };
+  const seekPreviewTime = (timeMs: number) => {
+    if (!current) return;
+    const targetMs = Math.max(current.startMs, Math.min(current.endMs, timeMs));
+    setStepPlaybackCompleted(null);
+    pendingSeekRef.current = targetMs;
+    setTime(targetMs);
+    if (audio.current && audio.current.readyState >= 1) audio.current.currentTime = targetMs / 1000;
+    syncPreviewFrame(targetMs);
+  };
   const handleAudioLoadedMetadata = () => {
     if (pendingSeekRef.current === null) return;
     const target = value.scenes[selectedRef.current];
     if (!target || !audio.current) return;
-    // 选择场景时若音频尚未加载，等元数据可用后补做一次精确定位。
-    audio.current.currentTime = target.startMs / 1000;
-    setTime(target.startMs);
+    // 元数据就绪后保留镜头选择或进度条请求的目标，不重置到镜头开头。
+    audio.current.currentTime = pendingSeekRef.current / 1000;
+    setTime(pendingSeekRef.current);
+    syncPreviewFrame(pendingSeekRef.current);
   };
   const handleAudioSeeked = () => {
     if (pendingSeekRef.current === null || !audio.current) return;
     const targetMs = pendingSeekRef.current;
-    if (Math.abs(audio.current.currentTime * 1000 - targetMs) <= 80) pendingSeekRef.current = null;
+    if (Math.abs(audio.current.currentTime * 1000 - targetMs) <= 80) {
+      pendingSeekRef.current = null;
+      syncPreviewFrame(audio.current.currentTime * 1000);
+    }
   };
   const handleAudioTimeUpdate = (event: React.SyntheticEvent<HTMLAudioElement>) => {
     const currentTimeMs = event.currentTarget.currentTime * 1000;
     const pendingSeekMs = pendingSeekRef.current;
-    if (pendingSeekMs !== null && currentTimeMs + 80 < pendingSeekMs) return;
+    // 前后拖动都等待音频完成定位，避免旧事件使进度条跳回。
+    if (pendingSeekMs !== null && Math.abs(currentTimeMs - pendingSeekMs) > 80) return;
     if (pendingSeekMs !== null) pendingSeekRef.current = null;
     setTime(currentTimeMs);
     if (playbackMode === "full") {
@@ -449,7 +474,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
       : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
       : definition.id === "rve/handdraw-image" ? handdrawTemplateData(candidateResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
-      : definition.id === "rve/auto-diagram" && current.diagram ? {type: current.diagram.type, svg: current.diagram.svg, bindings: current.diagram.bindings}
+      : definition.id === "rve/auto-diagram" && current.diagram ? {type: current.diagram.type, svg: current.diagram.svg, bindings: current.diagram.bindings, showFullDiagramFirst: current.diagram.showFullDiagramFirst}
       : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
     const candidatePresenter = definition.rollRole === "a-roll"
       ? {...current.presenter, rollType: "a-roll" as const, mode: "hero" as const, placement: "hero" as const, framing: "full" as const}
@@ -644,6 +669,11 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
         {/* 限制预览画布的显示尺寸，保持原始比例与时间轴逻辑。 */}
         <div className="visual-plan-preview-stage">
         {runtimeScene && currentStatus.usable ? <TemplatePreview brand={brand} scene={runtimeScene} presenter={previewPresenter} visualStyle={value.visualStyle} playing={playing} audioRef={audio} playerRef={previewPlayer} sceneStartMs={current.startMs} sceneEndMs={current.endMs} captions={captions} /> : <div className="template-preview-empty">{currentStatus.reason}</div>}
+        </div>
+        {/* 播放进度固定放在画布下方，编辑栏滚动后仍可定位当前镜头。 */}
+        <div className="visual-plan-preview-timeline">
+          <div className="visual-plan-preview-timeline-heading"><button type="button" className="secondary" onClick={() => playing ? audio.current?.pause() : playSelectedScene()}><Icon name="play" />{playing ? "暂停" : "播放"}</button><span className="metadata">{clock(Math.max(0, Math.min(current.endMs, time) - current.startMs))} / {clock(current.endMs - current.startMs)}</span></div>
+          <input type="range" aria-label="当前镜头播放进度" aria-valuetext={`${clock(Math.max(0, time - current.startMs))} / ${clock(current.endMs - current.startMs)}`} min={current.startMs} max={current.endMs} step={1} value={Math.max(current.startMs, Math.min(current.endMs, time))} onChange={(event) => seekPreviewTime(Number(event.target.value))} />
         </div>
       </aside>
     </div> : null}

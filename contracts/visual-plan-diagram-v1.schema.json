@@ -82,6 +82,11 @@
         "contextFingerprint": {
           "type": "string",
           "minLength": 1
+        },
+        "showFullDiagramFirst": {
+          "type": "boolean",
+          "default": false,
+          "description": "先展示完整图，在首个口播触发前淡出，再按绑定逐项显示。"
         }
       }
     },
@@ -163,6 +168,11 @@
         "contextFingerprint": {
           "type": "string",
           "minLength": 1
+        },
+        "showFullDiagramFirst": {
+          "type": "boolean",
+          "default": false,
+          "description": "先展示完整图，在首个口播触发前淡出，再按绑定逐项显示。"
         }
       }
     }

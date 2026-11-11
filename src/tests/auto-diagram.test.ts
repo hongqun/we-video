@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import {DOMParser} from "@xmldom/xmldom";
+import {diagramCandidateHash, patchDiagram} from "../lib/diagram/candidate";
 import {resolveNarrationCue} from "../remotion/templates/narration-cue";
 import {diagramDataSchema, diagramSchedule, diagramSvgAtFrame, parseDiagramSvg, validateDiagram, type DiagramData} from "../remotion/templates/auto-diagram-schema";
 import type {Caption} from "../remotion/schema";
@@ -89,4 +91,51 @@ assert.match(diagramSvgAtFrame(accessible, schedule, 0, true, "accessible"), /ar
 assert.throws(() => parseDiagramSvg({...accessible, svg: accessible.svg.replace('role="img"', 'role="button"')}));
 assert.throws(() => parseDiagramSvg({...accessible, svg: accessible.svg.replace('diagram-title diagram-desc', 'missing-title')}));
 
-console.log("自动图表安全与口播时间契约通过");
+
+// 总览按帧淡出，首个触发后恢复原有累积显现，往返跳帧不残留状态。
+const overview = diagramDataSchema.parse({...data, showFullDiagramFirst: true});
+assert.equal(diagramDataSchema.parse(data).showFullDiagramFirst, undefined);
+assert.equal(diagramDataSchema.safeParse({...data, showFullDiagramFirst: "true"}).success, false);
+assert.equal(diagramCandidateHash(data), diagramCandidateHash({...data, showFullDiagramFirst: false}));
+assert.notEqual(diagramCandidateHash(data), diagramCandidateHash(overview));
+assert.equal(patchDiagram(overview, undefined, {baseHash: diagramCandidateHash(overview), operations: [{op: "update_binding", groupId: "first", changes: {name: "新名称"}}]}).showFullDiagramFirst, true);
+const delayedScene = {startMs: 0, endMs: 3000};
+const delayedCaptions = [caption("甲，乙。甲", 600, 1600), caption("乙ＡＢＣ", 1600, 2600)];
+const opacityAt = (input: DiagramData, timing: ReturnType<typeof diagramSchedule>, frame: number, groupId = "second", complete = false) => {
+  const doc = new DOMParser().parseFromString(diagramSvgAtFrame(input, timing, frame, complete), "image/svg+xml");
+  const group = doc.getElementById(groupId);
+  assert(group, `缺少分组 ${groupId}`);
+  return group.hasAttribute("opacity") ? Number(group.getAttribute("opacity")) : 1;
+};
+for (const fps of [30, 60]) {
+  const timing = diagramSchedule(delayedScene, delayedCaptions, overview, fps);
+  const ordinaryTiming = diagramSchedule(delayedScene, delayedCaptions, data, fps);
+  assert.deepEqual(timing, ordinaryTiming);
+  const firstCue = timing[0]!.startFrame;
+  const fade = Math.round(fps * .24);
+  assert.equal(opacityAt(overview, timing, 0), 1);
+  assert.equal(opacityAt(data, timing, 0), 0);
+  assert.equal(diagramSvgAtFrame(data, timing, 0), diagramSvgAtFrame({...data, showFullDiagramFirst: false}, timing, 0));
+  assert.equal(opacityAt(overview, timing, firstCue - fade), 1);
+  assert.equal(opacityAt(overview, timing, firstCue - 1), 1 / fade);
+  assert.equal(opacityAt(overview, timing, firstCue), 0);
+  assert.equal(opacityAt(overview, timing, firstCue + 1, "first"), 1 / timing[0]!.fadeFrames);
+  assert.equal(opacityAt(overview, timing, firstCue + fade, "first"), 1);
+  assert.equal(opacityAt(overview, timing, firstCue + fade), 0);
+  assert.equal(opacityAt(overview, timing, timing[1]!.startFrame + timing[1]!.fadeFrames), 1);
+  assert.equal(opacityAt(overview, timing, firstCue, "opening"), 1);
+  assert.equal(opacityAt(overview, timing, firstCue, "link", true), 1);
+  const earlier = diagramSvgAtFrame(overview, timing, firstCue - 1);
+  diagramSvgAtFrame(overview, timing, timing[2]!.startFrame + fade);
+  assert.equal(diagramSvgAtFrame(overview, timing, firstCue - 1), earlier);
+  // 开场不足 240ms 时从首帧开始缩短淡出，不推迟首个口播触发。
+  const shortTiming = diagramSchedule(delayedScene, [caption("甲，乙。甲", 100, 1100), caption("乙ＡＢＣ", 1100, 2100)], overview, fps);
+  assert.equal(opacityAt(overview, shortTiming, 0), 1);
+  assert.equal(opacityAt(overview, shortTiming, shortTiming[0]!.startFrame - 1), 1 / shortTiming[0]!.startFrame);
+  assert.equal(opacityAt(overview, shortTiming, shortTiming[0]!.startFrame), 0);
+}
+assert.equal(diagramSvgAtFrame(overview, schedule, 0), diagramSvgAtFrame(data, schedule, 0));
+// 分组列表无须按触发时间排序，总览结束点始终使用最早触发。
+assert.equal(diagramSvgAtFrame(overview, [...diagramSchedule(delayedScene, delayedCaptions, overview)].reverse(), 0), diagramSvgAtFrame(overview, diagramSchedule(delayedScene, delayedCaptions, overview), 0));
+
+console.log("自动图表安全、口播时间与总览过渡契约通过");

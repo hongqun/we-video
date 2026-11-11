@@ -91,7 +91,7 @@ export const cancelDiagram = async (jobId: string, sceneId: string, reason = "�
 });
 
 // 手工图形与绑定更新共用请求锁，避免保存期间启动 Agent 覆盖候选。
-const changeDiagramManually = async (jobId: string, sceneId: string, input: unknown, editSvg: boolean) => withDiagramRequestLock(jobId, sceneId, async () => {
+const changeDiagramManually = async (jobId: string, sceneId: string, input: unknown, editSvg: boolean, showFullDiagramFirst?: boolean) => withDiagramRequestLock(jobId, sceneId, async () => {
   const {context, job} = await loadDiagramContext(jobId, sceneId); assertVisualPlanEditableState(job.state);
   const session = await readDiagramSession(jobId, sceneId);
   if (job.state === "planning_visuals") throw new Error("镜头规划正在生成，请完成后再调整图表");
@@ -106,7 +106,8 @@ const changeDiagramManually = async (jobId: string, sceneId: string, input: unkn
     data = edit.data;
   } else {
     const bindings = z.array(diagramBindingSchema).min(1).max(40).parse(input);
-    data = diagramDataSchema.parse({...candidate.data, bindings});
+    // 旧客户端未传开关时保留候选设置，绑定与播放选项一次保存。
+    data = diagramDataSchema.parse({...candidate.data, bindings, ...(showFullDiagramFirst === undefined ? {} : {showFullDiagramFirst})});
   }
   // 不安全的 SVG 不写入候选；几何失败则保留修改，允许继续手工修正。
   parseDiagramSvg(data);
@@ -118,7 +119,7 @@ const changeDiagramManually = async (jobId: string, sceneId: string, input: unkn
   await writeDiagramSession(jobId, sceneId, next); await syncDiagramResource(jobId, sceneId, next);
   return readDiagramSnapshot(jobId, sceneId);
 });
-export const changeDiagramBindings = (jobId: string, sceneId: string, input: unknown) => changeDiagramManually(jobId, sceneId, input, false);
+export const changeDiagramBindings = (jobId: string, sceneId: string, input: unknown, showFullDiagramFirst?: boolean) => changeDiagramManually(jobId, sceneId, input, false, showFullDiagramFirst);
 export const changeDiagramDrawing = (jobId: string, sceneId: string, input: unknown) => changeDiagramManually(jobId, sceneId, input, true);
 
 export const adoptDiagram = async (jobId: string, sceneId: string, withdraw = false) => {
@@ -132,7 +133,8 @@ export const adoptDiagram = async (jobId: string, sceneId: string, withdraw = fa
   // 重复采用同一候选不覆盖唯一的撤回槽位。
   if (!withdraw && JSON.stringify(source) === JSON.stringify(scene.diagram)) return plan;
   if (source.contextFingerprint !== context.fingerprint) throw new Error("图表上下文已变化，请重新生成");
-  const data = diagramDataSchema.parse({type: source.type, svg: source.svg, bindings: source.bindings});
+  // 采用与撤回均保留播放设置，校验数据与实际成片一致。
+  const data = diagramDataSchema.parse({type: source.type, svg: source.svg, bindings: source.bindings, showFullDiagramFirst: source.showFullDiagramFirst});
   validateDiagram(context.scene, context.captions, data);
   const geometry = await inspectDiagramGeometry(data, context.canvas.safeArea);
   if (geometry.length) throw new Error(geometry.join("；"));

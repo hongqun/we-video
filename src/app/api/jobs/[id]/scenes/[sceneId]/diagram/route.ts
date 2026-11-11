@@ -60,7 +60,7 @@ export async function POST(request: Request, context: Context) {
   try {
     const {id, sceneId} = await context.params;
     // 手工保存携带原候选，服务端检查并发修改后再执行完整校验。
-    const body = z.object({action: z.enum(["send", "retry", "cancel", "bindings", "drawing", "adopt", "withdraw"]), message: z.string().optional(), bindings: z.unknown().optional(), drawing: z.unknown().optional()}).strict().parse(await request.json());
+    const body = z.object({action: z.enum(["send", "retry", "cancel", "bindings", "drawing", "adopt", "withdraw"]), message: z.string().optional(), bindings: z.unknown().optional(), drawing: z.unknown().optional(), showFullDiagramFirst: z.boolean().optional()}).strict().parse(await request.json());
     if (body.action === "send") return NextResponse.json(await submitDiagram(id, sceneId, body.message ?? ""), {status: 202});
     if (body.action === "retry") {
       const snapshot = await readDiagramSnapshot(id, sceneId);
@@ -69,7 +69,8 @@ export async function POST(request: Request, context: Context) {
       return NextResponse.json(await submitDiagram(id, sceneId, text), {status: 202});
     }
     if (body.action === "cancel") {await cancelDiagram(id, sceneId); return NextResponse.json(await readDiagramSnapshot(id, sceneId));}
-    if (body.action === "bindings") return NextResponse.json(await changeDiagramBindings(id, sceneId, body.bindings));
+    // 播放选项与绑定共用保存入口，缺省兼容旧请求。
+    if (body.action === "bindings") return NextResponse.json(await changeDiagramBindings(id, sceneId, body.bindings, body.showFullDiagramFirst));
     if (body.action === "drawing") return NextResponse.json(await changeDiagramDrawing(id, sceneId, body.drawing));
     return NextResponse.json({plan: await adoptDiagram(id, sceneId, body.action === "withdraw")});
   } catch (error) {return failure(error);}

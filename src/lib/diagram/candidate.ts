@@ -17,7 +17,8 @@ export const diagramCandidateHash = (data: DiagramData, loopEvidence?: string) =
       : node.nodeValue?.trim() || ["text", "tspan", "title", "desc"].includes(element.tagName) ? [node.nodeValue] : []),
   });
   const bindings = data.bindings.map((binding) => ({groupId: binding.groupId, name: binding.name, cueText: binding.cueText, occurrence: binding.occurrence, after: [...binding.after].sort(), kind: binding.kind})).sort((a, b) => a.groupId.localeCompare(b.groupId));
-  return createHash("sha256").update(JSON.stringify({type: data.type, svg: canonical(root), bindings, loopEvidence: loopEvidence?.trim() ?? ""})).digest("hex");
+  // 关闭与缺省使用同一指纹，兼容已有候选；启用总览则视为内容变化。
+  return createHash("sha256").update(JSON.stringify({type: data.type, svg: canonical(root), bindings, ...(data.showFullDiagramFirst ? {showFullDiagramFirst: true} : {}), loopEvidence: loopEvidence?.trim() ?? ""})).digest("hex");
 };
 
 const groupId = diagramBindingSchema.shape.groupId;

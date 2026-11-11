@@ -5,7 +5,8 @@
       "name": "启动 We-Video 工作台",
       "type": "node-terminal",
       "request": "launch",
-      "command": "npm run dev",
+      // 调试时使用 Webpack，避开 Turbopack 内部 HMR 源码映射的重复读取警告。
+      "command": "npm run dev -- --webpack",
       "cwd": "${workspaceFolder}",
       "serverReadyAction": {
         "pattern": "Local:\\s+(https?://\\S+)",

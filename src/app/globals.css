@@ -3376,6 +3376,12 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .visual-plan-preview-stage { background: #f3f4f0; border: 1px solid #e5e7df; border-radius: 8px; display: grid; justify-items: center; overflow: hidden; padding: 8px; min-width: 0; }
 .visual-plan-preview-stage > .template-preview-player { width: min(100%, 520px); min-width: 0; }
 .visual-plan-preview-stage > .template-preview-empty { align-items: center; background: transparent; display: flex; justify-content: center; padding: 16px; text-align: center; width: 100%; box-sizing: border-box; }
+/* Step4 的时间轴独立于画布，暂停与播放时都可拖动定位。 */
+.visual-plan-preview-timeline {display: grid; gap: 8px; min-width: 0;}
+.visual-plan-preview-timeline-heading {display: flex; align-items: center; justify-content: space-between; gap: 8px;}
+.visual-plan-preview-timeline-heading > button {display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 5px 10px; font-size: 12px;}
+.visual-plan-preview-timeline-heading > span {font-variant-numeric: tabular-nums; white-space: nowrap;}
+.visual-plan-preview-timeline > input[type="range"] {box-sizing: border-box; width: 100%; min-width: 0; margin: 0; padding: 8px 0; cursor: pointer;}
 .visual-plan-preview-controls { display: grid; gap: 10px; min-width: 0; }
 .visual-plan-preview-controls .visual-plan-playback-mode { display: flex; flex-wrap: wrap; justify-self: stretch; gap: 2px; }
 .visual-plan-preview-controls .visual-plan-playback-mode button { flex: 1 1 auto; font-size: 11px; padding: 5px 7px; }
@@ -4354,6 +4360,9 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
 .auto-diagram-empty {margin: 0; padding: 16px 8px; font-size: 13px; line-height: 1.7; color: var(--muted, #627168);}
 .auto-diagram-stage > .auto-diagram-empty {padding: 24px; text-align: center;}
 .auto-diagram-spoken {flex: 0 1 auto; min-height: 0; max-height: 84px; overflow-y: auto; margin: 0; background: var(--paper, #f0f6ee); padding: 10px; border-radius: 8px; font-size: 12px; line-height: 1.7; scrollbar-width: thin;}
+/* 总览开关独立于绑定输入，保持窄面板内自然换行。 */
+.auto-diagram-overview {display: flex; flex: 0 0 auto; align-items: center; gap: 8px; font-size: 12px; line-height: 1.5;}
+.auto-diagram-overview input {flex: 0 0 auto; width: 16px; height: 16px; margin: 0;}
 .auto-diagram-binding-columns {display: flex; flex: 0 0 auto; justify-content: space-between; font-size: 11px; color: var(--muted, #627168); padding-right: 8px;}
 .auto-diagram-bindings {flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 5px;}
 .auto-diagram-bindings label {display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 8px; align-items: center; padding: 10px 0 12px; border-bottom: 1px solid var(--line, #dde6df);}

@@ -7,6 +7,7 @@ import {spokenTextForTimeRange} from "../lib/visual-plan-text";
 import {relationGraphDataSchema} from "../remotion/templates/relation-graph-schema";
 import {visualResourceForScene} from "../lib/visual-resource-selection";
 import {preserveVisualPlanStructure} from "../lib/derivation";
+import {diagramDataSchema} from "../remotion/templates/auto-diagram-schema";
 import {resolveVideoTheme} from "../remotion/visual-style";
 
 const content = {title: "核心能力", subtitle: "浏览器内预览", text: "模型和工具协同工作", keywords: ["模型", "工具"]};
@@ -154,4 +155,14 @@ const planned = await runContractPlanning({
 });
 assert.deepEqual(planned.scenes.map((scene) => scene.templateId), ["ip/opening-stage", "rve/visual-image", "ip/closing-stage"]);
 assert.equal(JSON.stringify(planned.scenes).includes("polygons"), false);
+
+// 当前与撤回槽位经过规划序列化后，播放设置仍传到成片数据。
+const overviewDiagram = diagramDataSchema.parse({type: "flowchart", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 800"><g id="step"><text x="40" y="80">模型</text></g></svg>', bindings: [{groupId: "step", name: "模型", cueText: "模型"}], showFullDiagramFirst: true});
+const adoptedOverview = {...overviewDiagram, contextFingerprint: "test-context"};
+const diagramPlan = visualPlanSchema.parse({...plan, scenes: [{...plan.scenes[0], templateId: "rve/auto-diagram", diagram: adoptedOverview, previousDiagram: {...adoptedOverview, showFullDiagramFirst: false}}]});
+const reopenedDiagramPlan = visualPlanSchema.parse(JSON.parse(JSON.stringify(diagramPlan)));
+assert.equal(deriveScenes(reopenedDiagramPlan, draft, narration)[0]?.templateData?.showFullDiagramFirst, true);
+const withdrawnDiagramPlan = visualPlanSchema.parse({...reopenedDiagramPlan, scenes: [{...reopenedDiagramPlan.scenes[0], diagram: reopenedDiagramPlan.scenes[0]!.previousDiagram, previousDiagram: undefined}]});
+assert.equal(deriveScenes(withdrawnDiagramPlan, draft, narration)[0]?.templateData?.showFullDiagramFirst, false);
+
 console.info("visual-plan.test 通过：模型、规划、模板和资源边界有效");

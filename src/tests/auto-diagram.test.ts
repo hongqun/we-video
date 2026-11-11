@@ -76,11 +76,11 @@ assert.doesNotThrow(() => diagramSchedule(scene, captions, regionEdge));
 assert.throws(() => diagramSchedule(scene, captions, {...regionEdge, bindings: regionEdge.bindings.map((binding, index) => index === 2 ? {...binding, cueText: "甲", occurrence: 1} : binding)}), /触发早于前置元素 second/);
 assert.throws(() => diagramSchedule(scene, captions, {...chart, bindings: chart.bindings.map((binding, index) => index === 0 ? {...binding, after: ["link"]} : binding)}));
 
-// loop 必须引用本镜头的明确回边原文，持续时间或“环环相扣”不能证明循环。
+// loop 必须引用本镜头的明确回边原文；失败提示引导重新选型，不预设流程图。
 const loop = {...data, type: "loop" as const};
-assert.throws(() => validateDiagramMeaning(loop, "整条攻击链环环相扣。", "环环相扣"));
-assert.throws(() => validateDiagramMeaning(loop, "先投毒，再进入系统。", "结果反馈回到输入"));
-assert.throws(() => validateDiagramMeaning(loop, "结果反馈回到输入，开始下一轮。"));
+assert.throws(() => validateDiagramMeaning(loop, "整条攻击链环环相扣。", "环环相扣"), /^Error: loopEvidence 未包含明确的返回、重复或反馈描述；“环环相扣”和持续时间不足以证明闭环，请重新判断关系并选择合适图型$/);
+assert.throws(() => validateDiagramMeaning(loop, "先投毒，再进入系统。", "结果反馈回到输入"), /^Error: 循环图必须提供取自本镜头口播的 loopEvidence，说明最后一步为何返回前序步骤；证据不足时请重新判断关系并选择合适图型$/);
+assert.throws(() => validateDiagramMeaning(loop, "结果反馈回到输入，开始下一轮。"), /^Error: 循环图必须提供取自本镜头口播的 loopEvidence，说明最后一步为何返回前序步骤；证据不足时请重新判断关系并选择合适图型$/);
 assert.doesNotThrow(() => validateDiagramMeaning(loop, "结果反馈回到输入，开始下一轮。", "结果反馈回到输入"));
 assert.doesNotThrow(() => validateDiagramMeaning(data, "先投毒，再进入系统。"));
 

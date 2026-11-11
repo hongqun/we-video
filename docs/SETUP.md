@@ -46,6 +46,8 @@ npx skills add cathrynlavery/diagram-design --skill diagram-design --agent deepa
 
 在根目录 `pipeline.config.json` 设置 `diagramAgent.enabled=true`，并配置文本模型连接。安装目录为 `.agents/skills/diagram-design/`，已被 Git 忽略，不随代码拉取或发布自动安装。部署时执行上述命令，或将完整安装目录随运行资源一并部署；不得只复制 `SKILL.md`，还需保留 `references/`、`assets/` 等技能文件及适用的上游许可声明。
 
+`diagramAgent.supportsVision=true` 会把复查截图发送给模型，需使用支持图像输入的模型；`diagramAgent.thinking=true` 开启 DeepSeek 思考模式。这两个字段缺省均为 `false`，新请求读取根配置生效。思考模式沿用现有输出与耗时预算；接入层保留工具调用所需的思考字段，截图通过图像消息传递，思考内容不展示在业务对话中。
+
 `diagramAgent.maxSaves` 控制每轮内容修改次数（含首次提交），默认 5，范围 1–10；全量保存与局部补丁共用预算，规范化后相同的内容复用上次报告且不扣保存次数。安全检查通过后，一次返回时间、语义和几何问题，修复项带稳定代码、分组 ID、文字实测边界或障碍节点坐标；连续未修复的错误会单独标出。`maxSteps` 仍限制模型与工具调用总次数，`timeoutMs` 限制整轮耗时；提高保存次数不会延长这两项预算。失败提示同时保留停止原因和当前图表的校验问题。
 
 修复优先调用 `patch_diagram({baseHash, operations})`，支持 `replace_group`（相同 ID 的完整 `<g>`）、`update_binding`（只改指定字段）和 `remove_group`（清理绑定、依赖及无障碍引用）。过期指纹或不安全替换不会覆盖候选；`read_current_diagram({groupIds})` 可只取相关分组。候选仍须通过完整校验及 `inspect_diagram`，再由用户预览采用。

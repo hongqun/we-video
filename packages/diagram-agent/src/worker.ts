@@ -17,6 +17,7 @@ import {Client} from "langsmith";
 import {getLangchainCallbacks} from "langsmith/langchain";
 import {XMLSerializer} from "@xmldom/xmldom";
 import {currentDiagramTurn, diagramAssistantText, diagramGraphRecursionLimit, diagramUserRequest} from "./model-context";
+import {diagramCompletionBody} from "./model-request";
 import {DiagramModelError, DiagramStreamBoundary, retryDiagramModel} from "./model-retry";
 import {assertDiagramCandidateReady} from "./candidate-review";
 import {loadDiagramContext} from "../../../src/lib/diagram/context";
@@ -197,6 +198,8 @@ const main = async () => {
   const allowed = new Set(["get_scene_context", "read_current_diagram", "save_diagram", "patch_diagram", "validate_diagram", "inspect_diagram", "ls", "read_file", "glob", "grep", "write_todos"]);
   // 模型可并行调用工具；候选的读、改、校验共用队列，避免相同 baseHash 同时落盘。
   let candidateTasks = Promise.resolve();
+  // 仅保留本轮原始消息，供发送时恢复 SDK 丢弃的思考字段；不跨请求共享。
+  let completionMessages: BaseMessage[] = [];
   const candidateTools = new Set(["read_current_diagram", "save_diagram", "patch_diagram", "validate_diagram", "inspect_diagram"]);
   // 在执行边界阻止 shell、子 Agent 和所有通用写入工具，不能仅依赖提示词限制。
   const guard = createMiddleware({name: "DiagramBudgetAndIsolation", wrapToolCall: async (request, handler) => {
@@ -221,7 +224,8 @@ const main = async () => {
     return pending;
   }, wrapModelCall: async (request, handler) => {
     modelStreamStarted = false;
-    try {return await retryDiagramModel(() => handler({...request, messages: currentDiagramTurn(request.messages), tools: request.tools.filter((item) => typeof item.name === "string" && allowed.has(item.name))}), {
+    completionMessages = currentDiagramTurn(request.messages);
+    try {return await retryDiagramModel(() => handler({...request, messages: completionMessages, tools: request.tools.filter((item) => typeof item.name === "string" && allowed.has(item.name))}), {
       signal: controller.signal, deadline, hasStreamed: () => modelStreamStarted,
       assertActive: async () => {await assertDiagramRequest(jobId, sceneId, requestId);},
       onRetry: async () => {
@@ -245,8 +249,8 @@ const main = async () => {
     return undefined;
   }});
   saver = SqliteSaver.fromConnString(path.join(diagramDirectory(jobId, sceneId), "checkpoints.sqlite"));
-  // 与主项目镜头规划保持一致，关闭 DeepSeek 思考模式，避免输出预算全部消耗在思考中。
-  const model = new ChatOpenAI({model: settings.model, apiKey: settings.apiKey, configuration: {baseURL: settings.baseURL}, modelKwargs: {thinking: {type: "disabled"}}, temperature: 0.3, streaming: true, maxTokens: settings.maxTokens, maxRetries: 0, timeout: settings.timeoutMs,
+  // 根配置控制思考模式；发送时保留多轮工具思考，并将截图移至兼容的图像消息。
+  const model = new ChatOpenAI({model: settings.model, apiKey: settings.apiKey, configuration: {baseURL: settings.baseURL, fetch: (input, init) => fetch(input, typeof init?.body === "string" ? {...init, body: diagramCompletionBody(init.body, completionMessages)} : init)}, modelKwargs: {thinking: {type: settings.thinking ? "enabled" : "disabled"}}, ...(settings.thinking ? {} : {temperature: 0.3}), streaming: true, maxTokens: settings.maxTokens, maxRetries: 0, timeout: settings.timeoutMs,
     // 必须同步标记含工具参数的空文本片段，防止中断后误判为尚未开始流式输出。
     callbacks: [new DiagramStreamBoundary(() => {modelStreamStarted = true;})],
   });

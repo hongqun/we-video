@@ -2152,10 +2152,12 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
   align-items: start;
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: 360px minmax(0, 1fr);
 }
 .script-review-editor,
 .script-ai-panel { display: grid; gap: 22px; min-width: 0; }
+/* AI 辅助区排在口播内容之前，窄屏时也保持相同顺序。 */
+.script-ai-panel { order: -1; }
 .script-review-header { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; }
 .script-review-header h2 { font-size: 28px; margin: 0 0 5px; }
 .script-review-header > svg { color: var(--green-dark); height: 24px; width: 24px; }
@@ -2324,7 +2326,7 @@ button.review-health-chip:hover:not(:disabled) { background: #294b3c; transform:
   .script-review-workspace {
     align-items: start;
     gap: 20px;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: 340px minmax(0, 1fr);
   }
 
   .script-review-editor,

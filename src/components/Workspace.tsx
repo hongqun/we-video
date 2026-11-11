@@ -266,7 +266,7 @@ export const Workspace: React.FC = () => {
     useState<Settings["defaultTextModel"]>("deepseek-v4-flash");
   const [voiceId, setVoiceId] = useState("");
   // 服务端设置加载前的占位值与正式默认语速保持一致，避免初始化时误判用户改动。
-  const [speechRate, setSpeechRate] = useState(0.95);
+  const [speechRate, setSpeechRate] = useState(1.0);
   const [jobId, setJobId] = useState<string | null>(null);
   const settingsKey = jobId ? `job:${jobId}` : `source:${selectedSourceAccountId ?? ""}:${sourceSeriesId}`;
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);

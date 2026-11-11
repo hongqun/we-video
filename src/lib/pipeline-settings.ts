@@ -98,7 +98,8 @@ export const readPipelineSettings = async (profile?: PlatformProfile, options: {
   if (!config.bailian.models.includes(model)) throw new Error(`专题配置的 TTS 模型 ${model || "（空）"} 不在 pipeline.config.json 的 bailian.models 中`);
   // 专题覆盖全局声音参数；语言默认跟随任务输出语言，避免英文沿用全局中文提示。
   const voiceSettings = profileTtsSchema.parse({
-    rate: numericSetting("TALK_VIDEO_TTS_RATE", "rate", 0.95),
+    // 未配置语速时使用正常语速。
+    rate: numericSetting("TALK_VIDEO_TTS_RATE", "rate", 1.0),
     pitch: numericSetting("TALK_VIDEO_TTS_PITCH", "pitch", 1),
     volume: numericSetting("TALK_VIDEO_TTS_VOLUME", "volume", 50),
     instruction: String(process.env.TALK_VIDEO_TTS_INSTRUCTION ?? bailian.instruction ?? ""),

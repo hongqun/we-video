@@ -23,7 +23,7 @@
     ],
     "sample_rate": 24000,
     "volume": 50,
-    "rate": 0.95,
+    "rate": 1.0,
     "pitch": 1.0,
     "instruction": "",
     "seed": 0,

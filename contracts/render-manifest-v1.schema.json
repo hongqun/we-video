@@ -26,7 +26,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": ["id","segmentId","startMs","endMs","transition","spokenText","content","templateId","rollType","presenterMode","presenterPoseId","presenterPlacement"],
-        "allOf": [{"if":{"properties":{"templateId":{"const":"rve/handdraw-image"}},"required":["templateId"]},"then":{"required":["templateData"],"properties":{"templateData":{"$ref":"handdraw-image-v1.schema.json"}}}},{"if":{"properties":{"templateId":{"const":"rve/auto-diagram"}},"required":["templateId"]},"then":{"required":["templateData"],"properties":{"templateData":{"$ref":"auto-diagram-v1.schema.json"}}}}],
+        "allOf": [{"if":{"properties":{"templateId":{"const":"rve/handdraw-image"}},"required":["templateId"]},"then":{"required":["templateData"],"properties":{"templateData":{"$ref":"handdraw-image-v1.schema.json"}}}},{"if":{"properties":{"templateId":{"const":"rve/auto-diagram"}},"required":["templateId"]},"then":{"required":["templateData"],"properties":{"templateData":{"$ref":"auto-diagram-v1.schema.json"}}}},{"if":{"properties":{"templateId":{"const":"rve/handdraw-explainer"}},"required":["templateId"]},"then":{"required":["templateData"],"properties":{"templateData":{"$ref":"handdraw-explainer-v1.schema.json"}}}}],
         "properties": {
           "id":{"type":"string"},"segmentId":{"type":"string"},"startMs":{"type":"integer","minimum":0},"endMs":{"type":"integer","minimum":1},
           "speechStartMs":{"type":"integer","minimum":0},"speechEndMs":{"type":"integer","minimum":1},"pauseAfterMs":{"type":"integer","minimum":0,"maximum":700},

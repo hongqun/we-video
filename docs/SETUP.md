@@ -46,13 +46,13 @@ npx skills add cathrynlavery/diagram-design --skill diagram-design --agent deepa
 
 在根目录 `pipeline.config.json` 设置 `diagramAgent.enabled=true`，并配置文本模型连接。安装目录为 `.agents/skills/diagram-design/`，已被 Git 忽略，不随代码拉取或发布自动安装。部署时执行上述命令，或将完整安装目录随运行资源一并部署；不得只复制 `SKILL.md`，还需保留 `references/`、`assets/` 等技能文件及适用的上游许可声明。
 
-`diagramAgent.supportsVision=true` 会把复查截图发送给模型，需使用支持图像输入的模型；`diagramAgent.thinking=true` 开启 DeepSeek 思考模式。这两个字段缺省均为 `false`，新请求读取根配置生效。思考模式沿用现有输出与耗时预算；接入层保留工具调用所需的思考字段，截图通过图像消息传递，思考内容不展示在业务对话中。
+`diagramAgent.supportsVision=true` 会把复查截图发送给模型，需使用支持图像输入的模型；`diagramAgent.thinking=true` 开启 DeepSeek 思考模式。这两个字段缺省均为 `false`，新请求读取根配置生效。思考模式下 `diagramAgent.reasoningEffort` 可选 `low`、`high`、`max`，默认 `low`，用于减少制图前过度推演；该参数是思考强度偏好，不是独立的思考 token 硬额度。[DeepSeek 参数说明](https://api-docs.deepseek.com/guides/thinking_mode/)。思考和正式输出共用 `maxTokens`；默认输出额度为 32,000 token，整轮 `timeoutMs` 默认为 600,000（10分钟），两者分别限制输出与总耗时；接入层保留工具调用所需的思考字段，截图通过图像消息传递，思考内容不展示在业务对话中。
 
-`diagramAgent.maxSaves` 控制每轮内容修改次数（含首次提交），默认 5，范围 1–10；全量保存与局部补丁共用预算，规范化后相同的内容复用上次报告且不扣保存次数。安全检查通过后，一次返回时间、语义和几何问题，修复项带稳定代码、分组 ID、文字实测边界或障碍节点坐标；连续未修复的错误会单独标出。`maxSteps` 仍限制模型与工具调用总次数，`timeoutMs` 限制整轮耗时；提高保存次数不会延长这两项预算。失败提示同时保留停止原因和当前图表的校验问题。
+`diagramAgent.maxSaves` 控制每轮内容修改次数（含首次提交），默认 5，范围 1–10；全量保存与局部补丁共用预算，规范化后相同的内容复用上次报告且不扣保存次数。SVG 白名单、字段或补丁输入错误会以 `recoverable` 和 `errors/repairs` 返回 Agent 继续修正，拒绝的输入不会覆盖候选或扣保存次数；`pattern` 等不支持的元素应替换为安全的纯色或基础图形。失败收尾保留具体校验原因，不以模型连接或依赖安装提示覆盖。安全检查通过后，一次返回时间、语义和几何问题，修复项带稳定代码、分组 ID、文字实测边界或障碍节点坐标；连续未修复的错误会单独标出。`maxSteps` 仍限制模型与工具调用总次数，`timeoutMs` 限制整轮耗时；提高保存次数不会延长这两项预算。失败提示同时保留停止原因和当前图表的校验问题。
 
 修复优先调用 `patch_diagram({baseHash, operations})`，支持 `replace_group`（相同 ID 的完整 `<g>`）、`update_binding`（只改指定字段）和 `remove_group`（清理绑定、依赖及无障碍引用）。过期指纹或不安全替换不会覆盖候选；`read_current_diagram({groupIds})` 可只取相关分组。候选仍须通过完整校验及 `inspect_diagram`，再由用户预览采用。
 
-模型通过 LangChain `wrapModelCall` 在尚未收到任何流片段时，对连接、限流或服务错误最多重试一次；重试占用步数及原始超时预算，不重放已完成的工具。中断流单独报告。`session.json` 的 `diagnostics` 仅保存请求 ID、错误类别、候选指纹及预算计数，不保存凭据或 SDK 请求对象。
+模型通过 LangChain `wrapModelCall` 在尚未收到任何流片段时，对连接、限流或服务错误最多重试一次；重试占用步数及原始超时预算，不重放已完成的工具。中断流单独报告。SDK 完成回调同时检查 `generationInfo.finish_reason` 和消息元数据；达到输出上限时以 `model_output_limit` 明确报告，并在工具执行前停止，保留已完成候选，不自动重试截断输出。类型参考和示例每页最多180行，选型最多比较两份参考，只读取最终选定图型的一份示例，优先提交首版后按校验结果修复。`session.json` 的 `diagnostics` 仅保存请求 ID、错误类别、候选指纹及预算计数，不保存凭据或 SDK 请求对象。
 
 需显式运行回归检查时，在项目根目录执行 `npm run test:diagram-reliability`。该命令覆盖示例中的时间冲突、文字溢出、穿越箭头、包含关系清理与补丁预算，并运行本地模型替身的连接恢复、取消及复查门槛测试；几何检查使用本地浏览器和字体，不调用模型。
 
@@ -61,6 +61,10 @@ npx skills add cathrynlavery/diagram-design --skill diagram-design --agent deepa
 Step 4 的首次生成与对话修改均由独立 worker 只读加载此技能。技能未安装或必需资料不完整时，编辑器显示安装提示并阻止生成；现有预览与采用流程保持不变。
 
 类型标识直接使用上游名称，例如 `flowchart`、`tree`、`loop`；不兼容旧的 `flow`、`hierarchy`、`cycle` 标识，旧图需重新生成，不自动迁移或删除数据。图表可使用区域、数据标记、独立标签和无向连接；定量图必须有上下文或用户提供的必要数值。
+
+## 安装手绘讲解 Agent
+
+第 4 步“手绘讲解”通过百炼生成插画，由 Remotion 原生绘制。独立运行依赖安装命令为 `npm ci --prefix packages/handdraw-agent`；自研 Skill 随包进入 Git，无需另外安装上游 Skill。Python 环境、百炼配置、使用方式和按需检查见[手绘讲解说明](HANDDRAW_EXPLAINER.md)。
 
 ## 安装 Remotion Agent Skills
 

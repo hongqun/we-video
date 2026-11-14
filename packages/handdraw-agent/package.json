@@ -1,0 +1,24 @@
+{
+  "name": "@we-video/handdraw-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "worker": "tsx src/worker.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "deepagents": "1.16.2",
+    "@langchain/openai": "^1.0.0",
+    "@langchain/core": "^1.0.0",
+    "dotenv": "^17.0.0",
+    "langchain": "^1.0.0",
+    "zod": "^4.4.3",
+    "langsmith": "0.9.0"
+  },
+  "devDependencies": {
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "@types/node": "24.10.1"
+  }
+}

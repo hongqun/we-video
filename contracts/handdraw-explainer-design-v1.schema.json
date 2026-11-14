@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "illustrations": {
+      "minItems": 1,
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "artworkId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "box": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "parts": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,47}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "box": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1
+                    }
+                  ]
+                },
+                "cueText": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "occurrence": {
+                  "default": 1,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "box",
+                "cueText",
+                "occurrence"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "artworkId",
+          "box",
+          "parts"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "labels": {
+      "maxItems": 12,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "box": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "fontSize": {
+            "type": "number",
+            "minimum": 18,
+            "maximum": 72
+          },
+          "color": {
+            "default": "#222222",
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "cueText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "occurrence": {
+            "default": 1,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "box",
+          "fontSize",
+          "color",
+          "cueText",
+          "occurrence"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "illustrations",
+    "labels"
+  ],
+  "additionalProperties": false,
+  "$id": "handdraw-explainer-design-v1.schema.json",
+  "title": "handdraw-explainer-design-v1"
+}

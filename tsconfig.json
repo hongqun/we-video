@@ -39,6 +39,7 @@
     "node_modules",
     "skills",
     "data",
-    "packages/diagram-agent"
+    "packages/diagram-agent",
+    "packages/handdraw-agent"
   ]
 }

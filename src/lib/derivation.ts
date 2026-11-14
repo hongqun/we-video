@@ -22,7 +22,7 @@ export const preserveVisualPlanStructure = (source: Plan, translated: Plan): Pla
     if (!translatedScene || translatedScene.segmentId !== scene.segmentId) throw new Error("英文派生翻译不能改变母稿镜头顺序");
     // 普通文案和关系图文字均由路径回填；模板、时间轴及图形结构不交给模型重写。
     // 英文派生保留模板选择，但清除中文图表采用状态；工作区不跨任务复制。
-    return {...scene, diagram: undefined, previousDiagram: undefined, content: translatedScene.content, ...(scene.visualData ? {visualData: translatedScene.visualData ?? scene.visualData} : {}), ...(scene.modelScene ? {modelScene: translatedScene.modelScene ?? scene.modelScene} : {})};
+    return {...scene, diagram: undefined, previousDiagram: undefined, handdrawExplainer: undefined, previousHanddrawExplainer: undefined, content: translatedScene.content, ...(scene.visualData ? {visualData: translatedScene.visualData ?? scene.visualData} : {}), ...(scene.modelScene ? {modelScene: translatedScene.modelScene ?? scene.modelScene} : {})};
   });
   return {...source, scenes};
 };
@@ -111,7 +111,7 @@ export const prepareEnglishTask = async (parentJobId: string, targetSeriesId: st
       atomicWriteJson(path.join(childDir, "source.json"), {...source, derivedFromJobId: parentJobId, derivedFromLanguage: "zh-CN"}),
       atomicWriteJson(path.join(childDir, "translation.json"), review),
       atomicWriteJson(path.join(childDir, "translation-source.json"), {draft, visualPlan: plan, visualResources: resources}),
-      atomicWriteJson(path.join(childDir, "visual-resources.json"), {...resources, resources: resources.resources.map((resource) => ({...resource, diagram: undefined}))}),
+      atomicWriteJson(path.join(childDir, "visual-resources.json"), {...resources, resources: resources.resources.map((resource) => ({...resource, diagram: undefined, handdrawExplainer: undefined}))}),
       fs.cp(path.join(parentDir, "uploaded-images"), path.join(childDir, "uploaded-images"), {recursive: true, force: false}).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }),
       // 手绘输入与已发布缓存独立复制，派生任务不读取母任务文件。
       fs.cp(path.join(parentDir, "handdraw"), path.join(childDir, "handdraw"), {recursive: true, force: false, filter: (source) => !path.basename(source).startsWith("work-")}).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }),
@@ -285,6 +285,7 @@ export const runTranslation = async (jobId: string, action: "generate" | "confir
     const translatedContents = applyVisualTranslations(translationContents, slots, translatedSlots);
     const translatedResources = resources ? {...resources, revision: resources.revision + 1, resources: resources.resources.map((resource, index) => ({...resource,
       diagram: undefined,
+      handdrawExplainer: undefined,
       polygons: resource.polygons.map((polygon, polygonIndex) => ({...polygon, text: (translatedContents[resourceKey(index)] as {polygons: Array<{text: string}>}).polygons[polygonIndex]!.text})),
     }))} : undefined;
     const translatedCover = translatedContents.__cover__ as {content: Record<string, unknown>} | undefined;

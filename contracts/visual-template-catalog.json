@@ -3,6 +3,7 @@
   {"id":"rve/text-reveal","label":"揭示文字","description":"逐步揭示核心文字。","category":"text","requiresMedia":false,"renderer":"text-reveal","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},
   {"id":"rve/visual-image","label":"图片逐步揭示","description":"按口播时间揭示人工审核配图。","category":"media","requiresMedia":true,"resourceType":"image","renderer":"visual-image","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},
   {"id":"rve/handdraw-image","label":"手绘插画","description":"上传线稿与上色图，逐笔描线并上色。","category":"media","requiresMedia":true,"resourceType":"handdraw","renderer":"handdraw-image","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},
+  {"id":"rve/handdraw-explainer","label":"手绘讲解","description":"对话设计插画与手写文字，按口播逐笔绘制。","category":"media","requiresMedia":true,"renderer":"handdraw-explainer","minDurationMs":3000,"adapted":true,"rollRole":"b-roll"},
   {"id":"rve/3d-model-scene","label":"3D Model Scene","description":"按口播编排 GLB 模型环绕、特写与标注。","category":"media","requiresMedia":true,"resourceType":"model","renderer":"3d-model-scene","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},
   {"id":"rve/text-highlight","label":"文字重点标注","description":"按口播锚点依次高亮关键词。","category":"content","requiresMedia":false,"renderer":"text-highlight","minDurationMs":2200,"adapted":true,"rollRole":"b-roll"},
   {"id":"rve/generic-content","label":"通用内容卡","description":"承载主标题、副标题、正文和关键词。","category":"content","requiresMedia":false,"renderer":"generic-content","minDurationMs":1800,"adapted":true,"rollRole":"b-roll"},

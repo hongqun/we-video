@@ -1,0 +1,12 @@
+{
+  "source": "https://github.com/threerocks/sweety-handdraw-video",
+  "reuse": "项目中已裁剪并保留 MIT 许可的绘制模块；新编译器仅调用确定性预处理函数，不执行原视频工具链。",
+  "projectRevision": "181d252fe5a1601a1098c387f78b921f5ae9d9b8",
+  "modules": {
+    "scripts/handdraw/vendor/line_first.py": "b4e55a0d968069ad6766359e0e64eebb53a85dc55bd92d9821534aefdaa2dd55",
+    "scripts/handdraw/vendor/line_topology.py": "ce70035b1d49ba398deae95e7cc4d4385aa380bc5f5bd3088056b38bead81bb0",
+    "scripts/handdraw/vendor/stroke_paths.py": "56b2d2b018a959a9efa7c1e16c078279cc927a23c10927d2a3c101c207f96323",
+    "scripts/handdraw/choreography.py": "79af1361b0ad5c6ac29d04d1a66d6991d31f6ca7a192d8335b4a577abc777e41",
+    "scripts/handdraw/prepare.py": "ab2ecd7673abcfc9e3d33626070e3366dde6dce45f331722a46d37a199c1a245"
+  }
+}

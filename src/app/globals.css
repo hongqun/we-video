@@ -1,3 +1,30 @@
+/* 手绘讲解使用对话与预览双栏，窄屏按阅读顺序堆叠。 */
+.handdraw-explainer-overlay {position: fixed; inset: 0; z-index: 150; padding: 24px; background: #10231bb8; display: grid; place-items: center;}
+.handdraw-explainer-dialog {width: min(1440px, 100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; background: var(--panel, #fff); border-radius: 18px; overflow: hidden; box-shadow: 0 24px 90px #0005;}
+.handdraw-explainer-heading {display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #dde3df;}
+.handdraw-explainer-heading h2 {margin: 4px 0 0;}
+.handdraw-explainer-body {display: grid; grid-template-columns: minmax(300px, 1fr) minmax(360px, 1.25fr); gap: 24px; padding: 24px; overflow: auto; min-height: 0;}
+.handdraw-explainer-conversation {display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 10px;}
+.handdraw-explainer-conversation label {display: grid; gap: 8px;}
+.handdraw-explainer-messages {min-height: 120px; max-height: 40dvh; overflow: auto; display: flex; flex-direction: column; gap: 10px;}
+.handdraw-explainer-message {background: #f4f7f2; border-radius: 10px; padding: 12px 14px;}
+.handdraw-explainer-message.is-user {background: #eaf6e6;}
+.handdraw-explainer-message.is-tool {font-size: 13px; color: #60736b; padding: 8px 12px;}
+.handdraw-explainer-message p {white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0;}
+.handdraw-explainer-preview {min-width: 0; display: flex; flex-direction: column; gap: 14px; align-items: stretch;}
+.handdraw-explainer-preview-stage {min-height: 240px; background: #f0f3ed; border-radius: 12px; display: grid; place-items: center; overflow: hidden;}
+.handdraw-explainer-preview-stage > .template-preview-player {width: min(100%, 450px);}
+.handdraw-explainer-preview-stage img {display: block; width: 100%; height: auto;}
+.handdraw-explainer-preview-stage > p {padding: 30px;}
+.handdraw-explainer-playback {display: flex; align-items: center; gap: 12px;}
+.handdraw-explainer-playback input {flex: 1; min-width: 60px;}
+.handdraw-explainer-playback span {white-space: nowrap; font-size: 13px;}
+@media (max-width: 850px) {
+  .handdraw-explainer-overlay {padding: 8px;}
+  .handdraw-explainer-dialog {max-height: calc(100dvh - 16px);}
+  .handdraw-explainer-body {grid-template-columns: minmax(0, 1fr); padding: 16px;}
+}
+
 :root {
   color-scheme: light;
   --ink: #10231b;

@@ -49,6 +49,11 @@ export const splitVisualPlanScene = (scenes: readonly VisualPlanScene[], index: 
     transition: {...noneTransition},
   };
   const retained: VisualPlanScene = {...cloneVisualPlanScene(current), endMs: splitAtMs, transition: {...noneTransition}};
+  // 编排已绑定原口播窗口，拆分后两侧都需重新制作，不能拉伸旧时间图。
+  if (current.templateId === "rve/handdraw-explainer") {
+    retained.handdrawExplainer = undefined; retained.previousHanddrawExplainer = undefined;
+    inserted.handdrawExplainer = undefined; inserted.previousHanddrawExplainer = undefined;
+  }
   if (current.templateId === "rve/3d-model-scene" && current.modelScene) {
     const [left, right] = splitModelPlan(current.modelScene, current, splitAtMs, captions, fps);
     retained.modelScene = left; inserted.modelScene = right;

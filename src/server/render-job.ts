@@ -16,6 +16,7 @@ import {buildVisualImageSchedule} from "../remotion/templates/visual-image";
 import {resolveModelSceneSchedule} from "../remotion/templates/model-scene-timing";
 import {verifyHanddrawArtifacts} from "../lib/handdraw";
 import {handdrawTiming} from "../remotion/templates/handdraw-schema";
+import {verifyExplainerContext} from "../lib/handdraw-explainer/service";
 
 const VISUAL_IMAGE_WRITER = path.join(REMOTION_PUBLIC_DIR, "template-assets", "visual-image", "writer_1.svg");
 
@@ -27,6 +28,7 @@ const assertRenderPreflight = async (manifest: RenderManifest) => {
   assertNarrationFrameCoverage(spans, narrationFrames);
   await Promise.all(manifest.scenes.map(async (scene) => {
     if (!getTemplateStatus(scene).usable) throw new Error(`渲染前检查失败：${scene.id} 的模板不可用`);
+    if (scene.templateId === "rve/handdraw-explainer") await verifyExplainerContext(manifest.jobId, scene.templateData);
     if (scene.templateId === "rve/handdraw-image") {
       const data = await verifyHanddrawArtifacts(manifest.jobId, scene.templateData);
       handdrawTiming(scene, data);

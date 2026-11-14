@@ -10,6 +10,7 @@ import type {VisualPlan} from "./visual-plan";
 import {visualResourceForScene} from "./visual-resource-selection";
 import {visualImagePolygonSchema} from "@/remotion/templates/visual-image-schema";
 import {handdrawResourceSchema} from "@/remotion/templates/handdraw-schema";
+import {explainerResourceSchema} from "@/remotion/templates/handdraw-explainer-schema";
 
 // 第四步视觉资源是独立事实源；新资源按 sceneId 隔离，segmentId 只保留父口播段兼容关系。
 export const visualResourceSchema = z.object({
@@ -20,6 +21,7 @@ export const visualResourceSchema = z.object({
   imageHeight: z.number().int().positive().optional(),
   modelPath: z.string().trim().min(1).optional(),
   handdraw: handdrawResourceSchema.optional(),
+  handdrawExplainer: explainerResourceSchema.optional(),
   // 图表执行状态与已采用内容分开保存。
   diagram: diagramResourceSchema.optional(),
   polygons: z.array(visualImagePolygonSchema).default([]),

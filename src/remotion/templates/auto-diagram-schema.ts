@@ -46,64 +46,69 @@ const isLocalFontFamily = (value: string) => {
   return localFonts.has(families[0]!) && families.every((family) => fallbackFonts.has(family));
 };
 
+// 输入校验错误与运行环境异常分开，Agent 可据此修复 SVG，而不是中断整轮制图。
+export class DiagramSvgError extends Error {}
+
 // 白名单使用 XML 解析树检查，拒绝整个输入，绝不以字符串清洗后直接信任 SVG。
 export const parseDiagramSvg = (data: DiagramData) => {
   const errors: string[] = [];
-  if (/<!|<\?/u.test(data.svg)) throw new Error("SVG 不允许声明、实体、注释或处理指令");
-  const doc = new DOMParser({onError: (level, message) => {errors.push(`${level}: ${message}`);}}).parseFromString(data.svg, "image/svg+xml");
-  if (errors.length || !doc.documentElement) throw new Error(`SVG 解析失败：${errors.join("；")}`);
+  if (/<!|<\?/u.test(data.svg)) throw new DiagramSvgError("SVG 不允许声明、实体、注释或处理指令");
+  let doc;
+  try {doc = new DOMParser({onError: (level, message) => {errors.push(`${level}: ${message}`);}}).parseFromString(data.svg, "image/svg+xml");}
+  catch {throw new DiagramSvgError("SVG 解析失败，请检查标签闭合、属性引号和 XML 转义");}
+  if (errors.length || !doc.documentElement) throw new DiagramSvgError(`SVG 解析失败：${errors.join("；")}`);
   const root = doc.documentElement;
-  if (root.tagName !== "svg" || root.getAttribute("viewBox")?.trim().replace(/\s+/g, " ") !== `0 0 ${DIAGRAM_WIDTH} ${DIAGRAM_HEIGHT}`) throw new Error(`SVG 必须使用 viewBox="0 0 ${DIAGRAM_WIDTH} ${DIAGRAM_HEIGHT}"`);
-  if (root.getAttribute("xmlns") !== "http://www.w3.org/2000/svg") throw new Error("SVG 必须声明标准命名空间");
+  if (root.tagName !== "svg" || root.getAttribute("viewBox")?.trim().replace(/\s+/g, " ") !== `0 0 ${DIAGRAM_WIDTH} ${DIAGRAM_HEIGHT}`) throw new DiagramSvgError(`SVG 必须使用 viewBox="0 0 ${DIAGRAM_WIDTH} ${DIAGRAM_HEIGHT}"`);
+  if (root.getAttribute("xmlns") !== "http://www.w3.org/2000/svg") throw new DiagramSvgError("SVG 必须声明标准命名空间");
   const groups = new Set(data.bindings.map((item) => item.groupId));
-  if (groups.size !== data.bindings.length || groups.has("opening")) throw new Error("动画分组 ID 重复或占用了 opening");
+  if (groups.size !== data.bindings.length || groups.has("opening")) throw new DiagramSvgError("动画分组 ID 重复或占用了 opening");
   const ids = new Map<string, {defs: boolean; tag: string}>();
   const references: string[] = [];
   const accessibleReferences: string[] = [];
   const found = new Set<string>();
   const walk = (element: Element, owner: string | null, inDefs: boolean) => {
     const tag = element.tagName;
-    if (!tags.has(tag)) throw new Error(`不允许的 SVG 标签：${tag}`);
-    if (tag === "svg" && element !== root) throw new Error("不允许嵌套 SVG");
+    if (!tags.has(tag)) throw new DiagramSvgError(`不允许的 SVG 标签：${tag}`);
+    if (tag === "svg" && element !== root) throw new DiagramSvgError("不允许嵌套 SVG");
     const id = element.getAttribute("id");
     inDefs ||= tag === "defs";
     if (id) {
-      if (!/^[a-zA-Z][\w-]{0,63}$/u.test(id) || ids.has(id)) throw new Error(`SVG ID 无效或重复：${id}`);
+      if (!/^[a-zA-Z][\w-]{0,63}$/u.test(id) || ids.has(id)) throw new DiagramSvgError(`SVG ID 无效或重复：${id}`);
       ids.set(id, {defs: inDefs, tag});
     }
     if (id && (groups.has(id) || id === "opening")) {
-      if (tag !== "g" || owner || inDefs) throw new Error(`动画或开场分组不可嵌套：${id}`);
+      if (tag !== "g" || owner || inDefs) throw new DiagramSvgError(`动画或开场分组不可嵌套：${id}`);
       owner = id; found.add(id);
     }
-    if (!inDefs && !["svg", "g", "defs", "title", "desc"].includes(tag) && !owner) throw new Error(`可见元素 ${tag} 必须归属 opening 或唯一动画组`);
-    if (["linearGradient", "radialGradient", "stop", "marker", "clipPath"].includes(tag) && !inDefs) throw new Error(`${tag} 必须放在 defs 内`);
+    if (!inDefs && !["svg", "g", "defs", "title", "desc"].includes(tag) && !owner) throw new DiagramSvgError(`可见元素 ${tag} 必须归属 opening 或唯一动画组`);
+    if (["linearGradient", "radialGradient", "stop", "marker", "clipPath"].includes(tag) && !inDefs) throw new DiagramSvgError(`${tag} 必须放在 defs 内`);
     for (let i = 0; i < element.attributes.length; i++) {
       const attr = element.attributes.item(i)!;
-      if (attr.name === "xmlns" && (element !== root || attr.value !== "http://www.w3.org/2000/svg")) throw new Error("SVG 命名空间无效");
-      if (attr.name === "role" && attr.value !== "img") throw new Error("SVG role 只允许 img");
-      if (attr.name === "aria-hidden" && !["true", "false"].includes(attr.value)) throw new Error("aria-hidden 值无效");
+      if (attr.name === "xmlns" && (element !== root || attr.value !== "http://www.w3.org/2000/svg")) throw new DiagramSvgError("SVG 命名空间无效");
+      if (attr.name === "role" && attr.value !== "img") throw new DiagramSvgError("SVG role 只允许 img");
+      if (attr.name === "aria-hidden" && !["true", "false"].includes(attr.value)) throw new DiagramSvgError("aria-hidden 值无效");
       if (["aria-labelledby", "aria-describedby"].includes(attr.name)) {
         const targets = attr.value.trim().split(/\s+/u);
-        if (!targets.every((target) => /^[a-zA-Z][\w-]{0,63}$/u.test(target))) throw new Error("无障碍引用必须使用本地 ID");
+        if (!targets.every((target) => /^[a-zA-Z][\w-]{0,63}$/u.test(target))) throw new DiagramSvgError("无障碍引用必须使用本地 ID");
         accessibleReferences.push(...targets);
       }
-      if (!attrs.has(attr.name)) throw new Error(`不允许的 SVG 属性：${attr.name}`);
-      if ([...attr.value].some((character) => character === "\\" || character.charCodeAt(0) <= 8) || /(?:javascript:|data:|https?:|@import|expression\s*\()/iu.test(attr.name === "xmlns" ? "" : attr.value)) throw new Error(`SVG 属性包含外部或可执行内容：${attr.name}`);
+      if (!attrs.has(attr.name)) throw new DiagramSvgError(`不允许的 SVG 属性：${attr.name}`);
+      if ([...attr.value].some((character) => character === "\\" || character.charCodeAt(0) <= 8) || /(?:javascript:|data:|https?:|@import|expression\s*\()/iu.test(attr.name === "xmlns" ? "" : attr.value)) throw new DiagramSvgError(`SVG 属性包含外部或可执行内容：${attr.name}`);
       if (/url\s*\(/iu.test(attr.value)) {
-        if (!/^url\(#[a-zA-Z][\w-]{0,63}\)$/u.test(attr.value)) throw new Error("只允许本地 defs 引用");
+        if (!/^url\(#[a-zA-Z][\w-]{0,63}\)$/u.test(attr.value)) throw new DiagramSvgError("只允许本地 defs 引用");
         references.push(attr.value.slice(5, -1));
       }
-      if (attr.name === "font-family" && !isLocalFontFamily(attr.value)) throw new Error(`SVG 只能以项目本地字体 Studio Sans / Studio Serif 为首选字体，收到：${attr.value}`);
+      if (attr.name === "font-family" && !isLocalFontFamily(attr.value)) throw new DiagramSvgError(`SVG 只能以项目本地字体 Studio Sans / Studio Serif 为首选字体，收到：${attr.value}`);
     }
     for (let node = element.firstChild; node; node = node.nextSibling) {
       if (node.nodeType === 1) walk(node as Element, owner, inDefs);
-      else if (node.nodeType !== 3 || (node.nodeValue?.trim() && !["text", "tspan", "title", "desc"].includes(tag))) throw new Error("SVG 包含无效文本或节点");
+      else if (node.nodeType !== 3 || (node.nodeValue?.trim() && !["text", "tspan", "title", "desc"].includes(tag))) throw new DiagramSvgError("SVG 包含无效文本或节点");
     }
   };
   walk(root, null, false);
-  for (const id of groups) if (!found.has(id)) throw new Error(`SVG 缺少动画分组：${id}`);
-  for (const ref of references) if (!ids.get(ref)?.defs) throw new Error(`引用必须指向 defs 内的有效资源：${ref}`);
-  for (const ref of accessibleReferences) if (!ids.has(ref)) throw new Error(`无障碍引用不存在：${ref}`);
+  for (const id of groups) if (!found.has(id)) throw new DiagramSvgError(`SVG 缺少动画分组：${id}`);
+  for (const ref of references) if (!ids.get(ref)?.defs) throw new DiagramSvgError(`引用必须指向 defs 内的有效资源：${ref}`);
+  for (const ref of accessibleReferences) if (!ids.has(ref)) throw new DiagramSvgError(`无障碍引用不存在：${ref}`);
   return {doc, root};
 };
 

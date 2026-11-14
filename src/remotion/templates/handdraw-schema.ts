@@ -29,12 +29,20 @@ export const handdrawDataSchema = z.object({
   }
 });
 export const HANDDRAW_PATH_FIELDS = ["completePath", "lineLayerPath", "colorLayerPath", "lineTimePath", "colorTimePath", "motionPath", "sketchLayerPath", "sketchTimePath", "eraseTimePath"] as const;
-export const handdrawResourceSchema = z.object({
+// 不支持的缓存版本只使当前素材失效，保留上传原图以便重新处理。
+const normalizeHanddrawResource = (value: unknown) => {
+  if (!value || typeof value !== "object" || !("data" in value)) return value;
+  const data = value.data;
+  if (!data || typeof data !== "object" || !("algorithmVersion" in data) || typeof data.algorithmVersion !== "string") return value;
+  if (handdrawVersionSchema.safeParse(data.algorithmVersion).success) return value;
+  return {...value, status: "failed", data: undefined, error: `手绘缓存版本 ${data.algorithmVersion} 与当前程序不兼容，请重新处理素材；上传原图已保留`};
+};
+export const handdrawResourceSchema = z.preprocess(normalizeHanddrawResource, z.object({
   lineart: fileSchema.optional(), color: fileSchema.optional(),
   status: z.enum(["waiting", "processing", "ready", "failed"]),
   requestId: z.string().optional(), startedAt: z.string().optional(), error: z.string().optional(),
   data: handdrawDataSchema.optional(),
-}).strict();
+}).strict());
 export type HanddrawResource = z.infer<typeof handdrawResourceSchema>;
 export type HanddrawData = z.infer<typeof handdrawDataSchema>;
 // PNG 的 RGB 通道存储毫秒整数，alpha=0 表示永不显现；禁止有损编码或色彩变换。
@@ -62,7 +70,10 @@ export type HanddrawMotion = z.infer<typeof handdrawMotionSchema>;
 
 export const handdrawTemplateData = (resource: HanddrawResource | undefined, resolve: (path: string) => string): HanddrawData | undefined => {
   if (resource?.status !== "ready" || !resource.data) return undefined;
-  const data = handdrawDataSchema.parse(resource.data);
+  // 客户端可能仍持有旧响应；单个不兼容资源不能在 useMemo 中抛错导致整页崩溃。
+  const parsed = handdrawDataSchema.safeParse(resource.data);
+  if (!parsed.success) return undefined;
+  const data = parsed.data;
   return {...data, ...Object.fromEntries(HANDDRAW_PATH_FIELDS.flatMap((key) => data[key] ? [[key, resolve(data[key])]] : []))};
 };
 

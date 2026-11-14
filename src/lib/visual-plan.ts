@@ -20,6 +20,7 @@ import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing
 import {handdrawTemplateData, handdrawTiming, handdrawDataSchema} from "@/remotion/templates/handdraw-schema";
 import {adoptedDiagramSchema, diagramDataSchema, validateDiagram} from "@/remotion/templates/auto-diagram-schema";
 import {textRevealSettingsSchema} from "@/remotion/templates/text-reveal-schema";
+import {assertExplainerFrames, explainerDataSchema, resolveExplainerPaths} from "@/remotion/templates/handdraw-explainer-schema";
 
 const presenterPlanSchema = z.object({rollType: rollTypeSchema, mode: presenterModeSchema, poseId: presenterPoseIdSchema, placement: presenterPlacementSchema, framing: presenterFramingSchema.optional()}).strict();
 
@@ -37,6 +38,9 @@ export const visualPlanSceneSchema = z.object({
   // 采用内容是渲染事实源，工作区后续改动不影响它。
   diagram: adoptedDiagramSchema.optional(),
   previousDiagram: adoptedDiagramSchema.optional(),
+  // 手绘候选在独立工作区，只有采用的数据进入镜头规划和成片。
+  handdrawExplainer: explainerDataSchema.optional(),
+  previousHanddrawExplainer: explainerDataSchema.optional(),
   // 揭示文字的音效设置独立保存，不混入文案或素材资源。
   textReveal: textRevealSettingsSchema.optional(),
   presenter: presenterPlanSchema,
@@ -122,6 +126,10 @@ export const readVisualPlan = async (jobId: string, revision?: number) => {
 };
 
 const templateDataForManifest = (scene: VisualPlanScene, resources: VisualResources, allowIncompleteImage = false): Record<string, unknown> | undefined => {
+  if (scene.templateId === "rve/handdraw-explainer") {
+    if (!scene.handdrawExplainer && !allowIncompleteImage) throw new Error(`镜头 ${scene.id} 的手绘讲解尚未采用`);
+    return scene.handdrawExplainer ? resolveExplainerPaths(scene.handdrawExplainer, (relative) => `artifact://${relative}`) : undefined;
+  }
   if (scene.templateId === "rve/auto-diagram") {
     if (!scene.diagram && !allowIncompleteImage) throw new Error(`镜头 ${scene.id} 的自动图表尚未采用`);
     // 成片渲染保留编辑器保存的总览选项。
@@ -233,6 +241,7 @@ export const validateVisualPlan = (plan: VisualPlan, draft: Draft, narration: Na
     // 草稿允许保留尚待简化的手绘镜头；确认和渲染必须满足真实绘制预算。
     if (scene.templateId === "rve/handdraw-image" && !allowIncompleteImage) handdrawTiming(runtimeScenes[index]!, handdrawDataSchema.parse(runtimeScenes[index]!.templateData));
     if (scene.templateId === "rve/auto-diagram" && !allowIncompleteImage) validateDiagram(runtimeScenes[index]!, narration.captions, runtimeScenes[index]!.templateData);
+    if (scene.templateId === "rve/handdraw-explainer" && !allowIncompleteImage) assertExplainerFrames(runtimeScenes[index]!, runtimeScenes[index]!.templateData);
     if (scene.templateId === "rve/relation-graph") {
       const graph = relationGraphDataSchema.parse(scene.visualData);
       graph.nodes.forEach((node) => {
@@ -245,16 +254,37 @@ export const validateVisualPlan = (plan: VisualPlan, draft: Draft, narration: Na
   });
 };
 
-export const saveVisualPlan = async (jobId: string, input: VisualPlanSaveInput, profile: PlatformProfile) => {
+// 保存与采用共用规划文件锁，采用时的版本比较和写入必须处于同一临界区。
+const withVisualPlanWriteLock = async <T>(jobId: string, action: () => Promise<T>) => {
+  const lock = path.join(jobDir(jobId), ".visual-plan-write.lock");
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {handle = await fs.open(lock, "wx"); await handle.writeFile(String(process.pid)); break;}
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const stat = await fs.stat(lock).catch(() => null);
+      if (stat && Date.now() - stat.mtimeMs > 30000) {
+        const pid = Number(await fs.readFile(lock, "utf8").catch(() => "0"));
+        let dead = !pid;
+        try {if (pid) process.kill(pid, 0);} catch (cause) {dead = (cause as NodeJS.ErrnoException).code === "ESRCH";}
+        if (dead) await fs.unlink(lock).catch(() => undefined);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  if (!handle) throw new Error("镜头规划正在保存，请稍后重试");
+  try {return await action();} finally {await handle.close(); await fs.unlink(lock);}
+};
+
+const saveVisualPlanData = async (jobId: string, input: VisualPlanSaveInput, profile: PlatformProfile, expectedPlanVersion?: number) => {
   const parsedInput = visualPlanSaveInputSchema.parse(input);
   const [current, draft, narration, resources] = await Promise.all([readVisualPlan(jobId).catch(() => null), readDraft(jobId), readNarration(jobId), readVisualResources(jobId)]);
+  if (expectedPlanVersion !== undefined && current?.planVersion !== expectedPlanVersion) throw new Error("镜头规划已在其他窗口更新，请刷新后重新采用");
   const plan = normalizeCover(normalizeVisualPlanVisibleText(visualPlanSchema.parse({...parsedInput, planVersion: (current?.planVersion ?? 0) + 1, createdAt: new Date().toISOString()}), draft.narrationSegments), draft.title);
   validateVisualPlan(plan, draft, narration, profile, resources, {allowIncompleteImage: true});
   await fs.rm(path.join(jobDir(jobId), "visual-plans"), {recursive: true, force: true});
   await copySplitModelResources(jobId, plan.scenes, resources);
   await atomicWriteJson(currentPlanPath(jobId), plan);
-  // 删除、切换或改变上下文后终止旧请求，保留当前图形供后续修订。
-  if (current?.scenes.some((scene) => scene.templateId === "rve/auto-diagram") || plan.scenes.some((scene) => scene.templateId === "rve/auto-diagram")) await (await import("./diagram/service")).reconcileDiagramRequests(jobId, current ?? {...plan, scenes: []}, plan);
   // 未完成的拆分手绘镜头拥有自己的请求，不能依赖父镜头 worker 回写。
   const splitResources = await readVisualResources(jobId);
   for (const scene of plan.scenes) {
@@ -266,6 +296,14 @@ export const saveVisualPlan = async (jobId: string, input: VisualPlanSaveInput, 
     fs.rm(path.join(jobDir(jobId), "manifest.json"), {force: true}),
     fs.rm(path.join(jobDir(jobId), "output.mp4"), {force: true}),
   ]);
+  return {plan, current};
+};
+
+export const saveVisualPlan = async (jobId: string, input: VisualPlanSaveInput, profile: PlatformProfile, expectedPlanVersion?: number) => {
+  const {plan, current} = await withVisualPlanWriteLock(jobId, () => saveVisualPlanData(jobId, input, profile, expectedPlanVersion));
+  // 先释放规划锁，再终止各镜头请求，避免与采用操作的请求锁形成相反锁顺序。
+  if (current?.scenes.some((scene) => scene.templateId === "rve/auto-diagram") || plan.scenes.some((scene) => scene.templateId === "rve/auto-diagram")) await (await import("./diagram/service")).reconcileDiagramRequests(jobId, current ?? {...plan, scenes: []}, plan);
+  if (current?.scenes.some((scene) => scene.templateId === "rve/handdraw-explainer")) await (await import("./handdraw-explainer/service")).reconcileExplainerRequests(jobId, current, plan);
   return plan;
 };
 
@@ -283,7 +321,7 @@ export const retimeCopiedVisualPlan = async (jobId: string) => {
     const startRatio = (scene.startMs - oldStart) / (oldEnd - oldStart);
     const endRatio = (scene.endMs - oldStart) / (oldEnd - oldStart);
     // 英文派生必须以译文重新制图，不能沿用中文采用内容。
-    const retimed = {...scene, diagram: undefined, previousDiagram: undefined, startMs: Math.round(next.startMs + duration * startRatio), endMs: Math.round(next.startMs + duration * endRatio)};
+    const retimed = {...scene, diagram: undefined, previousDiagram: undefined, handdrawExplainer: undefined, previousHanddrawExplainer: undefined, startMs: Math.round(next.startMs + duration * startRatio), endMs: Math.round(next.startMs + duration * endRatio)};
     if (retimed.templateId === "rve/3d-model-scene" && retimed.modelScene) retimed.modelScene = ensureCameraBoundaries(retimed.modelScene, retimed, narration.captions);
     return retimed;
   });
@@ -302,6 +340,7 @@ export const writeVisualPreviewManifest = async (jobId: string, profile: Platfor
   }
   for (const scene of deriveScenes(plan, draft, narration, resources)) {
     if (scene.templateId === "rve/handdraw-image") await (await import("./handdraw")).verifyHanddrawArtifacts(jobId, scene.templateData);
+    if (scene.templateId === "rve/handdraw-explainer") await (await import("./handdraw-explainer/service")).verifyExplainerContext(jobId, scene.templateData, plan);
   }
   // 仅当旧任务确实引用退役姿态时才把它加入新 Manifest，不扩张新任务的人物目录。
   const usedPoseIds = new Set([plan.cover?.presenterPoseId, ...plan.scenes.map((scene) => scene.presenter.poseId)]);

@@ -29,5 +29,17 @@
     "seed": 0,
     "language_hints": ["zh"],
     "enable_aigc_tag": false
+  },
+  "handdrawAgent": {
+    "enabled": false,
+    "imageModel": "qwen-image-2.0-pro",
+    "visionModel": "qwen3-vl-plus"
+  },
+  "diagramAgent": {
+    "enabled": false,
+    "thinking": false,
+    "reasoningEffort": "low",
+    "maxTokens": 32000,
+    "timeoutMs": 600000
   }
 }

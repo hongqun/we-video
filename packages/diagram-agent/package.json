@@ -6,7 +6,7 @@
   "scripts": {
     "worker": "tsx src/worker.ts",
     "check": "tsc --noEmit",
-    "test:reliability": "node --import tsx --test src/model-retry.test.ts src/candidate-review.test.ts"
+    "test:reliability": "node --import tsx --test src/model-retry.test.ts src/candidate-review.test.ts src/tool-feedback.test.ts"
   },
   "dependencies": {
     "deepagents": "1.16.2",

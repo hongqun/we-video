@@ -7,7 +7,8 @@ import {createDeepAgent, CompositeBackend, FilesystemBackend} from "deepagents";
 import {ChatOpenAI} from "@langchain/openai";
 import {tool} from "@langchain/core/tools";
 import {awaitAllCallbacks} from "@langchain/core/callbacks/promises";
-import type {BaseMessage} from "@langchain/core/messages";
+import {ToolMessage, type BaseMessage} from "@langchain/core/messages";
+import {diagramInputFeedback} from "./tool-feedback";
 import {GraphRecursionError} from "@langchain/langgraph";
 import {createMiddleware} from "langchain";
 import {SqliteSaver} from "@langchain/langgraph-checkpoint-sqlite";
@@ -18,7 +19,7 @@ import {getLangchainCallbacks} from "langsmith/langchain";
 import {XMLSerializer} from "@xmldom/xmldom";
 import {currentDiagramTurn, diagramAssistantText, diagramGraphRecursionLimit, diagramUserRequest} from "./model-context";
 import {diagramCompletionBody} from "./model-request";
-import {DiagramModelError, DiagramStreamBoundary, retryDiagramModel} from "./model-retry";
+import {DiagramModelError, DiagramStreamBoundary, diagramOutputWasTruncated, retryDiagramModel} from "./model-retry";
 import {assertDiagramCandidateReady} from "./candidate-review";
 import {loadDiagramContext} from "../../../src/lib/diagram/context";
 import {diagramSettings} from "../../../src/lib/diagram/settings";
@@ -28,7 +29,7 @@ import {syncDiagramResource} from "../../../src/lib/diagram/service";
 import {inspectDiagram, DiagramInspectionError, type DiagramInspection} from "../../../src/lib/diagram/geometry";
 import {DiagramSaveBudget, diagramCandidateHash, diagramPatchSchema, patchDiagram} from "../../../src/lib/diagram/candidate";
 import {compactDiagramReport, validateDiagramCandidate, type DiagramValidationReport} from "../../../src/lib/diagram/validation";
-import {diagramDataSchema, parseDiagramSvg, type DiagramData} from "../../../src/remotion/templates/auto-diagram-schema";
+import {diagramDataSchema, parseDiagramSvg, DiagramSvgError, type DiagramData} from "../../../src/remotion/templates/auto-diagram-schema";
 import {diagramTypeCatalog} from "../../../src/remotion/diagram-types";
 
 // 独立进程始终从项目根目录读取配置；不创建包级 .env 或密钥快照。
@@ -52,6 +53,11 @@ const diagnostics = {requestId, category: "starting", candidateHash: undefined a
 
 // 只读 backend 分别映射视频契约与独立安装的 Skill，不暴露整个项目或其他 Skill。
 class ReadOnlySkills extends FilesystemBackend {
+  // 契约和 Skill 保持完整；长篇类型资料与示例分段读取，避免一次塞入多套完整规范。
+  override async read(filePath: string, offset = 0, limit = 200) {
+    const paged = /\/(?:references|assets)\//u.test(filePath);
+    return super.read(filePath, offset, paged ? Math.min(limit, 180) : limit);
+  }
   override async write() {return {error: "设计资料只读，请使用 save_diagram 保存图表"};}
   override async edit() {return {error: "设计资料只读"};}
   override async uploadFiles(files: Array<[string, Uint8Array]>) {return files.map(([filePath]) => ({path: filePath, error: "permission_denied" as const}));}
@@ -86,6 +92,7 @@ const main = async () => {
   const budget = new DiagramSaveBudget(settings.maxSaves);
   let calls = 0, modelStreamStarted = false;
   let previousSaveErrors = new Set<string>();
+  let lastInputFailure = "";
   // 流式文本和工具进度共用写入队列，避免并发覆盖同一会话文件。
   let sessionWrites = Promise.resolve();
   const mutateSession = (change: (latest: Awaited<ReturnType<typeof readDiagramSession>>) => Awaited<ReturnType<typeof readDiagramSession>>, sync = false) => {
@@ -109,7 +116,7 @@ const main = async () => {
   let checked: {key: string; report: DiagramValidationReport} | undefined;
   const checkCurrent = async () => {
     const candidate = await readDiagramCandidate(jobId, sceneId);
-    if (!candidate) throw new DiagramExecutionError("尚未提交 SVG，请先保存图表");
+    if (!candidate) throw new DiagramExecutionError(lastInputFailure || "尚未提交 SVG，请先保存图表");
     const key = candidateKey(candidate.data, candidate.loopEvidence);
     let report: DiagramValidationReport;
     try {
@@ -154,6 +161,7 @@ const main = async () => {
     }
     await update(changed ? `制图与修复 ${budget.attempts}/${settings.maxSaves}` : "内容未变化，复用校验结果");
     const report = await checkCurrent();
+    lastInputFailure = "";
     const unchangedErrors = report.errors.filter((error) => previousSaveErrors.has(error));
     previousSaveErrors = new Set(report.errors);
     const feedback = {...report, duplicate: !changed, attempts: budget.attempts, remainingSaves: settings.maxSaves - budget.attempts, ...(unchangedErrors.length ? {unchangedErrors, repairInstruction: "相同问题仍未修复。请使用 patch_diagram，按 repairs.groupId 替换实际路径、调整文字或更新绑定；仅表达包含关系的多余连线应移除。不要重交整张未改变的 SVG。"} : {})};
@@ -180,8 +188,8 @@ const main = async () => {
     }, {name: "save_diagram", description: `保存当前 SVG 与口播绑定并执行安全、时间和浏览器几何校验。本轮最多 ${settings.maxSaves} 次保存（含首次），失败时按 repairs 与 unchangedErrors 修复。`, schema: diagramDataSchema.extend({loopEvidence: z.string().trim().min(1).max(500).optional().describe("仅 loop 必填：引用口播中明确返回前序步骤或重复执行的原文")})}),
     tool(async (input) => {
       const candidate = await readDiagramCandidate(jobId, sceneId);
-      if (!candidate) throw new Error("尚无图表，请先 save_diagram");
-      if (candidate.fingerprint !== context.fingerprint) throw new Error("候选上下文已过期，请用 save_diagram 重新制图");
+      if (!candidate) throw new DiagramSvgError("尚无图表，请先 save_diagram");
+      if (candidate.fingerprint !== context.fingerprint) throw new DiagramExecutionError("候选上下文已过期，请用 save_diagram 重新制图");
       return saveCandidate(patchDiagram(candidate.data, candidate.loopEvidence, input), candidate.loopEvidence);
     }, {name: "patch_diagram", description: "优先用于修复：baseHash 使用最新 candidateHash/hash；replace_group 提交相同 ID 的单个完整 g；update_binding 只提交要改的字段；remove_group 同时清理 SVG、binding 和 after 引用。补丁原子应用并完整校验，与 save_diagram 共用保存预算。", schema: diagramPatchSchema}),
     tool(async () => {await update("校验当前 SVG 与绑定"); return checkCurrent();}, {name: "validate_diagram", description: "对当前图表重新执行白名单、依赖、口播和浏览器几何检查。", schema: z.object({})}),
@@ -218,14 +226,22 @@ const main = async () => {
       if (modelFailure) throw modelFailure;
       if (inspectionFailure) throw inspectionFailure;
       if (controller.signal.aborted) throw new DiagramExecutionError("图表请求已取消或超时");
-      return handler(request);
+      try {return await handler(request);}
+      catch (error) {
+        const feedback = diagramInputFeedback(error);
+        if (!feedback) throw error;
+        // 安全检查仍拒绝整个输入；只把修复建议送回模型，不写入候选、不扣保存次数。
+        lastInputFailure = feedback.errors.join("；");
+        await update("图表输入校验未通过，等待修正", JSON.stringify(feedback));
+        return new ToolMessage({tool_call_id: request.toolCall.id ?? "", name: request.toolCall.name, content: JSON.stringify(feedback)});
+      }
     });
     candidateTasks = pending.then(() => undefined, () => undefined);
     return pending;
   }, wrapModelCall: async (request, handler) => {
     modelStreamStarted = false;
     completionMessages = currentDiagramTurn(request.messages);
-    try {return await retryDiagramModel(() => handler({...request, messages: completionMessages, tools: request.tools.filter((item) => typeof item.name === "string" && allowed.has(item.name))}), {
+    try {const response = await retryDiagramModel(() => handler({...request, messages: completionMessages, tools: request.tools.filter((item) => typeof item.name === "string" && allowed.has(item.name))}), {
       signal: controller.signal, deadline, hasStreamed: () => modelStreamStarted,
       assertActive: async () => {await assertDiagramRequest(jobId, sceneId, requestId);},
       onRetry: async () => {
@@ -233,7 +249,11 @@ const main = async () => {
         if (calls > settings.maxSteps) {executionFailure = new DiagramExecutionError(`图表模型与工具调用达到 ${settings.maxSteps} 次预算`); throw executionFailure;}
         await update("模型连接暂时失败，正在重试本次模型调用（1/1）");
       },
-    });} catch (error) {
+    });
+      // 回调同步捕获的截断优先于后续工具执行，半截 SVG 绝不进入保存流程。
+      if (modelFailure) throw modelFailure;
+      return response;
+    } catch (error) {
       // 框架可能包装中间件异常；保存筛选后的模型停止原因，避免再次变成通用报错。
       if (error instanceof DiagramModelError) modelFailure = error;
       throw error;
@@ -250,9 +270,11 @@ const main = async () => {
   }});
   saver = SqliteSaver.fromConnString(path.join(diagramDirectory(jobId, sceneId), "checkpoints.sqlite"));
   // 根配置控制思考模式；发送时保留多轮工具思考，并将截图移至兼容的图像消息。
-  const model = new ChatOpenAI({model: settings.model, apiKey: settings.apiKey, configuration: {baseURL: settings.baseURL, fetch: (input, init) => fetch(input, typeof init?.body === "string" ? {...init, body: diagramCompletionBody(init.body, completionMessages)} : init)}, modelKwargs: {thinking: {type: settings.thinking ? "enabled" : "disabled"}}, ...(settings.thinking ? {} : {temperature: 0.3}), streaming: true, maxTokens: settings.maxTokens, maxRetries: 0, timeout: settings.timeoutMs,
+  const model = new ChatOpenAI({model: settings.model, apiKey: settings.apiKey, configuration: {baseURL: settings.baseURL, fetch: (input, init) => fetch(input, typeof init?.body === "string" ? {...init, body: diagramCompletionBody(init.body, completionMessages)} : init)}, modelKwargs: {thinking: {type: settings.thinking ? "enabled" : "disabled"}}, ...(settings.thinking ? {reasoningEffort: settings.reasoningEffort} : {temperature: 0.3}), streaming: true, maxTokens: settings.maxTokens, maxRetries: 0, timeout: settings.timeoutMs,
     // 必须同步标记含工具参数的空文本片段，防止中断后误判为尚未开始流式输出。
-    callbacks: [new DiagramStreamBoundary(() => {modelStreamStarted = true;})],
+    callbacks: [new DiagramStreamBoundary(() => {modelStreamStarted = true;}, (output) => {
+      if (diagramOutputWasTruncated(output)) modelFailure = new DiagramModelError("model_output_limit", settings.maxTokens);
+    })],
   });
   // 模型路由与保存工具枚举、资源预检共用目录；只发送所选类型的具体资料。
   const typeRouting = diagramTypeCatalog.map(({id, label, reference, example}) => `${id}（${label}） → ${diagramSkillVirtualPath}${reference}；${diagramSkillVirtualPath}${example}`).join("\n");
@@ -261,11 +283,12 @@ const main = async () => {
 严格遵守视频适配契约。先 get_scene_context；修改已有图时先 read_current_diagram。本轮上下文是事实源，用户历史偏好按最新要求覆盖。
 支持以下 45 种主类型，使用目录中的原始标识；根据语义选择一种，变体归属主类型，首次生成与修改都必须读取对应参考和示例：
 ${typeRouting}
-按以下顺序设计：提取镜头上下文与用户指令中的事实及关系 → 明确观众通过图要理解的问题 → 根据核心关系选择图型并设计完整静态图 → 按口播安排分组显现与绑定。涉及行为、状态、约束或风险时，先读取 /skills/diagram-design/references/semantic-patterns.md 选择匹配的语义模式，再选择主图型；无匹配模式时按核心关系直接选型。最多读取两种候选的类型参考与示例作比较，不要逐类遍历。
+按以下顺序设计：提取镜头上下文与用户指令中的事实及关系 → 明确观众通过图要理解的问题 → 根据核心关系选择图型并设计完整静态图 → 按口播安排分组显现与绑定。涉及行为、状态、约束或风险时，先读取 /skills/diagram-design/references/semantic-patterns.md 选择匹配的语义模式，再选择主图型；无匹配模式时按核心关系直接选型。最多比较两种候选的类型参考，静态示例只读最终选定图型的一份。参考与示例每页最多180行，按目录定位布局、SVG和必要规则，不展开与本镜头无关的参数组合，不从头复述HTML/CSS。读完选型所需资料后立即完成一份简洁SVG并 save_diagram，后续按校验问题补读和修复，不把全部上下文耗在反复比较方案。
 “先、再、接着、最后”只说明讲述顺序，不能单独作为流程关系或 flowchart 的选型依据。分层、包含、交叠、因果、比较和真实流程按各自关系选型，不逐句拆成节点并添加无依据箭头；真实流程或决策分支可使用 flowchart，不为追求图型多样性牺牲准确性。语义地图表达定性接近关系而没有数值时使用概念区域或嵌套关系，不虚构散点坐标；所需数据缺失且无法忠实表达时说明缺少什么。
 “环环相扣”不构成 loop 依据。loop 必须提交 loopEvidence 引用明确返回或重复的口播；循环证据不足时重新判断关系并选择合适图型，不指定替代图型。
 只使用镜头上下文及用户指令提供的事实与数值。定量图缺少必要数据时说明缺少什么，不得编造数据、比例或精度。轴测图以静态 SVG 投影表达，不使用 3D 运行时。
 安全区约束包含区域标题和标签的实际文字边界，text 的 y 是基线，顶部必须为字高预留空间。保存失败时用返回的 measurements、boundary、edgeEndpoints 和 safeArea 精确修正。区域包含已有节点时通常无需再画指向容器内部的箭头；确有有向关系时终点须接触目标主形状边界，修改依赖 ID 不能代替修改路径坐标。
+SVG 不支持 pattern/filter/style/use；上游示例里的纹理不要照搬，背景使用 opening 中的纯色 rect，必要网格用少量 line/path。输入错误会返回 recoverable 和 repairs，按提示修正后继续提交，不能仅复述报错或宣称已保存。
 SVG 只能包含 svg/g/defs/path/rect/circle/ellipse/line/polyline/polygon/text/tspan/linearGradient/radialGradient/stop/marker/clipPath/title/desc。viewBox="0 0 960 800"，使用本地 Studio Sans / Studio Serif，中文至少 12px。
 每个可见元素归属 opening 或唯一绑定 g，分组不嵌套。每个绑定含 groupId、name、cueText、occurrence、after、kind。kind：node 为实体节点；edge 为有向边；region 为允许包含或重叠的区域；mark 为图表数据标记或投影；label 为独立文字；connector 为无向连接。edge 与 connector 的 after 均须包含两个不同的 node/region/mark 端点，触发词不得早于任何依赖；目标区域的讲述比连线更晚时，将连线触发词改为目标出现时或更后的原文，不删除真实依赖。节点文字在节点主形状内；图表外部标签用 label。有意重叠的区域或数据系列不可标为 node。最多 40 个绑定，按口播语义分组多枚数据标记。
 保存前简短说明图要解释的问题、核心关系、所选图型（及适用的语义模式）与布局；完成静态图设计和口播绑定后再 save_diagram，本轮最多 ${settings.maxSaves} 次真正修改（含首次）；save_diagram 和 patch_diagram 共用预算。修复优先 patch_diagram({baseHash: 最新 candidateHash, operations:[...]})，不要重发整张 SVG。replace_group 使用相同 ID 的单个完整 g；update_binding 只提交变化字段；remove_group 自动删除分组、binding 和其他 after 对它的引用。需要查看失败分组时用 read_current_diagram({groupIds:[...]})。重复提交不会扣保存预算，但仍消耗工具步数。
@@ -301,7 +324,7 @@ SVG 只能包含 svg/g/defs/path/rect/circle/ellipse/line/polyline/polygon/text/
   if (modelFailure) throw modelFailure;
   // 截断响应不能视作正常完成，也不能用通用连接错误掩盖实际原因。
   const finalMessage = (result as unknown as {messages?: Array<{response_metadata?: {finish_reason?: string}}>}).messages?.at(-1);
-  if (finalMessage?.response_metadata?.finish_reason === "length") throw new DiagramExecutionError(`模型输出达到 ${settings.maxTokens} token 上限，图表未完成，请重试或提高 diagramAgent.maxTokens`);
+  if (finalMessage?.response_metadata?.finish_reason === "length") throw (modelFailure = new DiagramModelError("model_output_limit", settings.maxTokens));
   await checkCurrent();
   const candidate = await readDiagramCandidate(jobId, sceneId);
   try {assertDiagramCandidateReady(candidate, {requestId, fingerprint: context.fingerprint, reviewedHash: reviewedKey, saves: budget.attempts, maxSaves: settings.maxSaves});}
@@ -332,9 +355,10 @@ const traceClient = new Client();
 const tracedRequest = traceable(async () => {
   try {return await main();}
   catch (error: unknown) {
-    diagnostics.category = timedOut ? "timeout" : inspectionFailure ? "inspection_failed" : modelFailure?.category ?? (executionFailure ? "budget_exhausted" : error instanceof GraphRecursionError ? "graph_limit" : error instanceof DiagramExecutionError ? "validation_failed" : "execution_failed");
+    const inputFailure = diagramInputFeedback(error);
+    diagnostics.category = timedOut ? "timeout" : inspectionFailure ? "inspection_failed" : modelFailure?.category ?? (executionFailure ? "budget_exhausted" : error instanceof GraphRecursionError ? "graph_limit" : error instanceof DiagramExecutionError || inputFailure ? "validation_failed" : "execution_failed");
     // 仅公开已知执行故障，不把含请求配置的 SDK 原始异常写入界面或追踪。
-    const message = timedOut ? "Agent 执行超时，请重试" : inspectionFailure?.message ?? executionFailure?.message ?? modelFailure?.message ?? (error instanceof DiagramExecutionError || error instanceof DiagramModelError ? error.message : error instanceof GraphRecursionError ? "图表内部执行步数达到上限，请缩小本轮修改范围后重试" : "Agent 运行失败，请检查模型连接、独立依赖和 diagram-design 安装后重试");
+    const message = timedOut ? "Agent 执行超时，请重试" : inspectionFailure?.message ?? executionFailure?.message ?? modelFailure?.message ?? (error instanceof DiagramExecutionError || error instanceof DiagramModelError ? error.message : error instanceof GraphRecursionError ? "图表内部执行步数达到上限，请缩小本轮修改范围后重试" : inputFailure?.errors.join("；") ?? "Agent 运行失败，请检查模型连接、独立依赖和 diagram-design 安装后重试");
     await fail(message);
     // 上传经过筛选的业务诊断，不将 SDK 配置或请求头写入根追踪错误。
     throw new DiagramExecutionError(message);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {DiagramModelError, DiagramStreamBoundary, diagramTransientFailure, retryDiagramModel} from "./model-retry";
+import {DiagramModelError, DiagramStreamBoundary, diagramOutputWasTruncated, diagramTransientFailure, retryDiagramModel} from "./model-retry";
 
 // 全部使用本地假调用，验证连接恢复不会重新执行模型调用之前已完成的工具。
 test("连接恢复只重试当前模型，保留已经完成的工具结果", async () => {
@@ -77,4 +77,28 @@ test("重试等待中的取消和不足的剩余时间不发第二次请求", as
     }), (error: unknown) => error instanceof DiagramModelError && error.category === (cancel ? "model_deadline" : "model_connection"));
     assert.equal(calls, 1); assert.equal(retries, cancel ? 1 : 0);
   }
+});
+
+// 复现只在 generationInfo 中返回 length、正文为空的实际失败响应。
+test("SDK 结束回调捕获纯思考截断，不依赖最终消息元数据", () => {
+  const output = {generations: [[{text: "", generationInfo: {finish_reason: "length"}}]]};
+  assert.equal(diagramOutputWasTruncated(output), true);
+  assert.equal(diagramOutputWasTruncated({generations: [[{text: "", generationInfo: {finish_reason: "tool_calls"}}]]}), false);
+  let failure: DiagramModelError | undefined;
+  const boundary = new DiagramStreamBoundary(() => {}, (result) => {
+    if (diagramOutputWasTruncated(result)) failure = new DiagramModelError("model_output_limit", 12000);
+  });
+  boundary.handleLLMEnd(output);
+  assert.equal(failure?.category, "model_output_limit");
+  assert.match(failure!.message, /12000/u);
+  assert.match(failure!.message, /reasoningEffort/u);
+});
+test("截断不被包装成流中断，也不自动重试模型", async () => {
+  const failure = new DiagramModelError("model_output_limit", 12000);
+  let calls = 0;
+  await assert.rejects(retryDiagramModel(() => {calls++; throw failure;}, {
+    signal: new AbortController().signal, deadline: Date.now() + 10000, hasStreamed: () => true,
+    assertActive: async () => {}, onRetry: async () => assert.fail("截断不能自动重新请求"),
+  }), (error: unknown) => error === failure);
+  assert.equal(calls, 1);
 });

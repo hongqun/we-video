@@ -35,12 +35,14 @@ export const TemplatePreview: React.FC<{scene: VideoScene; brand: RenderManifest
   const isModel = scene.templateId === "rve/3d-model-scene";
   // 自动图表保留绝对字幕与帧边界，避免预览重定位改变触发时间。
   const isDiagram = scene.templateId === "rve/auto-diagram";
+  // 手绘图层已按绝对帧边界编译，预览保留原镜头起点。
+  const isExplainer = scene.templateId === "rve/handdraw-explainer";
   // 编辑时直接使用图表画布，避免成片版式把 SVG 再缩小一层。
   const focusDiagram = isDiagram && diagramOnly;
   const compositionWidth = focusDiagram ? 960 : 1080;
   const compositionHeight = focusDiagram ? 800 : 1260;
-  const absoluteTiming = isModel || isDiagram;
-  const durationInFrames = absoluteTiming ? sceneFrameSpan(scene, 30).durationInFrames : Math.max(1, Math.ceil(durationMs / 1000 * 30));
+  const absoluteTiming = isModel || isDiagram || isExplainer;
+  const durationInFrames = isExplainer && typeof scene.templateData?.durationInFrames === "number" ? scene.templateData.durationInFrames : absoluteTiming ? sceneFrameSpan(scene, 30).durationInFrames : Math.max(1, Math.ceil(durationMs / 1000 * 30));
   const previewCaptions = captions.filter((caption) => caption.endMs > sceneStartMs && caption.startMs < sceneEndMs).map((caption) => ({...caption, startMs: Math.max(0, caption.startMs - sceneStartMs), endMs: Math.min(durationMs, caption.endMs - sceneStartMs), timestampMs: caption.timestampMs === null ? null : Math.max(0, caption.timestampMs - sceneStartMs)})).filter((caption) => caption.endMs > caption.startMs);
   const previewScene: VideoScene = {...scene, id: `template-preview-${scene.templateId}`, startMs: 0, endMs: durationMs, speechStartMs: previewCaptions[0]?.startMs, speechEndMs: previewCaptions.at(-1)?.endMs, pauseAfterMs: undefined, transition: PREVIEW_TRANSITION};
 
@@ -48,12 +50,12 @@ export const TemplatePreview: React.FC<{scene: VideoScene; brand: RenderManifest
     const handle = requestAnimationFrame(() => {
       const player = playerRef.current;
       if (!player) return;
-      const relativeFrame = isModel ? localModelFrame((audioRef?.current?.currentTime ?? 0) * 1000, scene, 30) : isDiagram ? Math.round((audioRef?.current?.currentTime ?? 0) * 30) - sceneFrameSpan(scene, 30).from : Math.ceil((((audioRef?.current?.currentTime ?? 0) * 1000 - sceneStartMs) / 1000) * 30);
+      const relativeFrame = isModel ? localModelFrame((audioRef?.current?.currentTime ?? 0) * 1000, scene, 30) : isDiagram || isExplainer ? Math.round((audioRef?.current?.currentTime ?? 0) * 30) - sceneFrameSpan(scene, 30).from : Math.ceil((((audioRef?.current?.currentTime ?? 0) * 1000 - sceneStartMs) / 1000) * 30);
       player.seekTo(Math.max(0, Math.min(durationInFrames - 1, relativeFrame)));
       if (playing) void player.play(); else player.pause();
     });
     return () => cancelAnimationFrame(handle);
-  }, [audioRef, durationInFrames, playerRef, playing, scene, sceneStartMs, isModel, isDiagram, focusDiagram]);
+  }, [audioRef, durationInFrames, playerRef, playing, scene, sceneStartMs, isModel, isDiagram, isExplainer, focusDiagram]);
 
   return <div className="template-preview-player">
     {/* 第四步口播由外部 audio 播放；单镜 Player 固定独立音量，确保模板内音效不受全局静音记录影响。 */}

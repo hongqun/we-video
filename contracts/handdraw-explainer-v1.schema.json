@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "compilerVersion": {
+      "type": "string",
+      "const": "explainer-1"
+    },
+    "contextFingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "cacheKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sceneId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9-]+$"
+    },
+    "sceneStartMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "sceneEndMs": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "width": {
+      "type": "number",
+      "const": 960
+    },
+    "height": {
+      "type": "number",
+      "const": 800
+    },
+    "fps": {
+      "type": "number",
+      "const": 30
+    },
+    "durationInFrames": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "layers": {
+      "minItems": 1,
+      "maxItems": 60,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,96}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "illustration",
+              "text"
+            ]
+          },
+          "box": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "width": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1600
+          },
+          "height": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1600
+          },
+          "startFrame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "endFrame": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "durationMs": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 600000
+          },
+          "linePath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "colorPath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lineTimePath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "colorTimePath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "motionPath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hashes": {
+            "type": "object",
+            "properties": {
+              "linePath": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "colorPath": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "lineTimePath": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "colorTimePath": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "motionPath": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "linePath",
+              "colorPath",
+              "lineTimePath",
+              "colorTimePath",
+              "motionPath"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "box",
+          "width",
+          "height",
+          "startFrame",
+          "endFrame",
+          "durationMs",
+          "linePath",
+          "colorPath",
+          "lineTimePath",
+          "colorTimePath",
+          "motionPath",
+          "hashes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "completePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completeHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "compilerVersion",
+    "contextFingerprint",
+    "cacheKey",
+    "sceneId",
+    "sceneStartMs",
+    "sceneEndMs",
+    "width",
+    "height",
+    "fps",
+    "durationInFrames",
+    "layers",
+    "completePath",
+    "completeHash"
+  ],
+  "additionalProperties": false,
+  "$id": "handdraw-explainer-v1.schema.json",
+  "title": "handdraw-explainer-v1"
+}

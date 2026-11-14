@@ -8,5 +8,7 @@ export async function register() {
     // 重启后保留图表文件，但不续跑已经消失的执行进程。
     const {recoverDiagramRequests} = await import("@/lib/diagram/service");
     await recoverDiagramRequests().catch(() => undefined);
+    const {recoverExplainerRequests} = await import("@/lib/handdraw-explainer/service");
+    await recoverExplainerRequests().catch(() => undefined);
   }
 }

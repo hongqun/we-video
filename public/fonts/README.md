@@ -2,6 +2,8 @@
 
 These font files are vendored for deterministic Remotion preview and rendering.
 
+- `ZCOOLKuaiLe-Regular.ttf`: ZCOOL KuaiLe handwritten display face used by handdraw explainer labels. Chinese stroke data guides path order; the final glyph outline always comes from this font. License: `OFL-ZCOOL-KuaiLe.txt`.
+
 - `NotoSansSC-Variable.woff2`: full Google Fonts `NotoSansSC[wght].ttf` converted losslessly to WOFF2
   - SHA-256: `2ce98082854b9bed7ebff709539f2c19eca637e6b6cd679b5195ede0d4094345`
 - `NotoSerifSC-Variable.woff2`: full Google Fonts `NotoSerifSC[wght].ttf` converted losslessly to WOFF2

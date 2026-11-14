@@ -29,9 +29,11 @@ import {resolveModelSceneSchedule} from "@/remotion/templates/model-scene-timing
 import {validateDiagram} from "@/remotion/templates/auto-diagram-schema";
 import {sceneFrameSpan} from "@/remotion/timeline";
 import {textRevealSoundEnabled} from "@/remotion/templates/text-reveal-schema";
+import {resolveExplainerPaths} from "@/remotion/templates/handdraw-explainer-schema";
 
 const TemplatePreview = dynamic(() => import("./TemplatePreview").then(({TemplatePreview: Component}) => Component), {ssr: false});
 const AutoDiagramEditor = dynamic(() => import("./AutoDiagramEditor").then((module) => module.AutoDiagramEditor), {ssr: false});
+const HanddrawExplainerEditor = dynamic(() => import("./HanddrawExplainerEditor").then((module) => module.HanddrawExplainerEditor), {ssr: false});
 const RelationGraphEditor = dynamic(() => import("./RelationGraphEditor").then(({RelationGraphEditor: Component}) => Component), {ssr: false});
 const ModelSceneEditor = dynamic(() => import("./ModelSceneEditor").then(({ModelSceneEditor: Component}) => Component), {ssr: false});
 type SpokenSegment = {id: string; spokenText: string};
@@ -92,6 +94,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
   const incomingPlan = useRef(JSON.stringify(plan));
   const [selected, setSelected] = useState(0);
   const [diagramEditorOpen, setDiagramEditorOpen] = useState(false);
+  const [explainerEditorOpen, setExplainerEditorOpen] = useState(false);
   const [relationEditorOpen, setRelationEditorOpen] = useState(false);
   const [relationEditorMaximized, setRelationEditorMaximized] = useState(false);
   const [time, setTime] = useState(0);
@@ -183,6 +186,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       ? {imagePath, imageWidth: sceneResource.imageWidth, imageHeight: sceneResource.imageHeight, polygons: sceneResource.polygons}
       : scene.templateId === "rve/3d-model-scene" && modelPath && scene.modelScene ? {modelPath, ...scene.modelScene}
       : scene.templateId === "rve/handdraw-image" ? handdrawTemplateData(sceneResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
+      : scene.templateId === "rve/handdraw-explainer" && scene.handdrawExplainer ? resolveExplainerPaths(scene.handdrawExplainer, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
       : scene.templateId === "rve/auto-diagram" && scene.diagram ? {type: scene.diagram.type, svg: scene.diagram.svg, bindings: scene.diagram.bindings, showFullDiagramFirst: scene.diagram.showFullDiagramFirst}
       : scene.templateId === "rve/relation-graph" ? scene.visualData
       // 与清单构建保持一致，让音效开关即时作用于当前预览。
@@ -238,6 +242,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     if (definition && !isTemplateAvailableForProfile(definition, profile)) return `第 ${index + 1} 个镜头：当前账号或专题不可用`;
     const status = previewStatus(scene);
     if (scene.templateId === "rve/auto-diagram" && visualResourceForScene(visualResources, value.scenes[index]!.id, scene.segmentId)?.diagram?.status === "stale") return `第 ${index + 1} 个镜头：图表上下文已过期，请重新制图并采用`;
+    if (scene.templateId === "rve/handdraw-explainer" && visualResourceForScene(visualResources, value.scenes[index]!.id, scene.segmentId)?.handdrawExplainer?.status === "stale") return `第 ${index + 1} 个镜头：手绘讲解已过期，请重新制作并采用`;
     if (status.usable && scene.templateId === "rve/3d-model-scene") {
       try { resolveModelSceneSchedule(scene, captions, scene.templateData); }
       catch (error) { return `第 ${index + 1} 个镜头：${error instanceof Error ? error.message : "口播绑定无效"}`; }
@@ -378,7 +383,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     const target = value.scenes[selectedRef.current];
     if (!target) return;
     const span = sceneFrameSpan(target, 30);
-    const frame = target.templateId === "rve/auto-diagram" || target.templateId === "rve/3d-model-scene"
+    const frame = target.templateId === "rve/auto-diagram" || target.templateId === "rve/3d-model-scene" || target.templateId === "rve/handdraw-explainer"
       ? Math.round(timeMs * 30 / 1000) - span.from
       : Math.ceil((timeMs - target.startMs) * 30 / 1000);
     previewPlayer.current?.seekTo(Math.max(0, Math.min(span.durationInFrames - 1, frame)));
@@ -474,6 +479,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
       ? {imagePath: candidateImagePath, imageWidth: candidateResource.imageWidth, imageHeight: candidateResource.imageHeight, polygons: candidateResource.polygons}
       : definition.id === "rve/3d-model-scene" && candidateModelPath ? {modelPath: candidateModelPath, ...(current.modelScene ?? freshCameraPlan(current))}
       : definition.id === "rve/handdraw-image" ? handdrawTemplateData(candidateResource?.handdraw, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
+      : definition.id === "rve/handdraw-explainer" && current.handdrawExplainer ? resolveExplainerPaths(current.handdrawExplainer, (relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision))
       : definition.id === "rve/auto-diagram" && current.diagram ? {type: current.diagram.type, svg: current.diagram.svg, bindings: current.diagram.bindings, showFullDiagramFirst: current.diagram.showFullDiagramFirst}
       : definition.id === "rve/relation-graph" ? current.visualData ?? buildRelationGraphFromKeywords(current.content.keywords) : undefined;
     const candidatePresenter = definition.rollRole === "a-roll"
@@ -482,7 +488,7 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
     // 预览场景使用扁平的人物字段，不能把 VisualPlan 的 presenter 对象直接塞进来。
     const candidate = runtimeScene ? {...runtimeScene, templateId: definition.id, rollType: candidatePresenter.rollType, presenterMode: candidatePresenter.mode, presenterPlacement: candidatePresenter.placement, presenterFraming: candidatePresenter.framing, ...(candidateTemplateData ? {templateData: candidateTemplateData} : {templateData: undefined})} : null;
     const status = !isTemplateAvailableForProfile(definition, profile) ? {usable: false, reason: "当前账号或专题不可用"} : candidate ? getTemplateStatus(candidate) : {usable: false, reason: "缺少时间轴"};
-    const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image" || definition.id === "rve/auto-diagram";
+    const canSelectPendingMedia = (definition.id === "rve/visual-image" && status.reason === "缺少完整图片资源") || definition.id === "rve/3d-model-scene" || definition.id === "rve/handdraw-image" || definition.id === "rve/auto-diagram" || definition.id === "rve/handdraw-explainer";
     return {definition, candidatePresenter, status, canSelectPendingMedia};
   }) : [];
   const selectedTemplateOption = templateOptions.find((option) => option.definition.id === current?.templateId);
@@ -572,6 +578,9 @@ export const VisualPlanWorkspace: React.FC<{jobId: string; title: string; plan: 
           </div>
         </details>
         {/* 打开 Agent 前保存本地规划，服务端上下文以已保存镜头为准。 */}
+        {/* 手绘讲解独立对话设计，采用后与主工作区共享同一份 Remotion 数据。 */}
+        {current.templateId === "rve/handdraw-explainer" ? <div className="relation-graph-editor-trigger visual-plan-diagram-toolbar"><span>手绘讲解{currentResource?.handdrawExplainer?.status === "stale" ? " · 已过期，需重新制作" : current.handdrawExplainer ? " · 已采用" : " · 待制作采用"}</span><button type="button" className="secondary" disabled={locked} onClick={async () => {const latest = dirty ? await save() : saved; if (latest) {audio.current?.pause(); setExplainerEditorOpen(true);}}}>设计手绘讲解</button></div> : null}
+        {explainerEditorOpen && runtimeScene && current.templateId === "rve/handdraw-explainer" ? <HanddrawExplainerEditor key={current.id} jobId={jobId} sceneId={current.id} scene={runtimeScene} captions={captions} audioSrc={audioSrc} brand={brand} presenter={profile.presenter} visualStyle={value.visualStyle} hasPrevious={Boolean(current.previousHanddrawExplainer)} url={(relative) => sceneImageUrl(jobId, relative, previewArtifactToken, visualResources.revision)} onClose={() => setExplainerEditorOpen(false)} onPlan={(next) => {setValue(next); setSaved(next); setMessage("手绘讲解采用内容已更新。"); void onHanddrawChange();}} /> : null}
         {current.templateId === "rve/auto-diagram" ? <div className="relation-graph-editor-trigger visual-plan-diagram-toolbar"><span>自动图表与口播绑定{currentResource?.diagram?.status === "stale" ? " · 已过期，需重新制图" : current.diagram ? " · 已采用" : " · 待生成采用"}</span><button className="secondary" type="button" disabled={locked} onClick={async () => {const latest = dirty ? await save() : saved; if (latest) {audio.current?.pause(); setDiagramEditorOpen(true);}}}>自动图表Agent</button></div> : null}
         {diagramEditorOpen && runtimeScene && current.templateId === "rve/auto-diagram" ? <AutoDiagramEditor key={current.id} jobId={jobId} sceneId={current.id} scene={runtimeScene} captions={captions} audioSrc={audioSrc} brand={brand} presenter={profile.presenter} visualStyle={value.visualStyle} hasPrevious={Boolean(current.previousDiagram)} onClose={() => setDiagramEditorOpen(false)} onPlan={(next) => {setValue(next); setSaved(next); setMessage("图表采用内容已更新。"); void onHanddrawChange();}} /> : null}
         {current.templateId === "rve/relation-graph" && current.visualData ? <div className="relation-graph-editor-trigger"><span>关系图节点与连线</span><button className="secondary" type="button" disabled={locked} onClick={() => { setRelationEditorMaximized(false); setRelationEditorOpen(true); }}>打开编辑器</button></div> : null}

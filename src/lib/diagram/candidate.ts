@@ -1,7 +1,7 @@
 import {createHash} from "node:crypto";
 import {DOMParser, XMLSerializer, type Element} from "@xmldom/xmldom";
 import {z} from "zod";
-import {diagramBindingSchema, diagramDataSchema, parseDiagramSvg, type DiagramData} from "../../remotion/templates/auto-diagram-schema";
+import {diagramBindingSchema, diagramDataSchema, parseDiagramSvg, DiagramSvgError, type DiagramData} from "../../remotion/templates/auto-diagram-schema";
 
 // 只忽略结构空白和属性顺序；文字空白、绘制顺序及实际坐标仍参与指纹。
 export const diagramCandidateHash = (data: DiagramData, loopEvidence?: string) => {
@@ -40,7 +40,7 @@ export const diagramPatchSchema = z.object({
 // 补丁先在内存副本上完成并通过白名单；失败时不留下半份 SVG 或绑定。
 export const patchDiagram = (data: DiagramData, loopEvidence: string | undefined, input: z.infer<typeof diagramPatchSchema>): DiagramData => {
   input = diagramPatchSchema.parse(input);
-  if (input.baseHash !== diagramCandidateHash(data, loopEvidence)) throw new Error("候选已变化，请重新读取 baseHash 后再修复");
+  if (input.baseHash !== diagramCandidateHash(data, loopEvidence)) throw new DiagramSvgError("候选已变化，请重新读取 baseHash 后再修复");
   const {doc} = parseDiagramSvg(data);
   let bindings = data.bindings.map((binding) => ({...binding, after: [...binding.after]}));
   const removed = new Set<string>();
@@ -48,19 +48,21 @@ export const patchDiagram = (data: DiagramData, loopEvidence: string | undefined
   for (const operation of input.operations) {
     const element = doc.getElementById(operation.groupId);
     const binding = bindings.find((item) => item.groupId === operation.groupId);
-    if (!element || (!binding && operation.groupId !== "opening") || removed.has(operation.groupId)) throw new Error(`补丁分组不存在或不可编辑：${operation.groupId}`);
+    if (!element || (!binding && operation.groupId !== "opening") || removed.has(operation.groupId)) throw new DiagramSvgError(`补丁分组不存在或不可编辑：${operation.groupId}`);
     if (operation.op === "replace_group") {
       const errors: string[] = [];
-      if (/<!|<\?/u.test(operation.svg)) throw new Error("补丁不允许声明、实体或注释");
-      const fragment = new DOMParser({onError: (_level, message) => {errors.push(message);}}).parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${operation.svg}</svg>`, "image/svg+xml");
+      if (/<!|<\?/u.test(operation.svg)) throw new DiagramSvgError("补丁不允许声明、实体或注释");
+      let fragment;
+      try {fragment = new DOMParser({onError: (_level, message) => {errors.push(message);}}).parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${operation.svg}</svg>`, "image/svg+xml");}
+      catch {throw new DiagramSvgError("补丁分组解析失败，请检查标签闭合、属性引号和 XML 转义");}
       const root = fragment.documentElement;
-      if (!root) throw new Error("补丁分组解析失败");
+      if (!root) throw new DiagramSvgError("补丁分组解析失败");
       const children = Array.from({length: root.childNodes.length}, (_, index) => root.childNodes.item(index)!).filter((node) => node.nodeType !== 3 || node.nodeValue?.trim());
       const replacement = children[0] as Element | undefined;
-      if (errors.length || children.length !== 1 || replacement?.tagName !== "g" || replacement.getAttribute("id") !== operation.groupId) throw new Error("替换内容必须是相同 ID 的单个 g 分组");
+      if (errors.length || children.length !== 1 || replacement?.tagName !== "g" || replacement.getAttribute("id") !== operation.groupId) throw new DiagramSvgError("替换内容必须是相同 ID 的单个 g 分组");
       element.parentNode!.replaceChild(doc.importNode(replacement, true), element);
     } else if (operation.op === "update_binding") {
-      if (!binding) throw new Error("opening 没有可更新的口播绑定");
+      if (!binding) throw new DiagramSvgError("opening 没有可更新的口播绑定");
       bindings = bindings.map((item) => item.groupId === operation.groupId ? diagramBindingSchema.parse({...item, ...operation.changes}) : item);
     } else {
       // 连线删除后同步清理无障碍 ID 引用，避免只剩悬空标签引用。

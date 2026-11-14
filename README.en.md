@@ -33,10 +33,12 @@ https://github.com/user-attachments/assets/63047ef0-d178-4486-9c87-7bf7db18ae30
 - **Animated character intro stage**: Introduce the topic with a character and an animated stage.
 - **Text reveal**: Gradually reveal key text to pace the narration.
 - **Progressive image reveal**: Unfold images alongside the explanation to highlight visual details.
-- **Hand-drawn illustrations**: Reveal outlines stroke by stroke and add color gradually, making the drawing process part of the explanation.
+- **Hand-drawn illustrations**: Upload line art and a colored image, then reveal outlines stroke by stroke and add color gradually.
+- **Hand-drawn explainer**: Create illustrations and handwritten text with an Agent, revealing them stroke by stroke alongside the narration.
 - **3D model explainer**: Use orbiting views, close-ups, and annotations to show an object's shape and structure.
 - **Text highlights**: Highlight keywords in sequence with the narration to help viewers follow the main points.
 - **General content cards**: Present titles, body text, and keywords clearly to convey knowledge and ideas.
+- **Automatic diagrams**: Create diagrams with an Agent, progressively revealing processes, structures, and data alongside the narration.
 - **Relationship diagrams**: Gradually reveal connections between concepts to make complex relationships easier to understand.
 - **Animated character conclusion stage**: Wrap up the content and emphasize the conclusion with a character and an animated stage.
 
